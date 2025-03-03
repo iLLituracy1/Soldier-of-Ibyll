@@ -882,6 +882,7 @@ function calculateInitiative(enemy) {
 
 // Setup the combat UI for the new phased system
 function setupCombatUI(enemy, environment) {
+  cleanupCombatUI();
   document.getElementById('enemyName').textContent = enemy.name;
   document.getElementById('enemyHealthDisplay').textContent = `${enemy.health} HP`;
   document.getElementById('playerHealthDisplay').textContent = `${Math.round(window.gameState.health)} HP`;
@@ -919,107 +920,126 @@ function setupCombatUI(enemy, environment) {
 
 // Add environment indicator to UI
 function addEnvironmentIndicator(environment) {
-  // Create environment indicator if it doesn't exist
-  if (!document.getElementById('environmentIndicator')) {
-    const stanceContainer = document.getElementById('stanceContainer');
-    
-    const environmentContainer = document.createElement('div');
-    environmentContainer.id = 'environmentContainer';
-    environmentContainer.style.width = '100%';
-    environmentContainer.style.display = 'flex';
-    environmentContainer.style.justifyContent = 'space-between';
-    environmentContainer.style.alignItems = 'center';
-    environmentContainer.style.margin = '10px 0';
-    
-    // Terrain indicator
-    const terrainDiv = document.createElement('div');
-    terrainDiv.style.width = '45%';
-    
-    const terrainLabel = document.createElement('div');
-    terrainLabel.textContent = 'Terrain:';
-    
-    const terrainValue = document.createElement('div');
-    terrainValue.id = 'terrainValue';
-    terrainValue.style.fontWeight = 'bold';
-    terrainValue.textContent = capitalizeFirstLetter(environment.terrain);
-    
-    terrainDiv.appendChild(terrainLabel);
-    terrainDiv.appendChild(terrainValue);
-    
-    // Weather indicator
-    const weatherDiv = document.createElement('div');
-    weatherDiv.style.width = '45%';
-    weatherDiv.style.textAlign = 'right';
-    
-    const weatherLabel = document.createElement('div');
-    weatherLabel.textContent = 'Weather:';
-    
-    const weatherValue = document.createElement('div');
-    weatherValue.id = 'weatherValue';
-    weatherValue.style.fontWeight = 'bold';
-    weatherValue.textContent = capitalizeFirstLetter(environment.weather);
-    
-    weatherDiv.appendChild(weatherLabel);
-    weatherDiv.appendChild(weatherValue);
-    
-    environmentContainer.appendChild(terrainDiv);
-    environmentContainer.appendChild(weatherDiv);
-    
-    // Insert after stance container
+  // First, remove any existing environment container to prevent duplication
+  const existingContainer = document.getElementById('environmentContainer');
+  if (existingContainer) {
+    existingContainer.remove();
+  }
+  
+  const combatHeader = document.getElementById('combatHeader');
+  const stanceContainer = document.getElementById('stanceContainer');
+  
+  const environmentContainer = document.createElement('div');
+  environmentContainer.id = 'environmentContainer';
+  environmentContainer.style.width = '100%';
+  environmentContainer.style.display = 'flex';
+  environmentContainer.style.justifyContent = 'space-between';
+  environmentContainer.style.alignItems = 'center';
+  environmentContainer.style.margin = '10px 0';
+  
+  // Terrain indicator
+  const terrainDiv = document.createElement('div');
+  terrainDiv.style.width = '45%';
+  
+  const terrainLabel = document.createElement('div');
+  terrainLabel.textContent = 'Terrain:';
+  
+  const terrainValue = document.createElement('div');
+  terrainValue.id = 'terrainValue';
+  terrainValue.style.fontWeight = 'bold';
+  terrainValue.textContent = capitalizeFirstLetter(environment.terrain);
+  
+  terrainDiv.appendChild(terrainLabel);
+  terrainDiv.appendChild(terrainValue);
+  
+  // Weather indicator
+  const weatherDiv = document.createElement('div');
+  weatherDiv.style.width = '45%';
+  weatherDiv.style.textAlign = 'right';
+  
+  const weatherLabel = document.createElement('div');
+  weatherLabel.textContent = 'Weather:';
+  
+  const weatherValue = document.createElement('div');
+  weatherValue.id = 'weatherValue';
+  weatherValue.style.fontWeight = 'bold';
+  weatherValue.textContent = capitalizeFirstLetter(environment.weather);
+  
+  weatherDiv.appendChild(weatherLabel);
+  weatherDiv.appendChild(weatherValue);
+  
+  environmentContainer.appendChild(terrainDiv);
+  environmentContainer.appendChild(weatherDiv);
+  
+  // Insert after stance container if it exists, otherwise after combat header
+  if (stanceContainer) {
     stanceContainer.parentNode.insertBefore(environmentContainer, stanceContainer.nextSibling);
+  } else if (combatHeader) {
+    combatHeader.parentNode.insertBefore(environmentContainer, combatHeader.nextSibling);
   }
 }
 
 // Add momentum indicator
 function addMomentumIndicator() {
-  // Create momentum indicator if it doesn't exist
-  if (!document.getElementById('momentumIndicator')) {
-    const environmentContainer = document.getElementById('environmentContainer');
-    
-    const momentumContainer = document.createElement('div');
-    momentumContainer.id = 'momentumContainer';
-    momentumContainer.style.width = '100%';
-    momentumContainer.style.display = 'flex';
-    momentumContainer.style.justifyContent = 'space-between';
-    momentumContainer.style.alignItems = 'center';
-    momentumContainer.style.margin = '10px 0';
-    
-    // Player momentum
-    const playerMomentumDiv = document.createElement('div');
-    playerMomentumDiv.style.width = '45%';
-    
-    const playerMomentumLabel = document.createElement('div');
-    playerMomentumLabel.textContent = 'Your Momentum:';
-    
-    const playerMomentumValue = document.createElement('div');
-    playerMomentumValue.id = 'playerMomentumValue';
-    playerMomentumValue.style.fontWeight = 'bold';
-    playerMomentumValue.textContent = window.gameState.playerMomentum;
-    
-    playerMomentumDiv.appendChild(playerMomentumLabel);
-    playerMomentumDiv.appendChild(playerMomentumValue);
-    
-    // Enemy momentum
-    const enemyMomentumDiv = document.createElement('div');
-    enemyMomentumDiv.style.width = '45%';
-    enemyMomentumDiv.style.textAlign = 'right';
-    
-    const enemyMomentumLabel = document.createElement('div');
-    enemyMomentumLabel.textContent = 'Enemy Momentum:';
-    
-    const enemyMomentumValue = document.createElement('div');
-    enemyMomentumValue.id = 'enemyMomentumValue';
-    enemyMomentumValue.style.fontWeight = 'bold';
-    enemyMomentumValue.textContent = window.gameState.enemyMomentum;
-    
-    enemyMomentumDiv.appendChild(enemyMomentumLabel);
-    enemyMomentumDiv.appendChild(enemyMomentumValue);
-    
-    momentumContainer.appendChild(playerMomentumDiv);
-    momentumContainer.appendChild(enemyMomentumDiv);
-    
-    // Insert after environment container
+  // First, remove any existing momentum container to prevent duplication
+  const existingContainer = document.getElementById('momentumContainer');
+  if (existingContainer) {
+    existingContainer.remove();
+  }
+  
+  const environmentContainer = document.getElementById('environmentContainer');
+  
+  const momentumContainer = document.createElement('div');
+  momentumContainer.id = 'momentumContainer';
+  momentumContainer.style.width = '100%';
+  momentumContainer.style.display = 'flex';
+  momentumContainer.style.justifyContent = 'space-between';
+  momentumContainer.style.alignItems = 'center';
+  momentumContainer.style.margin = '10px 0';
+  
+  // Player momentum
+  const playerMomentumDiv = document.createElement('div');
+  playerMomentumDiv.style.width = '45%';
+  
+  const playerMomentumLabel = document.createElement('div');
+  playerMomentumLabel.textContent = 'Your Momentum:';
+  
+  const playerMomentumValue = document.createElement('div');
+  playerMomentumValue.id = 'playerMomentumValue';
+  playerMomentumValue.style.fontWeight = 'bold';
+  playerMomentumValue.textContent = window.gameState.playerMomentum;
+  
+  playerMomentumDiv.appendChild(playerMomentumLabel);
+  playerMomentumDiv.appendChild(playerMomentumValue);
+  
+  // Enemy momentum
+  const enemyMomentumDiv = document.createElement('div');
+  enemyMomentumDiv.style.width = '45%';
+  enemyMomentumDiv.style.textAlign = 'right';
+  
+  const enemyMomentumLabel = document.createElement('div');
+  enemyMomentumLabel.textContent = 'Enemy Momentum:';
+  
+  const enemyMomentumValue = document.createElement('div');
+  enemyMomentumValue.id = 'enemyMomentumValue';
+  enemyMomentumValue.style.fontWeight = 'bold';
+  enemyMomentumValue.textContent = window.gameState.enemyMomentum;
+  
+  enemyMomentumDiv.appendChild(enemyMomentumLabel);
+  enemyMomentumDiv.appendChild(enemyMomentumValue);
+  
+  momentumContainer.appendChild(playerMomentumDiv);
+  momentumContainer.appendChild(enemyMomentumDiv);
+  
+  // Insert after environment container if it exists
+  if (environmentContainer) {
     environmentContainer.parentNode.insertBefore(momentumContainer, environmentContainer.nextSibling);
+  } else {
+    // If environment container doesn't exist, add it after the distance container
+    const distanceContainer = document.getElementById('distanceContainer');
+    if (distanceContainer) {
+      distanceContainer.parentNode.insertBefore(momentumContainer, distanceContainer.nextSibling);
+    }
   }
   
   // Update momentum values
@@ -1056,62 +1076,74 @@ function updateMomentumIndicator() {
 
 // Add distance indicator to combat UI
 function addDistanceIndicator() {
-  // Create distance indicator if it doesn't exist
-  if (!document.getElementById('distanceIndicator')) {
-    const combatHeader = document.getElementById('combatHeader');
-    
-    const distanceContainer = document.createElement('div');
-    distanceContainer.id = 'distanceContainer';
-    distanceContainer.style.width = '100%';
-    distanceContainer.style.display = 'flex';
-    distanceContainer.style.justifyContent = 'space-between';
-    distanceContainer.style.alignItems = 'center';
-    distanceContainer.style.margin = '10px 0';
-    
-    const distanceLabel = document.createElement('div');
-    distanceLabel.textContent = 'Combat Distance:';
-    distanceLabel.style.marginRight = '10px';
-    
-    const distanceIndicator = document.createElement('div');
-    distanceIndicator.id = 'distanceIndicator';
-    distanceIndicator.style.flex = '1';
-    distanceIndicator.style.height = '20px';
-    distanceIndicator.style.background = '#333';
-    distanceIndicator.style.borderRadius = '4px';
-    distanceIndicator.style.position = 'relative';
-    
-    // Add distance markers
-    const markerLabels = ['Close', 'Medium', 'Far'];
-    for (let i = 0; i < 3; i++) {
-      const marker = document.createElement('div');
-      marker.style.position = 'absolute';
-      marker.style.top = '-20px';
-      marker.style.left = `${i * 50}%`;
-      marker.style.transform = 'translateX(-50%)';
-      marker.style.fontSize = '0.8em';
-      marker.textContent = markerLabels[i];
-      distanceIndicator.appendChild(marker);
-    }
-    
-    // Add position token
-    const positionToken = document.createElement('div');
-    positionToken.id = 'positionToken';
-    positionToken.style.position = 'absolute';
-    positionToken.style.width = '24px';
-    positionToken.style.height = '24px';
-    positionToken.style.borderRadius = '50%';
-    positionToken.style.background = '#4b6bff';
-    positionToken.style.top = '-2px';
-    positionToken.style.left = `${(2 / 2) * 100}%`; // Start at far distance (2)
-    positionToken.style.transform = 'translateX(-50%)';
-    positionToken.style.transition = 'left 0.5s ease';
-    distanceIndicator.appendChild(positionToken);
-    
-    distanceContainer.appendChild(distanceLabel);
-    distanceContainer.appendChild(distanceIndicator);
-    
-    // Insert after combat header
+  // First, remove any existing distance container to prevent duplication
+  const existingContainer = document.getElementById('distanceContainer');
+  if (existingContainer) {
+    existingContainer.remove();
+  }
+
+  const combatHeader = document.getElementById('combatHeader');
+  
+  const distanceContainer = document.createElement('div');
+  distanceContainer.id = 'distanceContainer';
+  distanceContainer.style.width = '100%';
+  distanceContainer.style.display = 'flex';
+  distanceContainer.style.justifyContent = 'space-between';
+  distanceContainer.style.alignItems = 'center';
+  distanceContainer.style.margin = '10px 0';
+  
+  const distanceLabel = document.createElement('div');
+  distanceLabel.textContent = 'Combat Distance:';
+  distanceLabel.style.marginRight = '10px';
+  
+  const distanceIndicator = document.createElement('div');
+  distanceIndicator.id = 'distanceIndicator';
+  distanceIndicator.style.flex = '1';
+  distanceIndicator.style.height = '20px';
+  distanceIndicator.style.background = '#333';
+  distanceIndicator.style.borderRadius = '4px';
+  distanceIndicator.style.position = 'relative';
+  
+  // Add distance markers
+  const markerLabels = ['Close', 'Medium', 'Far'];
+  for (let i = 0; i < 3; i++) {
+    const marker = document.createElement('div');
+    marker.style.position = 'absolute';
+    marker.style.top = '-20px';
+    marker.style.left = `${i * 50}%`;
+    marker.style.transform = 'translateX(-50%)';
+    marker.style.fontSize = '0.8em';
+    marker.textContent = markerLabels[i];
+    distanceIndicator.appendChild(marker);
+  }
+  
+  // Add position token
+  const positionToken = document.createElement('div');
+  positionToken.id = 'positionToken';
+  positionToken.style.position = 'absolute';
+  positionToken.style.width = '24px';
+  positionToken.style.height = '24px';
+  positionToken.style.borderRadius = '50%';
+  positionToken.style.background = '#4b6bff';
+  positionToken.style.top = '-2px';
+  positionToken.style.left = `${(2 / 2) * 100}%`; // Start at far distance (2)
+  positionToken.style.transform = 'translateX(-50%)';
+  positionToken.style.transition = 'left 0.5s ease';
+  distanceIndicator.appendChild(positionToken);
+  
+  distanceContainer.appendChild(distanceLabel);
+  distanceContainer.appendChild(distanceIndicator);
+  
+  // Insert after combat header
+  if (combatHeader) {
     combatHeader.parentNode.insertBefore(distanceContainer, combatHeader.nextSibling);
+  } else {
+    // Fallback if combat header is not found
+    console.error("Combat header not found when adding distance indicator");
+    const combatInterface = document.getElementById('combatInterface');
+    if (combatInterface) {
+      combatInterface.appendChild(distanceContainer);
+    }
   }
   
   // Update position token
@@ -1120,56 +1152,67 @@ function addDistanceIndicator() {
 
 // Add stance indicator to combat UI
 function addStanceIndicator() {
-  // Create stance container if it doesn't exist
-  if (!document.getElementById('stanceIndicator')) {
-    const distanceContainer = document.getElementById('distanceContainer');
-    
-    const stanceContainer = document.createElement('div');
-    stanceContainer.id = 'stanceContainer';
-    stanceContainer.style.width = '100%';
-    stanceContainer.style.display = 'flex';
-    stanceContainer.style.justifyContent = 'space-between';
-    stanceContainer.style.alignItems = 'center';
-    stanceContainer.style.margin = '10px 0';
-    
-    // Player stance
-    const playerStanceDiv = document.createElement('div');
-    playerStanceDiv.style.width = '45%';
-    
-    const playerStanceLabel = document.createElement('div');
-    playerStanceLabel.textContent = 'Your Stance:';
-    
-    const playerStanceValue = document.createElement('div');
-    playerStanceValue.id = 'playerStanceValue';
-    playerStanceValue.style.fontWeight = 'bold';
-    playerStanceValue.style.color = '#4b6bff';
-    playerStanceValue.textContent = capitalizeFirstLetter(window.gameState.combatStance);
-    
-    playerStanceDiv.appendChild(playerStanceLabel);
-    playerStanceDiv.appendChild(playerStanceValue);
-    
-    // Enemy stance
-    const enemyStanceDiv = document.createElement('div');
-    enemyStanceDiv.style.width = '45%';
-    enemyStanceDiv.style.textAlign = 'right';
-    
-    const enemyStanceLabel = document.createElement('div');
-    enemyStanceLabel.textContent = 'Enemy Stance:';
-    
-    const enemyStanceValue = document.createElement('div');
-    enemyStanceValue.id = 'enemyStanceValue';
-    enemyStanceValue.style.fontWeight = 'bold';
-    enemyStanceValue.style.color = '#ff4b4b';
-    enemyStanceValue.textContent = capitalizeFirstLetter(window.gameState.enemyStance);
-    
-    enemyStanceDiv.appendChild(enemyStanceLabel);
-    enemyStanceDiv.appendChild(enemyStanceValue);
-    
-    stanceContainer.appendChild(playerStanceDiv);
-    stanceContainer.appendChild(enemyStanceDiv);
-    
-    // Insert after distance container
+  // First, remove any existing stance container to prevent duplication
+  const existingContainer = document.getElementById('stanceContainer');
+  if (existingContainer) {
+    existingContainer.remove();
+  }
+  
+  const distanceContainer = document.getElementById('distanceContainer');
+  
+  const stanceContainer = document.createElement('div');
+  stanceContainer.id = 'stanceContainer';
+  stanceContainer.style.width = '100%';
+  stanceContainer.style.display = 'flex';
+  stanceContainer.style.justifyContent = 'space-between';
+  stanceContainer.style.alignItems = 'center';
+  stanceContainer.style.margin = '10px 0';
+  
+  // Player stance
+  const playerStanceDiv = document.createElement('div');
+  playerStanceDiv.style.width = '45%';
+  
+  const playerStanceLabel = document.createElement('div');
+  playerStanceLabel.textContent = 'Your Stance:';
+  
+  const playerStanceValue = document.createElement('div');
+  playerStanceValue.id = 'playerStanceValue';
+  playerStanceValue.style.fontWeight = 'bold';
+  playerStanceValue.style.color = '#4b6bff';
+  playerStanceValue.textContent = capitalizeFirstLetter(window.gameState.combatStance);
+  
+  playerStanceDiv.appendChild(playerStanceLabel);
+  playerStanceDiv.appendChild(playerStanceValue);
+  
+  // Enemy stance
+  const enemyStanceDiv = document.createElement('div');
+  enemyStanceDiv.style.width = '45%';
+  enemyStanceDiv.style.textAlign = 'right';
+  
+  const enemyStanceLabel = document.createElement('div');
+  enemyStanceLabel.textContent = 'Enemy Stance:';
+  
+  const enemyStanceValue = document.createElement('div');
+  enemyStanceValue.id = 'enemyStanceValue';
+  enemyStanceValue.style.fontWeight = 'bold';
+  enemyStanceValue.style.color = '#ff4b4b';
+  enemyStanceValue.textContent = capitalizeFirstLetter(window.gameState.enemyStance);
+  
+  enemyStanceDiv.appendChild(enemyStanceLabel);
+  enemyStanceDiv.appendChild(enemyStanceValue);
+  
+  stanceContainer.appendChild(playerStanceDiv);
+  stanceContainer.appendChild(enemyStanceDiv);
+  
+  // Insert after distance container
+  if (distanceContainer) {
     distanceContainer.parentNode.insertBefore(stanceContainer, distanceContainer.nextSibling);
+  } else {
+    // If distance container doesn't exist yet, add it after the combat header
+    const combatHeader = document.getElementById('combatHeader');
+    if (combatHeader) {
+      combatHeader.parentNode.insertBefore(stanceContainer, combatHeader.nextSibling);
+    }
   }
   
   // Update stance indicators
@@ -1220,6 +1263,25 @@ function updateStanceIndicator() {
     }
   }
 }
+
+// Clean up combat UI when combat ends
+function cleanupCombatUI() {
+  // Remove all combat indicators to prevent duplication on next combat
+  const containersToRemove = [
+    'distanceContainer',
+    'stanceContainer',
+    'environmentContainer',
+    'momentumContainer'
+  ];
+  
+  containersToRemove.forEach(id => {
+    const container = document.getElementById(id);
+    if (container) {
+      container.remove();
+    }
+  });
+}
+
 
 // Get text description of distance
 function getDistanceText(distance) {
@@ -3162,6 +3224,10 @@ function advanceCombatTurn() {
 
 // End combat with result
 function endCombatWithResult(result) {
+
+   // Clean up the combat UI elements first
+   cleanupCombatUI();
+
   // Hide combat interface
   document.getElementById('combatInterface').classList.add('hidden');
   
@@ -3351,6 +3417,7 @@ function endCombatWithResult(result) {
   // Update UI
   window.updateStatusBars();
   window.updateProfileIfVisible();
+  window.updateActionButtons();
 }
 
 // Get details for a player action
