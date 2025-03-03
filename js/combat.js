@@ -164,9 +164,21 @@ window.createEnemy = function(enemyType) {
             options.push("quick_shot");
           }
         }
-        // If too close, try to retreat
+        // If too close, try to retreat - consider tactical factors
         else if (state.combatDistance < this.preferredDistance) {
-          options.push("retreat");
+          if (this.health < this.maxHealth * 0.5 || this.stamina < this.maxStamina * 0.4) {
+            options.push("retreat"); // Retreat if wounded or tired
+          }
+          else if (state.playerStance === "aggressive" && state.playerMomentum > 1) {
+            options.push("retreat"); // Retreat if player has momentum and is aggressive
+          }
+          else if (Math.random() < 0.6) {
+            options.push("retreat"); // 60% chance to try to maintain preferred range
+          }
+          else {
+            // Sometimes choose to stand ground and fight even at close range
+            options.push("quick_shot");
+          }
         }
         // Otherwise do a quick attack
         else if (state.combatDistance > this.preferredDistance) {
@@ -1459,13 +1471,20 @@ function updateCombatActions() {
     if (enemyAction && enemyAction.type) {
       if (enemyAction.type.includes('attack') || enemyAction.type === 'quick_shot') {
         addCombatButton('dodge', 'Dodge', combatActions);
+
+        if (enemyAction.type === "retreat" || enemyAction.effect === "distance+1") {
+          // Show pursuit options when enemy is retreating
+          addCombatButton('pursue', 'Pursue Enemy', combatActions);
+          addCombatButton('hold_position', 'Hold Position', combatActions);
+          return; // Exit early after showing these specific buttons
+        }
         
         // Only show parry at close range and if player has sufficient skills
-        if (window.gameState.combatDistance === 0 && window.player.skills.melee > 1) {
+        if (window.gameState.combatDistance === 0 && window.player.skills.melee > 3) {
           addCombatButton('parry', 'Parry', combatActions);
           
           // Perfect parry option with high skill
-          if (window.player.skills.melee > 3) {
+          if (window.player.skills.melee > 6) {
             addCombatButton('perfect_parry', 'Perfect Parry (Risky)', combatActions);
           }
         }
@@ -1803,8 +1822,8 @@ function executeQueuedEnemyAction() {
           result.message += ` The ${enemy.name} closes in.`;
         }
         
-        updateDistanceIndicator();
-      }
+    updateDistanceIndicator();
+  }
       else if (action.effect === 'stun') {
         result.message += ` You are momentarily stunned.`;
         window.gameState.playerStaggered = true;
@@ -2213,6 +2232,108 @@ function handleReactionPhaseAction(action) {
     console.error("No enemy action to react to");
     window.gameState.combatPhase = "decision";
     updateCombatActions();
+    return;
+  }
+
+  if (action === 'pursue' || action === 'hold_position') {
+    const enemy = window.gameState.currentEnemy;
+    
+    if (action === 'pursue') {
+      // Calculate pursuit success chance based on attributes and skills
+      const physicalFactor = window.player.phy * 0.4; // 40% weighting on physical
+      const mentalFactor = window.player.men * 0.2; // 20% weighting on mental
+      const meleeFactor = (window.player.skills.melee || 0) * 0.3; // 30% weighting on melee
+      const tacticsFactor = (window.player.skills.tactics || 0) * 0.1; // 10% weighting on tactics
+      
+      // Calculate base success chance (scale to 0-1 range)
+      const baseSuccessChance = (physicalFactor + mentalFactor + meleeFactor + tacticsFactor) / 10;
+      
+      // Apply factors like terrain and injuries
+      let finalSuccessChance = baseSuccessChance;
+      
+      // Terrain affects pursuit chance
+      if (window.gameState.terrain === 'slippery') {
+        finalSuccessChance -= 0.2; // Harder to pursue on slippery ground
+      } else if (window.gameState.terrain === 'rocky') {
+        finalSuccessChance -= 0.1; // Slightly harder on rocky terrain
+      }
+      
+      // Injuries affect pursuit
+      window.gameState.playerInjuries.forEach(injury => {
+        if (injury.name === "Twisted Ankle") {
+          finalSuccessChance -= 0.3; // Much harder to pursue with a bad ankle
+        }
+      });
+      
+      // Stamina affects pursuit success
+      if (window.gameState.stamina < window.gameState.maxStamina * 0.3) {
+        finalSuccessChance -= 0.15; // Harder to pursue when tired
+      }
+      
+      // Enemy factors 
+      if (window.gameState.enemyStance === 'evasive') {
+        finalSuccessChance -= 0.1; // Harder to catch evasive enemies
+      }
+      
+      // Ensure the chance is within reasonable bounds
+      finalSuccessChance = Math.max(0.1, Math.min(0.9, finalSuccessChance));
+      
+      // Roll for success
+      const pursuitSuccess = Math.random() < finalSuccessChance;
+      
+      if (pursuitSuccess) {
+        // Successful pursuit maintains distance and grants momentum
+        document.getElementById('combatLog').innerHTML += `<p>You quickly pursue as the ${enemy.name} tries to retreat, maintaining combat distance!</p>`;
+        
+        // Cancel the enemy's retreat
+        enemyAction.effect = null; // Nullify the distance change
+        
+        // Gain momentum for successful pursuit
+        window.gameState.playerMomentum = Math.min(5, window.gameState.playerMomentum + 1);
+        window.gameState.enemyMomentum = Math.max(-5, window.gameState.enemyMomentum - 1);
+        updateMomentumIndicator();
+        
+        // Use some stamina for the pursuit
+        window.gameState.stamina = Math.max(0, window.gameState.stamina - 10);
+        
+        // Skill improvement chance
+        if (Math.random() < 0.3) {
+          // Either melee or tactics could improve
+          if (Math.random() < 0.7) {
+            const meleeImprovement = parseFloat((Math.random() * 0.02 + 0.01).toFixed(2));
+            const meleeCap = Math.floor(window.player.phy / 1.5);
+            
+            if (window.player.skills.melee < meleeCap) {
+              window.player.skills.melee = Math.min(meleeCap, window.player.skills.melee + meleeImprovement);
+              document.getElementById('combatLog').innerHTML += `<p>Your pursuit tactics improved your melee combat skill (+${meleeImprovement}).</p>`;
+            }
+          } else {
+            const tacticsImprovement = parseFloat((Math.random() * 0.02 + 0.01).toFixed(2));
+            const tacticsCap = Math.floor(window.player.men / 1.5);
+            
+            if (window.player.skills.tactics < tacticsCap) {
+              window.player.skills.tactics = Math.min(tacticsCap, window.player.skills.tactics + tacticsImprovement);
+              document.getElementById('combatLog').innerHTML += `<p>Your pursuit tactics improved your tactical thinking (+${tacticsImprovement}).</p>`;
+            }
+          }
+        }
+      } else {
+        // Failed pursuit - enemy gets away
+        document.getElementById('combatLog').innerHTML += `<p>You try to pursue the ${enemy.name}, but they manage to increase the distance between you.</p>`;
+        
+        // Use some stamina for the failed attempt
+        window.gameState.stamina = Math.max(0, window.gameState.stamina - 8);
+      }
+    } else if (action === 'hold_position') {
+      // Player chooses not to pursue
+      document.getElementById('combatLog').innerHTML += `<p>You hold your position as the ${enemy.name} retreats, increasing the distance between you.</p>`;
+      
+      // Slightly recover stamina for not exerting yourself
+      window.gameState.stamina = Math.min(window.gameState.maxStamina, window.gameState.stamina + 5);
+    }
+    
+    // Let the enemy action complete (may be nullified if pursuit was successful)
+    executeQueuedEnemyAction();
     return;
   }
   
