@@ -3620,7 +3620,7 @@ window.checkForCombatEncounters = function(action) {
   // Only certain actions have a chance for combat
   if (action === 'patrol' || action === 'scout') {
     // Base chance depends on action
-    let combatChance = action === 'patrol' ? 0.99 : 0.99;
+    let combatChance = action === 'patrol' ? 0.25 : 0.33;
     
     // Adjust for day/night and weather
     const hours = Math.floor(window.gameTime / 60);
