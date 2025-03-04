@@ -1166,3 +1166,190 @@ window.handleTrain = function() {
 window.handlePatrol = function() {
   window.ActionSystem.handleAction('patrol');
 };
+
+
+// Enhanced ActionSystem handler with safety checks for common actions
+(function enhanceActionSystemHandling() {
+  // Add safeguards to the ActionSystem if it exists
+  if (window.ActionSystem) {
+    console.log("Enhancing ActionSystem with safety checks...");
+    
+    // Store the original handler
+    const originalActionHandler = window.ActionSystem.handleAction;
+    
+    // Replace with enhanced version
+    window.ActionSystem.handleAction = function(action) {
+      console.log(`[ActionSystem Enhanced] Handling action: ${action}`);
+      
+      // These actions should always work regardless of game state
+      const uiActions = ['profile', 'inventory', 'questLog'];
+      
+      // Force check game state consistency 
+      if (window.gameState.inBattle && !window.gameState.currentEnemy) {
+        console.warn("Inconsistent battle state detected - fixing");
+        window.gameState.inBattle = false;
+      }
+      
+      // Detect if we're in mission state but with no mission data
+      if (window.gameState.inMission && !window.gameState.currentMission) {
+        console.warn("Inconsistent mission state detected - fixing");
+        window.gameState.inMission = false;
+      }
+      
+      // Always allow UI actions
+      if (uiActions.includes(action)) {
+        console.log(`[ActionSystem] Allowing UI action: ${action}`);
+        
+        switch (action) {
+          case 'profile':
+            if (window.UI && window.UI.openPanel) {
+              window.UI.openPanel('profile');
+            } else {
+              const profilePanel = document.getElementById('profile');
+              if (profilePanel) {
+                profilePanel.classList.remove('hidden');
+              }
+            }
+            return;
+            
+          case 'inventory':
+            if (window.UI && window.UI.openPanel) {
+              window.UI.openPanel('inventory');
+            } else {
+              const inventoryPanel = document.getElementById('inventory');
+              if (inventoryPanel) {
+                inventoryPanel.classList.remove('hidden');
+              }
+            }
+            return;
+            
+          case 'questLog':
+            if (window.UI && window.UI.openPanel) {
+              window.UI.openPanel('questLog');
+            } else {
+              const questPanel = document.getElementById('questLog');
+              if (questPanel) {
+                questPanel.classList.remove('hidden');
+              }
+            }
+            return;
+        }
+      }
+      
+      // Check if we're being blocked by an inconsistent state
+      if (window.gameState.inMission && 
+          !window.gameState.inBattle && 
+          action !== 'profile' && 
+          action !== 'inventory' && 
+          action !== 'questLog') {
+        
+        // Check if we're actually in a functional mission
+        let missionActive = false;
+        
+        if (window.MissionSystem && window.MissionSystem.getCurrentMission) {
+          missionActive = !!window.MissionSystem.getCurrentMission();
+        } else if (window.missionSystem && window.missionSystem.activeMission) {
+          missionActive = !!window.missionSystem.activeMission;
+        } else if (window.gameState.currentMission) {
+          missionActive = true;
+        }
+        
+        // If there's no active mission but inMission is true, we're in a bad state
+        if (!missionActive) {
+          console.warn("Detected stale mission state - resetting to allow normal actions");
+          window.gameState.inMission = false;
+        }
+      }
+      
+      // Now proceed with the normal action handler
+      if (window.gameState.inBattle) {
+        console.warn("Attempted to use normal action while in battle");
+        return;
+      }
+      
+      if (window.gameState.inMission && !uiActions.includes(action)) {
+        console.warn("Attempted to use normal action while in mission");
+        return;
+      }
+      
+      // Call the original handler if all checks pass
+      originalActionHandler(action);
+    };
+    
+    console.log("ActionSystem enhancement complete");
+  }
+})();
+
+// Call this function to reset game state in emergency situations
+window.resetGameStateEmergency = function() {
+  console.log("EMERGENCY GAME STATE RESET");
+  
+  // Reset all major state flags
+  window.gameState.inBattle = false;
+  window.gameState.currentEnemy = null;
+  window.gameState.inMission = false;
+  window.gameState.currentMission = null;
+  window.gameState.missionStage = 0;
+  window.gameState.inMissionCombat = false;
+  
+  // Force action container visibility
+  const actionsContainer = document.getElementById('actions');
+  if (actionsContainer) {
+    actionsContainer.style.display = 'flex';
+    
+    // Clear and restore buttons
+    actionsContainer.innerHTML = '';
+    if (window.UI && window.UI.updateActionButtons) {
+      window.UI.updateActionButtons();
+    } else if (window.updateActionButtons) {
+      window.updateActionButtons();
+    }
+  }
+  
+  // Show success message
+  if (window.UI && window.UI.showNotification) {
+    window.UI.showNotification("Game state has been reset. You can continue playing.", "success");
+  }
+};
+
+// Emergency button to fix the current stuck state
+(function addEmergencyResetButton() {
+  console.log("Checking if emergency reset button is needed...");
+  
+  // Only add if we're in a stuck state
+  if (window.gameState.inMission || window.gameState.inBattle) {
+    // Check for visible buttons
+    const actionsContainer = document.getElementById('actions');
+    const hasVisibleButtons = actionsContainer && 
+                              actionsContainer.style.display !== 'none' && 
+                              actionsContainer.children.length > 0;
+    
+    if (!hasVisibleButtons) {
+      console.log("Adding emergency reset button");
+      
+      // Create the button
+      const resetButton = document.createElement('button');
+      resetButton.style.position = 'fixed';
+      resetButton.style.bottom = '20px';
+      resetButton.style.right = '20px';
+      resetButton.style.zIndex = '9999';
+      resetButton.style.padding = '10px 20px';
+      resetButton.style.backgroundColor = '#ff4b4b';
+      resetButton.style.color = 'white';
+      resetButton.style.border = 'none';
+      resetButton.style.borderRadius = '5px';
+      resetButton.style.fontWeight = 'bold';
+      resetButton.style.cursor = 'pointer';
+      resetButton.textContent = '🚨 RESET GAME STATE';
+      
+      // Add click handler
+      resetButton.onclick = function() {
+        window.resetGameStateEmergency();
+        // Remove the button after click
+        document.body.removeChild(resetButton);
+      };
+      
+      document.body.appendChild(resetButton);
+    }
+  }
+})();

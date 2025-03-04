@@ -1606,28 +1606,78 @@ window.setOriginalEndCombatFunction = function(originalFunction) {
 };
 
 window.endCombatWithResult = function(result) {
-  console.log("Ending combat with result:", result);
+  console.log("Enhanced endCombatWithResult called with:", result);
   
   // First, clean up the UI
-  cleanupCombatUI();
+  if (typeof window.cleanupCombatUI === 'function') {
+    window.cleanupCombatUI();
+  }
   
-  // Check if the combat system's endCombat is available
+  // Process based on result type
   if (window.CombatSystem && typeof window.CombatSystem.endCombat === 'function') {
     window.CombatSystem.endCombat(result);
   } else {
-    // Legacy fallback
-    handleCombatEnd(result);
+    // Legacy fallback handler
+    if (result === 'victory') {
+      // Add victory handling
+      window.setNarrative("You have defeated your opponent!");
+    } else if (result === 'defeat') {
+      // Handle player defeat
+      window.setNarrative("You have been defeated, but managed to escape with your life.");
+      
+      // Reduce health and stamina
+      const healthReduction = Math.floor(window.gameState.maxHealth * 0.5);
+      const staminaReduction = Math.floor(window.gameState.maxStamina * 0.5);
+      window.gameState.health = Math.max(1, window.gameState.health - healthReduction);
+      window.gameState.stamina = Math.max(0, window.gameState.stamina - staminaReduction);
+      
+      // Add time (unconscious for 2 hours)
+      window.updateTimeAndDay(120);
+      
+    } else if (result === 'retreat') {
+      // Handle player retreat
+      window.setNarrative("You've managed to retreat from combat and return to safety, though you're exhausted from running.");
+      
+      // Reduce stamina from running
+      const staminaLoss = Math.floor(window.gameState.maxStamina * 0.3);
+      window.gameState.stamina = Math.max(0, window.gameState.stamina - staminaLoss);
+      
+      // Add some time (30 minutes of running/recovery)
+      window.updateTimeAndDay(30);
+    }
   }
   
-  // Ensure we update the action buttons
-  console.log("Ensuring action buttons are updated after combat");
+  // Clear combat state
+  window.gameState.inBattle = false;
+  window.gameState.currentEnemy = null;
+  
+  // Fix mission state if needed
+  if (typeof window.fixMissionStateAfterCombat === 'function') {
+    setTimeout(window.fixMissionStateAfterCombat, 100);
+  }
+  
+  // Update UI
+  if (typeof window.updateStatusBars === 'function') {
+    window.updateStatusBars();
+  }
+  
+  // Force action button update (with a delay to ensure everything else is done)
   setTimeout(function() {
-    if (window.UI && typeof window.UI.updateActionButtons === 'function') {
-      window.UI.updateActionButtons();
-    } else if (typeof window.updateActionButtons === 'function') {
+    if (typeof window.updateActionButtons === 'function') {
       window.updateActionButtons();
     }
-  }, 500);
+    
+    // Double check that buttons appear
+    setTimeout(function() {
+      const actionsContainer = document.getElementById('actions');
+      if (actionsContainer && actionsContainer.children.length === 0) {
+        console.log("No action buttons found after combat! Running safeguard...");
+        if (typeof window.safeguardCombatCleanup === 'function') {
+          window.safeguardCombatCleanup();
+        }
+      }
+    }, 500);
+  }, 200);
 };
 
 // Enhanced cleanup function with double-check
@@ -1981,3 +2031,357 @@ window.startCombat = function(enemyType, environment) {
 };
 
 console.log("Combat stamina enhancements loaded");
+
+// This safety function will guarantee buttons are restored even if something goes wrong
+window.safeguardCombatCleanup = function() {
+  console.log("Running combat cleanup safeguard...");
+  
+  // Make sure critical UI elements are visible
+  const narrativeContainer = document.getElementById('narrative-container');
+  const statusBars = document.querySelector('.status-bars');
+  const location = document.getElementById('location');
+  const timeDisplay = document.getElementById('timeDisplay');
+  const dayDisplay = document.getElementById('dayDisplay');
+  const dayNightIndicator = document.getElementById('dayNightIndicator');
+  const actionsContainer = document.getElementById('actions');
+  const combatInterface = document.getElementById('combatInterface');
+  
+  // Restore visibility of normal game elements
+  if (narrativeContainer) narrativeContainer.style.display = 'block';
+  if (statusBars) statusBars.style.display = 'flex';
+  if (location) location.style.display = 'block';
+  if (timeDisplay) timeDisplay.style.display = 'block';
+  if (dayDisplay) dayDisplay.style.display = 'block';
+  if (dayNightIndicator) dayNightIndicator.style.display = 'block';
+  
+  // Hide combat interface
+  if (combatInterface) {
+    combatInterface.classList.add('hidden');
+    combatInterface.classList.remove('combat-fullscreen');
+  }
+  
+  // Make sure action buttons container is visible
+  if (actionsContainer) {
+    actionsContainer.style.display = 'flex';
+    actionsContainer.innerHTML = ''; // Clear any stale buttons
+  }
+  
+  // Force game state to be out of battle
+  window.gameState.inBattle = false;
+  window.gameState.currentEnemy = null;
+  
+  // Force update action buttons
+  if (window.UI && typeof window.UI.updateActionButtons === 'function') {
+    window.UI.updateActionButtons();
+  } else if (typeof window.updateActionButtons === 'function') {
+    window.updateActionButtons();
+  } else {
+    // Manual fallback if all else fails - add some basic buttons
+    if (actionsContainer) {
+      const restBtn = document.createElement('button');
+      restBtn.className = 'action-btn';
+      restBtn.textContent = 'Rest';
+      restBtn.setAttribute('data-action', 'rest');
+      restBtn.onclick = function() {
+        if (window.ActionSystem) {
+          window.ActionSystem.handleAction('rest');
+        } else if (typeof window.handleRest === 'function') {
+          window.handleRest();
+        }
+      };
+      actionsContainer.appendChild(restBtn);
+      
+      // Add profile button
+      const profileBtn = document.createElement('button');
+      profileBtn.className = 'action-btn';
+      profileBtn.textContent = 'Profile';
+      profileBtn.setAttribute('data-action', 'profile');
+      profileBtn.onclick = function() {
+        if (window.UI) {
+          window.UI.openPanel('profile');
+        } else {
+          document.getElementById('profile').classList.remove('hidden');
+        }
+      };
+      actionsContainer.appendChild(profileBtn);
+    }
+  }
+  
+  console.log("Combat cleanup safeguard completed");
+};
+
+// Enhanced function to clean up combat UI with better error handling
+const originalCleanupCombatUI = window.cleanupCombatUI;
+window.cleanupCombatUI = function() {
+  console.log("Improved combat UI cleanup running...");
+  
+  try {
+    // Try original cleanup first
+    if (typeof originalCleanupCombatUI === 'function') {
+      originalCleanupCombatUI();
+    }
+    
+    // Always restore action buttons container visibility
+    const actionsContainer = document.getElementById('actions');
+    if (actionsContainer) {
+      actionsContainer.style.display = 'flex';
+    }
+    
+    // Force update of action buttons
+    setTimeout(function() {
+      if (window.UI && typeof window.UI.updateActionButtons === 'function') {
+        window.UI.updateActionButtons();
+      } else if (typeof window.updateActionButtons === 'function') {
+        window.updateActionButtons();
+      }
+      
+      // Double check after a short delay
+      setTimeout(function() {
+        const actionsContainer = document.getElementById('actions');
+        if (actionsContainer && actionsContainer.children.length === 0) {
+          console.log("No action buttons found after combat! Running safeguard...");
+          window.safeguardCombatCleanup();
+        }
+      }, 500);
+    }, 100);
+  } catch (error) {
+    console.error("Error during combat cleanup:", error);
+    // Run safeguard function if anything goes wrong
+    window.safeguardCombatCleanup();
+  }
+};
+
+// Enhance endCombatWithResult to be more robust
+const originalEndCombatWithResult = window.endCombatWithResult;
+window.endCombatWithResult = function(result) {
+  console.log("Enhanced endCombatWithResult called with:", result);
+  
+  try {
+    // Try original function
+    if (typeof originalEndCombatWithResult === 'function') {
+      originalEndCombatWithResult(result);
+    } else {
+      // Fallback if original not found
+      if (window.CombatSystem && typeof window.CombatSystem.endCombat === 'function') {
+        window.CombatSystem.endCombat(result);
+      }
+    }
+  } catch (error) {
+    console.error("Error ending combat:", error);
+  }
+  
+  // Always run these critical cleanup steps regardless of errors
+  setTimeout(function() {
+    // Force combat state to be false
+    window.gameState.inBattle = false;
+    
+    // Make sure UI is properly restored
+    window.cleanupCombatUI();
+    
+    // Add emergency button to escape the stuck state
+    if (document.getElementById('actions').children.length === 0) {
+      window.safeguardCombatCleanup();
+    }
+  }, 300);
+};
+
+// Emergency recovery button - add this to fix your current stuck state
+(function addEmergencyButton() {
+  // Check if we're in a stuck state
+  const actionsContainer = document.getElementById('actions');
+  if (actionsContainer && actionsContainer.children.length === 0) {
+    console.log("EMERGENCY: Adding recovery button to fix stuck state");
+    
+    // Create emergency button
+    const emergencyBtn = document.createElement('button');
+    emergencyBtn.className = 'action-btn';
+    emergencyBtn.style.backgroundColor = '#ff4b4b';
+    emergencyBtn.style.color = 'white';
+    emergencyBtn.style.fontWeight = 'bold';
+    emergencyBtn.textContent = '🛟 EMERGENCY RECOVERY';
+    emergencyBtn.onclick = function() {
+      window.safeguardCombatCleanup();
+    };
+    
+    // Add to body if actions container is hidden
+    if (actionsContainer.style.display === 'none') {
+      emergencyBtn.style.position = 'fixed';
+      emergencyBtn.style.bottom = '20px';
+      emergencyBtn.style.right = '20px';
+      emergencyBtn.style.zIndex = '9999';
+      document.body.appendChild(emergencyBtn);
+    } else {
+      actionsContainer.appendChild(emergencyBtn);
+    }
+  }
+})();
+
+// CRITICAL FIX: Reset mission state after combat if needed
+window.fixMissionStateAfterCombat = function() {
+  console.log("Checking and fixing mission state after combat...");
+  
+  // Check if combat has ended but mission state is still active
+  if (!window.gameState.inBattle && window.gameState.inMission) {
+    console.log("Detected stuck mission state! Resetting mission flags...");
+    
+    // Check if we were in mission combat (which may have ended improperly)
+    if (window.gameState.inMissionCombat) {
+      console.log("Mission combat flag was still active! Clearing it...");
+      window.gameState.inMissionCombat = false;
+      
+      // If mission system exists and was in the middle of combat, try to continue the mission
+      if (window.MissionSystem && typeof window.MissionSystem.continueMissionAfterCombat === 'function') {
+        // Try to salvage the mission by continuing with a victory result
+        console.log("Attempting to continue mission with victory result...");
+        try {
+          window.MissionSystem.continueMissionAfterCombat('victory');
+        } catch (err) {
+          console.error("Failed to continue mission:", err);
+          // If continuation fails, reset mission state
+          window.gameState.inMission = false;
+          window.gameState.currentMission = null;
+          window.gameState.missionStage = 0;
+        }
+      } else {
+        // If we can't continue the mission, reset mission state
+        window.gameState.inMission = false;
+        window.gameState.currentMission = null;
+        window.gameState.missionStage = 0;
+      }
+    } else {
+      // If not in mission combat, just reset all mission flags
+      window.gameState.inMission = false;
+      window.gameState.currentMission = null;
+      window.gameState.missionStage = 0;
+    }
+    
+    // Update the UI
+    if (window.UI && typeof window.UI.updateActionButtons === 'function') {
+      window.UI.updateActionButtons();
+    } else if (typeof window.updateActionButtons === 'function') {
+      window.updateActionButtons();
+    }
+    
+    console.log("Mission state reset completed");
+  }
+};
+
+// Enhance endCombatWithResult to check mission state
+const originalEndCombatWithMissionCheck = window.endCombatWithResult;
+window.endCombatWithResult = function(result) {
+  console.log("Enhanced endCombatWithResult with mission state check called with:", result);
+  
+  try {
+    // Try original function
+    if (typeof originalEndCombatWithMissionCheck === 'function') {
+      originalEndCombatWithMissionCheck(result);
+    }
+  } catch (error) {
+    console.error("Error ending combat:", error);
+  }
+  
+  // Always run mission state check after combat ends
+  setTimeout(function() {
+    window.fixMissionStateAfterCombat();
+    
+    // Double check that the UI is properly updated
+    setTimeout(function() {
+      // If actions are still empty, try a full recovery
+      const actionsContainer = document.getElementById('actions');
+      if (!actionsContainer || actionsContainer.children.length === 0) {
+        if (window.safeguardCombatCleanup) {
+          window.safeguardCombatCleanup();
+        }
+      }
+    }, 300);
+  }, 200);
+};
+
+// Fix to ActionSystem.handleAction to prevent "attempted to use normal action in mission" errors
+(function enhanceActionSystem() {
+  if (window.ActionSystem && window.ActionSystem.handleAction) {
+    const originalHandleAction = window.ActionSystem.handleAction;
+    
+    window.ActionSystem.handleAction = function(action) {
+      // Check for UI-related actions that should always work
+      const alwaysAllowedActions = ['profile', 'inventory', 'questLog'];
+      
+      // If we're in a mission but trying to use UI actions, allow it anyway
+      if (window.gameState.inMission && alwaysAllowedActions.includes(action)) {
+        console.log(`Allowing UI action '${action}' during mission for better UX`);
+        
+        // Special handling for these actions
+        switch(action) {
+          case 'profile':
+            if (window.UI && window.UI.openPanel) {
+              window.UI.openPanel('profile');
+            } else {
+              document.getElementById('profile').classList.remove('hidden');
+            }
+            return;
+          case 'inventory':
+            if (window.UI && window.UI.openPanel) {
+              window.UI.openPanel('inventory');
+            } else {
+              document.getElementById('inventory').classList.remove('hidden');
+            }
+            return;
+          case 'questLog':
+            if (window.UI && window.UI.openPanel) {
+              window.UI.openPanel('questLog');
+            } else {
+              document.getElementById('questLog').classList.remove('hidden');
+            }
+            return;
+        }
+      }
+      
+      // For everything else, use the original handler
+      originalHandleAction(action);
+    };
+  }
+})();
+
+// Emergency mission state reset - execute immediately to fix current state
+(function emergencyMissionReset() {
+  console.log("Checking for emergency mission state reset...");
+  
+  // Only run if we have no action buttons and we're in mission state
+  const actionsContainer = document.getElementById('actions');
+  if (window.gameState.inMission && (!actionsContainer || actionsContainer.children.length === 0)) {
+    console.log("EMERGENCY: Resetting stuck mission state");
+    
+    // Force reset all mission-related flags
+    window.gameState.inMission = false;
+    window.gameState.currentMission = null;
+    window.gameState.missionStage = 0;
+    window.gameState.inMissionCombat = false;
+    window.gameState.inBattle = false;
+    
+    // Try to update UI
+    if (window.safeguardCombatCleanup) {
+      window.safeguardCombatCleanup();
+    } else if (actionsContainer) {
+      actionsContainer.style.display = 'flex';
+      
+      // Create emergency button
+      const emergencyBtn = document.createElement('button');
+      emergencyBtn.className = 'action-btn';
+      emergencyBtn.style.backgroundColor = '#ff4b4b';
+      emergencyBtn.style.color = 'white';
+      emergencyBtn.style.fontWeight = 'bold';
+      emergencyBtn.textContent = '🛟 RESET GAME STATE';
+      emergencyBtn.onclick = function() {
+        window.gameState.inMission = false;
+        window.gameState.inBattle = false;
+        location.reload(); // Reload the page as a last resort
+      };
+      actionsContainer.appendChild(emergencyBtn);
+      
+      // Try to restore normal buttons
+      if (window.updateActionButtons) {
+        window.updateActionButtons();
+      }
+    }
+  }
+})();

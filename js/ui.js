@@ -1163,7 +1163,28 @@ window.UI = {
   }
 };
 
-// Initialize UI system when document is ready
+
+// Initialize mission system compat layer early during page load
+document.addEventListener('DOMContentLoaded', function() {
+  // Ensure mission system is initialized
+  if (!window.missionSystem || !window.missionSystem.availableMissions) {
+    console.log("Initializing mission system compatibility layer");
+    
+    if (!window.missionSystem) {
+      window.missionSystem = {
+        availableMissions: [],
+        missionHistory: [],
+        currentMission: null,
+        missionCooldowns: {}
+      };
+    }
+    
+    // Ensure crucial properties exist
+    if (!window.missionSystem.availableMissions) window.missionSystem.availableMissions = [];
+    if (!window.missionSystem.missionHistory) window.missionSystem.missionHistory = [];
+    if (!window.missionSystem.missionCooldowns) window.missionSystem.missionCooldowns = {};
+  }
+});// Initialize UI system when document is ready
 document.addEventListener('DOMContentLoaded', function() {
   window.UI.init();
 });
@@ -1245,7 +1266,13 @@ window.handleAction = function(action) {
 
 // Add backward compatibility for mission system
 if (!window.missionSystem) {
-  window.missionSystem = window.MissionSystem || {
+  window.missionSystem = {
+    // Common properties that might be accessed
+    availableMissions: [],
+    missionHistory: [],
+    currentMission: null,
+    missionCooldowns: {},
+    
     canGetMissionsFrom: function(npcId) {
       if (window.MissionSystem) {
         return window.MissionSystem.canGetMissionsFrom(npcId);
@@ -1264,14 +1291,91 @@ if (!window.missionSystem) {
       }
       return false;
     },
-    // Add missing generateAvailableMissions function
+    // Add missing generateAvailableMissions function for compatibility
     generateAvailableMissions: function() {
-      console.log("Generating available missions for compatibility");
-      // This function was likely used to pre-generate missions on game startup
-      // We'll implement a basic version that simply ensures the mission templates are registered
-      if (window.MissionSystem && typeof window.MissionSystem.registerMissionTemplates === 'function') {
+      console.log("Generating available missions");
+      if (window.MissionSystem) {
         window.MissionSystem.registerMissionTemplates();
+        // Make sure to initialize our internal array for compatibility
+        this.availableMissions = [];
+        return true;
       }
+      this.availableMissions = []; // Ensure we always have an array
+      return false;
+    },
+    updateCooldowns: function() {
+      if (window.MissionSystem) {
+        window.MissionSystem.updateCooldowns();
+      }
+    },
+    getMissionCooldowns: function() {
+      if (window.MissionSystem) {
+        return window.MissionSystem.getMissionCooldowns();
+      }
+      return this.missionCooldowns;
+    },
+    getCurrentMission: function() {
+      if (window.MissionSystem) {
+        return window.MissionSystem.getCurrentMission();
+      }
+      return this.currentMission;
+    },
+    getMissionHistory: function() {
+      if (window.MissionSystem) {
+        return window.MissionSystem.getMissionHistory();
+      }
+      return this.missionHistory;
     }
   };
 }
+
+// Helper function to check if a button already exists
+window.buttonExists = function(action, container) {
+  if (!container) return false;
+  
+  // Check all existing buttons for this action
+  const existingButtons = container.querySelectorAll(`[data-action="${action}"]`);
+  return existingButtons.length > 0;
+};
+
+// Enhanced version of UI.addActionButton that prevents duplicates
+const originalAddActionButton = window.UI.addActionButton;
+window.UI.addActionButton = function(label, action, container) {
+  // Check if button already exists
+  if (window.buttonExists(action, container)) {
+    console.log(`Button for action '${action}' already exists, not adding duplicate`);
+    return;
+  }
+  
+  // Call original function
+  originalAddActionButton(label, action, container);
+};
+
+// Override updateActionButtons in ui.js to fix duplicate buttons
+const originalUIUpdateActionButtons = window.UI.updateActionButtons;
+window.UI.updateActionButtons = function() {
+  const actionsContainer = document.getElementById('actions');
+  if (!actionsContainer) {
+    console.warn("Actions container not found when updating action buttons");
+    return;
+  }
+  
+  // Clear existing buttons
+  actionsContainer.innerHTML = '';
+  
+  // Now call the original function
+  originalUIUpdateActionButtons();
+};
+
+// Replace the direct NPC button handling to use canGetMissionsFrom correctly
+const getMissionsFromNPC = function(npcId) {
+  if (window.MissionSystem && typeof window.MissionSystem.getAvailableMissionsFrom === 'function') {
+    return window.MissionSystem.getAvailableMissionsFrom(npcId);
+  } else if (window.missionSystem && typeof window.missionSystem.getAvailableMissionsFrom === 'function') {
+    return window.missionSystem.getAvailableMissionsFrom(npcId);
+  }
+  return [];
+};
+
+// This ensures backwards compatibility with both API styles
+window.missionSystem.getMissionsFromNPC = getMissionsFromNPC;
