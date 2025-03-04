@@ -1357,6 +1357,15 @@ function startCombatRound() {
 function updateCombatActions() {
   const combatActions = document.getElementById('combatActions');
   combatActions.innerHTML = '';
+
+  const originalStartCombatRound = window.startCombatRound;
+window.startCombatRound = function() {
+  // Process any active buffs
+  processEnemyBuffs();
+  
+  // Call the original function
+  originalStartCombatRound();
+};
   
   // In decision phase - show available actions based on distance and career
   if (window.gameState.combatPhase === "decision") {
@@ -1464,46 +1473,52 @@ function updateCombatActions() {
     addCombatButton('cancel', 'Cancel Action', combatActions);
   }
   // In reaction phase - show reactions if available
-  else if (window.gameState.combatPhase === "reaction") {
-    const enemyAction = window.gameState.enemyQueuedAction;
-    
-    // Available reactions depend on the enemy's action and player's skills
-    if (enemyAction && enemyAction.type) {
-      if (enemyAction.type.includes('attack') || enemyAction.type === 'quick_shot') {
-        addCombatButton('dodge', 'Dodge', combatActions);
+else if (window.gameState.combatPhase === "reaction") {
+  const enemyAction = window.gameState.enemyQueuedAction;
+  
+  // If only bracing is allowed, just show that option
+  if (window.gameState.onlyBracingAllowed) {
+    addCombatButton('brace', 'Brace for Impact', combatActions);
+    return;
+  }
+  
+  // Available reactions depend on the enemy's action and player's skills
+  if (enemyAction && enemyAction.type) {
+    if (enemyAction.type.includes('attack') || enemyAction.type === 'quick_shot') {
+      addCombatButton('dodge', 'Dodge', combatActions);
 
-        if (enemyAction.type === "retreat" || enemyAction.effect === "distance+1") {
-          // Show pursuit options when enemy is retreating
-          addCombatButton('pursue', 'Pursue Enemy', combatActions);
-          addCombatButton('hold_position', 'Hold Position', combatActions);
-          return; // Exit early after showing these specific buttons
-        }
+      if (enemyAction.type === "retreat" || enemyAction.effect === "distance+1") {
+        // Show pursuit options when enemy is retreating
+        addCombatButton('pursue', 'Pursue Enemy', combatActions);
+        addCombatButton('hold_position', 'Hold Position', combatActions);
+        return; // Exit early after showing these specific buttons
+      }
+      
+      // Only show parry at close range and if player has sufficient skills
+      if (window.gameState.combatDistance === 0 && window.player.skills.melee > 3) {
+        addCombatButton('parry', 'Parry', combatActions);
         
-        // Only show parry at close range and if player has sufficient skills
-        if (window.gameState.combatDistance === 0 && window.player.skills.melee > 3) {
-          addCombatButton('parry', 'Parry', combatActions);
-          
-          // Perfect parry option with high skill
-          if (window.player.skills.melee > 6) {
-            addCombatButton('perfect_parry', 'Perfect Parry (Risky)', combatActions);
-          }
-        }
-        
-        // Show block if player is in defensive stance
-        if (window.gameState.combatStance === 'defensive') {
-          addCombatButton('block', 'Block', combatActions);
+        // Perfect parry option with high skill
+        if (window.player.skills.melee > 6) {
+          addCombatButton('perfect_parry', 'Perfect Parry (Risky)', combatActions);
         }
       }
       
-      // Can also just brace for impact
-      addCombatButton('brace', 'Brace for Impact', combatActions);
-      
-      // Terrain and stance specific reactions
-      if (window.gameState.combatStance === 'evasive' && window.gameState.terrain !== 'slippery') {
-        addCombatButton('sidestep', 'Sidestep', combatActions);
+      // Show block if player is in defensive stance
+      if (window.gameState.combatStance === 'defensive') {
+        addCombatButton('block', 'Block', combatActions);
       }
     }
+    
+    // Can also just brace for impact
+    addCombatButton('brace', 'Brace for Impact', combatActions);
+    
+    // Terrain and stance specific reactions
+    if (window.gameState.combatStance === 'evasive' && window.gameState.terrain !== 'slippery') {
+      addCombatButton('sidestep', 'Sidestep', combatActions);
+    }
   }
+}
 }
 
 // Execute enemy turn using AI behavior
@@ -1681,7 +1696,21 @@ function executeEnemyTurn() {
 }
 
 // Check if player can react to enemy action with improved calculation
+// Check if player can react to enemy action with improved calculation
 function canReactToEnemyAction(enemyAction) {
+  // Non-damaging abilities like roars should only allow bracing
+  if (enemyAction.effect === 'intimidate' || 
+      enemyAction.effect === 'morale-10' ||
+      enemyAction.effect === 'war_cry') {
+    
+    // Set a flag to indicate only bracing is allowed
+    window.gameState.onlyBracingAllowed = true;
+    return true; // Allow reaction phase but limit reactions in UI
+  } else {
+    // Reset the flag for normal attacks
+    window.gameState.onlyBracingAllowed = false;
+  }
+  
   // Base chance factors
   const tacticsFactor = (window.player.skills.tactics || 0) * 0.1;
   const stanceFactor = window.gameState.combatStance === 'evasive' ? 0.2 : 0;
@@ -1746,7 +1775,8 @@ function executeQueuedEnemyAction() {
   };
   
   // Check if the action is valid at current distance
-  if (action.minRange > window.gameState.combatDistance || action.maxRange < window.gameState.combatDistance) {
+  if ((action.minRange !== undefined && action.minRange > window.gameState.combatDistance) || 
+      (action.maxRange !== undefined && action.maxRange < window.gameState.combatDistance)) {
     result.success = false;
     result.message = `The ${enemy.name}'s ${action.name} misses due to incorrect range.`;
   } 
@@ -1762,6 +1792,12 @@ function executeQueuedEnemyAction() {
       } else if (window.gameState.combatStance === 'defensive') {
         damage *= 0.8;
       }
+
+      // Apply attack buff if any
+      if (enemy.attackBuff && enemy.attackBuff > 0) {
+        damage += enemy.attackBuff;
+        console.log(`Enemy attack buffed by ${enemy.attackBuff}. New damage: ${damage}`);
+      }
       
       // Apply momentum modifiers
       if (window.gameState.enemyMomentum > 0) {
@@ -1775,7 +1811,7 @@ function executeQueuedEnemyAction() {
       
       // Apply injury effects
       window.gameState.playerInjuries.forEach(injury => {
-        if (injury.name === "Fractured Arm" && action.type.includes("block")) {
+        if (injury.name === "Fractured Arm" && action.type && action.type.includes("block")) {
           // Blocking with a fractured arm is less effective
           damage = Math.round(damage * (1 + injury.damagePenalty));
         }
@@ -1822,22 +1858,62 @@ function executeQueuedEnemyAction() {
           result.message += ` The ${enemy.name} closes in.`;
         }
         
-    updateDistanceIndicator();
-  }
+        updateDistanceIndicator();
+      }
       else if (action.effect === 'stun') {
         result.message += ` You are momentarily stunned.`;
         window.gameState.playerStaggered = true;
       }
-      else if (action.effect === 'intimidate') {
+      else if (action.effect === 'intimidate' || action.effect === 'morale-10') {
+        // Handle intimidation effects (like roars)
         const moraleReduction = Math.floor(Math.random() * 10) + 5; // 5-15 morale reduction
         window.gameState.morale = Math.max(0, window.gameState.morale - moraleReduction);
-        result.message += ` The intimidating display lowers your morale by ${moraleReduction}.`;
+        result.message = `The ${enemy.name} uses ${action.name}. The intimidating display lowers your morale by ${moraleReduction}.`;
+        
+        // Add buff for the enemy
+        applyEnemyBuff({
+          name: "Intimidated",
+          stat: "attack",
+          bonus: 2,
+          duration: 2,
+          description: "Intimidation boosts attack"
+        });
+        
+        result.message += ` The display seems to empower their attacks!`;
+      }
+      else if (action.effect === 'defend+2' || action.effect === 'defensive') {
+        // Defensive abilities
+        result.message = `The ${enemy.name} uses ${action.name}, adopting a defensive stance.`;
+        
+        // Apply defense buff
+        applyEnemyBuff({
+          name: "Defensive Stance",
+          stat: "defense",
+          bonus: 2,
+          duration: 3,
+          description: "Improved defenses"
+        });
+      }
+      else if (action.effect === 'buff' || action.effect === 'selfbuff') {
+        // Generic buff abilities
+        result.message = `The ${enemy.name} uses ${action.name}, preparing for their next move.`;
+        
+        // Apply generic buff
+        applyEnemyBuff({
+          name: action.name,
+          stat: "attack",
+          bonus: 2,
+          duration: 2,
+          description: "Enhanced combat ability"
+        });
       }
     }
   }
   
   // Apply damage to player
-  window.gameState.health = Math.max(0, window.gameState.health - result.playerDamage);
+  if (result.playerDamage > 0) {
+    window.gameState.health = Math.max(0, window.gameState.health - result.playerDamage);
+  }
   
   // Update combat log
   document.getElementById('combatLog').innerHTML += `<p>${result.message}</p>`;
@@ -1891,6 +1967,70 @@ function executeQueuedEnemyAction() {
     }
   }, recoveryTime);
 }
+  
+
+// 2. Buff system for enemies
+function applyEnemyBuff(buff) {
+  const enemy = window.gameState.currentEnemy;
+  
+  // Initialize buffs array if it doesn't exist
+  enemy.activeBuffs = enemy.activeBuffs || [];
+  
+  // Add the new buff
+  enemy.activeBuffs.push({
+    name: buff.name,
+    stat: buff.stat,
+    bonus: buff.bonus,
+    duration: buff.duration,
+    description: buff.description
+  });
+  
+  // Apply the buff effect
+  if (buff.stat === "attack") {
+    enemy.attackBuff = (enemy.attackBuff || 0) + buff.bonus;
+  } else if (buff.stat === "defense") {
+    enemy.defenseBuff = (enemy.defenseBuff || 0) + buff.bonus;
+  }
+  
+  // Log the buff application
+  document.getElementById('combatLog').innerHTML += `<p>The ${enemy.name} gains ${buff.name}! ${buff.description}.</p>`;
+}
+
+
+// 3. Process enemy buffs each turn
+function processEnemyBuffs() {
+  const enemy = window.gameState.currentEnemy;
+  
+  // If no buffs, skip processing
+  if (!enemy.activeBuffs || enemy.activeBuffs.length === 0) {
+    return;
+  }
+  
+  // Process each active buff
+  for (let i = enemy.activeBuffs.length - 1; i >= 0; i--) {
+    const buff = enemy.activeBuffs[i];
+    
+    // Reduce duration
+    buff.duration--;
+    
+    // If expired, remove the buff
+    if (buff.duration <= 0) {
+      // Remove the stat bonus
+      if (buff.stat === "attack") {
+        enemy.attackBuff -= buff.bonus;
+      } else if (buff.stat === "defense") {
+        enemy.defenseBuff -= buff.bonus;
+      }
+      
+      // Log the buff expiration
+      document.getElementById('combatLog').innerHTML += `<p>The ${enemy.name}'s ${buff.name} has worn off.</p>`;
+      
+      // Remove from active buffs
+      enemy.activeBuffs.splice(i, 1);
+    }
+  }
+}
+
 
 // Add combat button to UI
 function addCombatButton(action, label, container) {
@@ -2222,6 +2362,18 @@ function handlePreparationPhaseAction(action) {
     window.gameState.combatPhase = "decision";
     updateCombatActions();
   }
+}
+
+
+function calculateEnemyAttackWithBuffs(action, enemy) {
+  let damage = action.damage || 0;
+  
+  // Apply attack buff if any
+  if (enemy.attackBuff && enemy.attackBuff > 0) {
+    damage += enemy.attackBuff;
+  }
+  
+  return damage;
 }
 
 // Handle action selected during reaction phase
