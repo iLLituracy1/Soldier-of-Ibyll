@@ -466,3 +466,61 @@ window.handleAction = function(action) {
   // Call the original function
   originalHandleAction_questLog(action);
 };
+
+
+// Initialize UI system when document is ready
+document.addEventListener('DOMContentLoaded', function() {
+  window.UI.init();
+});
+
+// Backward compatibility layer for functions that were moved from global scope
+window.updateStatusBars = function() {
+  if (window.UI && typeof window.UI.updateStatusBars === 'function') {
+    window.UI.updateStatusBars();
+  } else {
+    console.warn("UI system not initialized yet, can't update status bars");
+  }
+};
+
+window.updateTimeAndDay = function(minutesToAdd) {
+  if (window.UI && typeof window.UI.updateTimeAndDay === 'function') {
+    window.UI.updateTimeAndDay(minutesToAdd);
+  } else {
+    console.warn("UI system not initialized yet, can't update time and day");
+  }
+};
+
+window.setNarrative = function(text) {
+  if (window.UI && typeof window.UI.setNarrative === 'function') {
+    window.UI.setNarrative(text);
+  } else {
+    console.warn("UI system not initialized yet, can't set narrative");
+  }
+};
+
+window.addToNarrative = function(text) {
+  if (window.UI && typeof window.UI.addToNarrative === 'function') {
+    window.UI.addToNarrative(text);
+  } else {
+    console.warn("UI system not initialized yet, can't add to narrative");
+  }
+};
+
+window.showNotification = function(text, type) {
+  if (window.UI && typeof window.UI.showNotification === 'function') {
+    window.UI.showNotification(text, type);
+  } else {
+    console.warn("UI system not initialized yet, can't show notification");
+  }
+};
+
+// Add updateActionButtons compatibility with override support
+window.originalUpdateActionButtons = function() {
+  if (window.UI && typeof window.UI.updateActionButtons === 'function') {
+    window.UI.updateActionButtons();
+  } else {
+    console.warn("UI system not initialized yet, can't update action buttons");
+  }
+};
+
+window.updateActionButtons = window.originalUpdateActionButtons;
