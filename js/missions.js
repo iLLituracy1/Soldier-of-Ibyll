@@ -752,8 +752,8 @@ window.updateTimeAndDay = function(minutesToAdd) {
   }
 };
 
-// Add mission system to combat outcome handler
-const originalEndCombatWithResult = window.endCombatWithResult;
+
+// In missions.js - find the existing code:
 window.endCombatWithResult = function(result) {
   // Check if this is mission combat
   if (window.gameState.inMissionCombat) {
@@ -774,6 +774,34 @@ window.endCombatWithResult = function(result) {
     originalEndCombatWithResult(result);
   }
 };
+
+// Modify it to call the cleanup function:
+window.endCombatWithResult = function(result) {
+  // Clean up combat UI first if the function exists
+  if (window.cleanupCombatAfterBattle) {
+    window.cleanupCombatAfterBattle();
+  }
+  
+  // Check if this is mission combat
+  if (window.gameState.inMissionCombat) {
+    console.log("Ending mission combat with result:", result);
+    
+    // Add enemyName to result if available
+    if (window.gameState.currentEnemy) {
+      result.enemyName = window.gameState.currentEnemy.name;
+    }
+    
+    // First end combat normally
+    originalEndCombatWithResult(result);
+    
+    // Then continue the mission
+    window.missionSystem.continueMissionAfterCombat(result);
+  } else {
+    // Regular combat ending
+    originalEndCombatWithResult(result);
+  }
+};
+
 
 // Debug the combat check for missions
 window.missionSystem.initiateMissionCombat = function() {
