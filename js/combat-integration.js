@@ -6,6 +6,9 @@
   const originalEndCombatWithResult = window.endCombatWithResult || function() {};
   const originalCleanupCombatUI = window.cleanupCombatUI || function() {};
   
+  // Central tracking for mission combat callback
+  let _missionCombatCallback = null;
+  
   // Enhanced combat end function with robust mission integration
   window.endCombatWithResult = function(result) {
     console.log("[Combat Integration] Ending combat with result:", result);
@@ -30,13 +33,13 @@
     if (inMissionCombat) {
       console.log("[Combat Integration] Handling mission combat result:", result);
       
+      // Always set mission combat flag to false before continuing to avoid duplicate calls
+      window.gameState.inMissionCombat = false;
+      
       // First, try the modern mission system
       if (window.MissionSystem && typeof window.MissionSystem.continueMissionAfterCombat === 'function') {
         try {
-          // Set flag to false before continuing to avoid duplicate calls
-          window.gameState.inMissionCombat = false;
-          
-          // Continue mission with the result
+          // Continue mission with the result after a short delay
           setTimeout(() => {
             window.MissionSystem.continueMissionAfterCombat(result);
           }, 500);
@@ -53,10 +56,7 @@
       // Try the legacy mission system
       else if (window.missionSystem && typeof window.missionSystem.continueMissionAfterCombat === 'function') {
         try {
-          // Set flag to false before continuing to avoid duplicate calls
-          window.gameState.inMissionCombat = false;
-          
-          // Continue mission with the result
+          // Continue mission with the result after a short delay
           setTimeout(() => {
             window.missionSystem.continueMissionAfterCombat(result);
           }, 500);
@@ -275,53 +275,168 @@
     }, 600);
   }
   
-  // Enhanced combat system integration for missions - with delayed initialization
-  function extendCombatSystem() {
-    // Check if CombatSystem exists now
-    if (!window.CombatSystem) {
-      console.log("[Combat Integration] CombatSystem not initialized yet, will try again later");
-      // Try again in 500ms
-      setTimeout(extendCombatSystem, 500);
+  // Fix the retreat functionality to properly handle mission-combat integration
+  const originalAttemptRetreat = window.attemptRetreat || function() {};
+  window.attemptRetreat = function() {
+    console.log("[Combat Integration] Player attempting retreat from combat");
+    
+    // Check if we're in a mission-related combat
+    if (window.gameState.inMissionCombat) {
+      console.log("[Combat Integration] Handling retreat during mission combat");
+      
+      // Show retreat message
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        combatLog.innerHTML += `<p>You attempt to retreat from combat...</p>`;
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      // Force UI cleanup before ending combat to avoid glitches
+      if (typeof window.cleanupCombatUI === 'function') {
+        window.cleanupCombatUI();
+      }
+      
+      // Clear combat state
+      window.gameState.inBattle = false;
+      window.gameState.currentEnemy = null;
+      
+      // Ensure we safely handle mission continuation
+      setTimeout(() => {
+        // End combat with retreat result
+        window.endCombatWithResult('retreat');
+      }, 500);
+      
       return;
     }
     
-    console.log("[Combat Integration] Extending CombatSystem with mission integration");
+    // For non-mission combat, use the original retreat function
+    originalAttemptRetreat();
+  };
+  
+  // Enhanced mission combat start function
+  window.startMissionCombat = function(enemyType, environment, callbackOnCompletion) {
+    console.log("[Combat Integration] Starting mission combat with enemy:", enemyType);
     
-    // Save original startMissionCombat if it exists
-    const originalStartMissionCombat = window.CombatSystem.startMissionCombat;
+    // Set mission combat flag
+    window.gameState.inMissionCombat = true;
     
-    // Replace with enhanced version
+    // Store callback for later use
+    _missionCombatCallback = callbackOnCompletion;
+    
+    // Start the combat
+    if (window.CombatSystem && typeof window.CombatSystem.startCombat === 'function') {
+      window.CombatSystem.startCombat(enemyType, environment);
+    } else if (typeof window.startCombat === 'function') {
+      window.startCombat(enemyType, environment);
+    } else {
+      console.error("[Combat Integration] No combat system available to start combat");
+      
+      // Reset mission combat flag
+      window.gameState.inMissionCombat = false;
+      
+      // Call the callback with defeat result as a fallback
+      if (typeof callbackOnCompletion === 'function') {
+        callbackOnCompletion('defeat');
+      }
+    }
+  };
+  
+  // Create a direct function to continue mission after combat
+  window.continueMissionAfterCombat = function(result) {
+    console.log("[Combat Integration] Continuing mission after combat with result:", result);
+    
+    // Clear mission combat flag first to prevent duplicate calls
+    window.gameState.inMissionCombat = false;
+    
+    // Call the stored callback if available
+    if (typeof _missionCombatCallback === 'function') {
+      setTimeout(() => {
+        _missionCombatCallback(result);
+        
+        // Clear the callback after use
+        _missionCombatCallback = null;
+      }, 300);
+    }
+    // Try to use the mission system directly if no callback is set
+    else if (window.MissionSystem && typeof window.MissionSystem.continueMissionAfterCombat === 'function') {
+      setTimeout(() => {
+        window.MissionSystem.continueMissionAfterCombat(result);
+      }, 300);
+    }
+    else if (window.missionSystem && typeof window.missionSystem.continueMissionAfterCombat === 'function') {
+      setTimeout(() => {
+        window.missionSystem.continueMissionAfterCombat(result);
+      }, 300);
+    }
+    else {
+      console.warn("[Combat Integration] No method available to continue mission after combat");
+      
+      // Reset mission state as a last resort
+      safelyResetMissionState();
+    }
+  };
+  
+  // Enhance CombatSystem if available
+  if (window.CombatSystem) {
+    console.log("[Combat Integration] Enhancing CombatSystem with mission integration");
+    
+    // Add startMissionCombat method to CombatSystem
     window.CombatSystem.startMissionCombat = function(enemyType, environment, callbackOnCompletion) {
-      console.log("[Combat Integration] Starting mission combat with:", enemyType);
+      console.log("[Combat Integration] CombatSystem starting mission combat with:", enemyType);
       
       // Set mission combat flag
       window.gameState.inMissionCombat = true;
       
-      // Start combat either using the original method or direct combat start
-      if (typeof originalStartMissionCombat === 'function') {
-        originalStartMissionCombat(enemyType, environment, callbackOnCompletion);
-      } else {
-        // Fallback to direct combat start
-        this.startCombat(enemyType, environment);
-        
-        // Register one-time event listener for combat end if callback provided
-        if (callbackOnCompletion && typeof this.on === 'function') {
-          this.on('combatEnd', function handleMissionCombatEnd(data) {
-            // Call the mission callback with the result
-            callbackOnCompletion(data.result);
-            
-            // Remove this event listener
-            if (typeof window.CombatSystem.off === 'function') {
-              window.CombatSystem.off('combatEnd', handleMissionCombatEnd);
-            }
-          });
-        }
+      // Store callback for mission continuation
+      _missionCombatCallback = callbackOnCompletion;
+      
+      // Start the combat
+      this.startCombat(enemyType, environment);
+    };
+    
+    // Enhance endCombat method with mission integration
+    const originalEndCombat = window.CombatSystem.endCombat;
+    window.CombatSystem.endCombat = function(result) {
+      console.log("[Combat Integration] CombatSystem ending combat with result:", result);
+      
+      // Store mission combat state before calling original function
+      const wasInMissionCombat = window.gameState.inMissionCombat;
+      
+      // Call original method to handle normal combat end
+      originalEndCombat.call(this, result);
+      
+      // If this was a mission combat, handle mission continuation
+      if (wasInMissionCombat) {
+        // Continue mission after a delay to ensure UI is clean
+        setTimeout(() => {
+          window.continueMissionAfterCombat(result);
+        }, 500);
       }
     };
   }
   
-  // Start the extension process
-  extendCombatSystem();
+  console.log("[Combat Integration] Combat-mission integration module initialized");
   
-  console.log("[Combat Integration] Combat-Mission integration module initialized");
+  // Final check after a slight delay to ensure everything is ready
+  setTimeout(() => {
+    // Add enhanced retreat functionality to CombatSystem if it exists
+    if (window.CombatSystem && !window.CombatSystem._hasEnhancedRetreat) {
+      // Enhanced retreat handling
+      const originalHandleCombatAction = window.CombatSystem.handleCombatAction;
+      
+      window.CombatSystem.handleCombatAction = function(action) {
+        // Special handling for retreat_combat action
+        if (action === 'retreat_combat' && window.gameState.inMissionCombat) {
+          window.attemptRetreat();
+          return;
+        }
+        
+        // Normal handling for other actions
+        originalHandleCombatAction.call(this, action);
+      };
+      
+      // Flag to prevent duplicate enhancements
+      window.CombatSystem._hasEnhancedRetreat = true;
+    }
+  }, 1000);
 })();
