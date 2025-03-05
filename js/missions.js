@@ -1,106 +1,94 @@
-// MISSIONS.JS
-// Complete event-based mission system that directly replaces the old file
+// ENHANCED MISSION SYSTEM
+// A complete rewrite of the mission system with improved combat integration
 
-// Create the mission system namespace using immediately-invoked function
 window.MissionSystem = (function() {
   // Private state
-  let _missionTemplates = {};
-  let _currentMission = null;
-  let _missionStage = 0;
-  let _missionInProgress = false;
-  let _missionHistory = [];
-  let _missionCooldowns = {};
-  let _dialogueStage = 0;
+  let _missionTemplates = {};      // Mission template definitions
+  let _currentMission = null;      // Currently active mission
+  let _missionStage = 0;           // Current stage in the active mission
+  let _missionHistory = [];        // Record of completed missions
+  let _missionCooldowns = {};      // Cooldown periods for mission types
+  let _dialogueStage = 0;          // Current dialogue stage (for dialogue mission stages)
+  let _combatCallback = null;      // Callback for when combat completes
+  let _pendingCombatResult = null; // Store combat result when UI is not ready
+  
+  // Event system for mission state changes
+  const _events = {
+    missionStart: [],
+    missionComplete: [],
+    missionFail: [],
+    stageChange: [],
+    combatStart: [],
+    combatEnd: []
+  };
   
   // Private helper functions
-  const _logDebug = function(message, data) {
+  function _log(message, data) {
     console.log(`[MissionSystem] ${message}`, data || '');
-  };
+  }
+  
+  // Register event listeners
+  function _on(event, callback) {
+    if (!_events[event]) {
+      _events[event] = [];
+    }
+    _events[event].push(callback);
+    return _events[event].length - 1;
+  }
+  
+  // Remove event listener
+  function _off(event, index) {
+    if (!_events[event]) return;
+    _events[event].splice(index, 1);
+  }
+  
+  // Trigger event
+  function _trigger(event, data) {
+    if (!_events[event]) return;
+    _log(`Event triggered: ${event}`, data);
+    
+    for (const callback of _events[event]) {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error(`Error in ${event} event handler:`, error);
+      }
+    }
+  }
   
   // Generate a unique mission ID
-  const _generateMissionId = function() {
+  function _generateMissionId() {
     return 'mission_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-  };
-  
-  // Mission completion handler
-  const _completeMission = function(success, rewards) {
-    if (!_currentMission) {
-      console.warn("No active mission to complete");
-      return;
-    }
-    
-    _logDebug('Completing mission:', { mission: _currentMission.title, success });
-    
-    // Record mission completion in history
-    _missionHistory.push({
-      id: _currentMission.id,
-      title: _currentMission.title,
-      type: _currentMission.type,
-      success: success,
-      completedOn: window.gameState.day
-    });
-    
-    // Limit history size
-    if (_missionHistory.length > 20) {
-      _missionHistory.shift();
-    }
-    
-    // Distribute rewards if successful
-    if (success && rewards) {
-      _applyMissionRewards(rewards);
-    }
-    
-    // Apply cooldown
-    _missionCooldowns[_currentMission.type] = {
-      until: window.gameState.day + (_currentMission.cooldown || 2)
-    };
-    
-    // Reset mission state
-    window.gameState.inMission = false;
-    window.gameState.currentMission = null;
-    window.gameState.missionStage = 0;
-    
-    _currentMission = null;
-    _missionStage = 0;
-    _missionInProgress = false;
-    _dialogueStage = 0;
-    
-    // Update UI
-    if (window.UI) {
-      window.UI.updateStatusBars();
-      window.UI.updateActionButtons();
-    }
-    
-    // Update achievement progress
-    if (success) {
-      window.updateAchievementProgress('mission_master');
-    }
-  };
+  }
   
   // Apply mission rewards
-  const _applyMissionRewards = function(rewards) {
+  function _applyMissionRewards(rewards) {
     if (!rewards) return;
     
     let rewardText = "You receive:";
     
-    // Award experience
+    // Apply experience rewards
     if (rewards.experience) {
       const expGain = rewards.experience;
       window.gameState.experience += expGain;
       rewardText += `\n- ${expGain} experience`;
       
       // Check for level up
-      window.checkLevelUp();
+      if (window.GameState && typeof window.GameState.checkLevelUp === 'function') {
+        window.GameState.checkLevelUp();
+      } else if (typeof window.checkLevelUp === 'function') {
+        window.checkLevelUp();
+      }
     }
     
-    // Award taelors (currency)
+    // Apply currency rewards
     if (rewards.taelors) {
       const taelors = rewards.taelors;
       window.player.taelors = (window.player.taelors || 0) + taelors;
       rewardText += `\n- ${taelors} taelors`;
     }
     
-    // Award items
+    // Apply item rewards
     if (rewards.items && rewards.items.length > 0) {
       for (const item of rewards.items) {
         // Check if item should be awarded based on chance
@@ -110,6 +98,7 @@ window.MissionSystem = (function() {
         if (!window.player.inventory) {
           window.player.inventory = [];
         }
+        
         window.player.inventory.push({
           name: item.name,
           effect: item.effect || "No special effects",
@@ -120,12 +109,13 @@ window.MissionSystem = (function() {
       }
     }
     
-    // Award relationship changes
+    // Apply relationship changes
     if (rewards.relationships) {
       for (const [npcId, change] of Object.entries(rewards.relationships)) {
         if (!window.player.relationships) {
           window.player.relationships = {};
         }
+        
         if (!window.player.relationships[npcId]) {
           // Use correct name for each NPC ID
           let npcName = npcId;
@@ -135,6 +125,7 @@ window.MissionSystem = (function() {
           
           window.player.relationships[npcId] = { name: npcName, disposition: 0 };
         }
+        
         const currentRelationship = window.player.relationships[npcId];
         if (currentRelationship) {
           const newDisposition = Math.min(100, Math.max(-100, currentRelationship.disposition + change));
@@ -150,22 +141,101 @@ window.MissionSystem = (function() {
     }
     
     // Show rewards to player
-    if (window.setNarrative) {
-      addToNarrative(rewardText);
+    if (typeof window.addToNarrative === 'function') {
+      window.addToNarrative(rewardText);
     }
-  };
+  }
+  
+  // Handle mission completion
+  function _completeMission(success, rewards) {
+    if (!_currentMission) {
+      console.warn("[MissionSystem] No active mission to complete");
+      return;
+    }
+    
+    _log('Completing mission:', { mission: _currentMission.title, success });
+    
+    // Record mission completion in history
+    _missionHistory.push({
+      id: _currentMission.id,
+      title: _currentMission.title,
+      type: _currentMission.type,
+      success: success,
+      completedOn: window.gameState.day
+    });
+    
+    // Limit history size to 20 entries
+    if (_missionHistory.length > 20) {
+      _missionHistory.shift();
+    }
+    
+    // Distribute rewards if successful
+    if (success && rewards) {
+      _applyMissionRewards(rewards);
+    }
+    
+    // Apply cooldown
+    _missionCooldowns[_currentMission.type] = {
+      until: window.gameState.day + (_currentMission.cooldown || 2)
+    };
+    
+    // Trigger appropriate completion event
+    if (success) {
+      _trigger('missionComplete', { mission: _currentMission });
+    } else {
+      _trigger('missionFail', { mission: _currentMission });
+    }
+    
+    // Reset mission state
+    window.gameState.inMission = false;
+    window.gameState.currentMission = null;
+    window.gameState.missionStage = 0;
+    
+    _currentMission = null;
+    _missionStage = 0;
+    _dialogueStage = 0;
+    _combatCallback = null;
+    
+    // Update UI
+    if (window.UI) {
+      window.UI.updateStatusBars();
+      window.UI.updateActionButtons();
+      
+      // Unlock narrative for updates if it was locked
+      if (window.UI.state) {
+        window.UI.state.narrativeLock = false;
+      }
+    } else {
+      // Legacy UI update
+      if (typeof window.updateStatusBars === 'function') {
+        window.updateStatusBars();
+      }
+      
+      if (typeof window.updateActionButtons === 'function') {
+        window.updateActionButtons();
+      }
+    }
+    
+    // Update achievement progress
+    if (success && typeof window.updateAchievementProgress === 'function') {
+      window.updateAchievementProgress('mission_master');
+    }
+    
+    return true;
+  }
   
   // Generate a mission from a template
-  const _generateMission = function(type) {
+  function _generateMission(type) {
     // Get the mission template
     const template = _missionTemplates[type];
     if (!template) {
-      console.error("Unknown mission type:", type);
+      console.error("[MissionSystem] Unknown mission type:", type);
       return null;
     }
     
     // Check cooldown
     if (_missionCooldowns[type] && window.gameState.day < _missionCooldowns[type].until) {
+      _log(`Mission ${type} on cooldown until day ${_missionCooldowns[type].until}`);
       return null;
     }
     
@@ -182,17 +252,27 @@ window.MissionSystem = (function() {
     };
     
     return mission;
-  };
+  }
   
   // Process the current mission stage
-  const _processMissionStage = function() {
+  function _processMissionStage() {
     if (!_currentMission || _missionStage >= _currentMission.stages.length) {
-      console.warn("No active mission stage to process");
+      console.warn("[MissionSystem] No active mission stage to process");
       return;
     }
     
     const stage = _currentMission.stages[_missionStage];
-    _logDebug('Processing mission stage:', { stage: _missionStage, type: stage.type });
+    _log('Processing mission stage:', { stage: _missionStage, type: stage.type });
+    
+    // Trigger stage change event
+    _trigger('stageChange', { 
+      mission: _currentMission,
+      stageIndex: _missionStage, 
+      stage: stage 
+    });
+    
+    // Update mission stage in global state
+    window.gameState.missionStage = _missionStage;
     
     // Process stage based on type
     switch(stage.type) {
@@ -212,15 +292,19 @@ window.MissionSystem = (function() {
         _processDialogueStage(stage);
         break;
       default:
-        console.warn("Unknown mission stage type:", stage.type);
+        console.warn("[MissionSystem] Unknown mission stage type:", stage.type);
+        // Move to next stage as a fallback
+        _advanceMissionStage();
     }
-  };
+  }
   
   // Process a text stage
-  const _processTextStage = function(stage) {
-    setNarrative(stage.text);
+  function _processTextStage(stage) {
+    if (typeof window.setNarrative === 'function') {
+      window.setNarrative(stage.text);
+    }
     
-    // Check for continue button
+    // Create Continue button
     const actionsContainer = document.getElementById('actions');
     if (actionsContainer) {
       actionsContainer.innerHTML = '';
@@ -233,12 +317,18 @@ window.MissionSystem = (function() {
       };
       
       actionsContainer.appendChild(continueBtn);
+    } else {
+      console.warn("[MissionSystem] Actions container not found for text stage");
+      // Auto-advance after a delay as fallback
+      setTimeout(_advanceMissionStage, 2000);
     }
-  };
+  }
   
   // Process a choice stage
-  const _processChoiceStage = function(stage) {
-    setNarrative(stage.text);
+  function _processChoiceStage(stage) {
+    if (typeof window.setNarrative === 'function') {
+      window.setNarrative(stage.text);
+    }
     
     // Create choice buttons
     const actionsContainer = document.getElementById('actions');
@@ -288,7 +378,9 @@ window.MissionSystem = (function() {
             // Process choice outcome
             if (choice.outcome) {
               if (choice.outcome.text) {
-                addToNarrative("\n\n" + choice.outcome.text);
+                if (typeof window.addToNarrative === 'function') {
+                  window.addToNarrative("\n\n" + choice.outcome.text);
+                }
               }
               
               if (choice.outcome.goto !== undefined) {
@@ -305,8 +397,14 @@ window.MissionSystem = (function() {
                 const currentHealth = window.gameState.health;
                 const damage = choice.outcome.damage;
                 window.gameState.health = Math.max(1, currentHealth - damage);
-                showNotification(`You took ${damage} damage!`, 'damage');
-                updateStatusBars();
+                
+                if (typeof window.showNotification === 'function') {
+                  window.showNotification(`You took ${damage} damage!`, 'damage');
+                }
+                
+                if (typeof window.updateStatusBars === 'function') {
+                  window.updateStatusBars();
+                }
               }
               
               // Handle special outcomes
@@ -330,12 +428,16 @@ window.MissionSystem = (function() {
         
         actionsContainer.appendChild(choiceBtn);
       });
+    } else {
+      console.warn("[MissionSystem] Actions container not found for choice stage");
     }
-  };
+  }
   
   // Process a combat stage
-  const _processCombatStage = function(stage) {
-    setNarrative(stage.text);
+  function _processCombatStage(stage) {
+    if (typeof window.setNarrative === 'function') {
+      window.setNarrative(stage.text);
+    }
     
     // Create initiate combat button
     const actionsContainer = document.getElementById('actions');
@@ -346,49 +448,147 @@ window.MissionSystem = (function() {
       combatBtn.className = 'action-btn';
       combatBtn.textContent = 'Engage';
       combatBtn.onclick = function() {
-        // Set mission combat flag
-        window.gameState.inMissionCombat = true;
-        
-        // Start combat using the appropriate system
-        window.startCombat(stage.enemy, stage.environment || null);
-        
-        // Save original endCombatWithResult function
-        if (typeof window.originalEndCombatFunction !== 'function') {
-          window.originalEndCombatFunction = window.endCombatWithResult;
-          
-          // Override endCombatWithResult to handle mission continuation
-          window.endCombatWithResult = function(result) {
-            // Call original function
-            if (typeof window.originalEndCombatFunction === 'function') {
-              window.originalEndCombatFunction(result);
-            }
-            
-            // Continue mission after a short delay
-            if (window.gameState.inMissionCombat) {
-              window.gameState.inMissionCombat = false;
-              
-              setTimeout(() => {
-                window.MissionSystem.continueMissionAfterCombat(result);
-              }, 1000);
-            }
-          };
-        }
+        _startCombat(stage);
       };
       
       actionsContainer.appendChild(combatBtn);
+    } else {
+      console.warn("[MissionSystem] Actions container not found for combat stage");
+      // Auto-start combat as fallback
+      setTimeout(() => {
+        _startCombat(stage);
+      }, 1000);
     }
-  };
+  }
+  
+  // Handle combat start
+  function _startCombat(stage) {
+    // Set mission combat flag
+    window.gameState.inMissionCombat = true;
+    
+    // Prepare combat callback
+    _combatCallback = function(result) {
+      _handleCombatResult(result, stage);
+    };
+    
+    // Register one-time event listener for combat end
+    if (window.CombatSystem && typeof window.CombatSystem.on === 'function') {
+      window.CombatSystem.on('combatEnd', function handleCombatEnd(data) {
+        // Remove this listener to avoid duplicate calls
+        window.CombatSystem.off('combatEnd', handleCombatEnd);
+        
+        // Call our callback with the result
+        _combatCallback(data.result);
+      });
+      
+      // Start combat using the proper API
+      if (typeof window.CombatSystem.startMissionCombat === 'function') {
+        window.CombatSystem.startMissionCombat(stage.enemy, stage.environment || null);
+      } else {
+        window.CombatSystem.startCombat(stage.enemy, stage.environment || null);
+      }
+    } else {
+      // Legacy combat system
+      if (typeof window.setOriginalEndCombatFunction === 'function') {
+        // Save original endCombatWithResult function
+        window.setOriginalEndCombatFunction(window.endCombatWithResult);
+        
+        // Override endCombatWithResult to handle mission continuation
+        window.endCombatWithResult = function(result) {
+          // Call original function
+          if (typeof window.originalEndCombatFunction === 'function') {
+            window.originalEndCombatFunction(result);
+          }
+          
+          // Continue mission after a short delay
+          if (window.gameState.inMissionCombat) {
+            window.gameState.inMissionCombat = false;
+            
+            setTimeout(() => {
+              _handleCombatResult(result, stage);
+            }, 1000);
+          }
+        };
+      }
+      
+      // Start combat with legacy function
+      if (typeof window.startCombat === 'function') {
+        window.startCombat(stage.enemy, stage.environment || null);
+      } else {
+        console.error("[MissionSystem] No combat system available");
+        // Skip combat as a failsafe
+        _advanceMissionStage();
+      }
+    }
+    
+    // Trigger combat start event
+    _trigger('combatStart', { 
+      mission: _currentMission,
+      stage: stage,
+      enemy: stage.enemy,
+      environment: stage.environment
+    });
+  }
   
   // Handle combat result
-  const _handleCombatResult = function(result, stage) {
-    _logDebug('Handling combat result:', result);
+  function _handleCombatResult(result, stage) {
+    _log('Handling combat result:', result);
+    
+    // Clear the callback
+    _combatCallback = null;
+    
+    // Clear mission combat flag
+    window.gameState.inMissionCombat = false;
+    
+    // Check if mission system is still active
+    if (!_currentMission) {
+      console.warn("[MissionSystem] No active mission when handling combat result");
+      return;
+    }
+    
+    // Check if UI is ready - use presence of actions container as indicator
+    const actionsContainer = document.getElementById('actions');
+    if (!actionsContainer || actionsContainer.style.display === 'none') {
+      // UI isn't ready yet, store the result and check again later
+      _log('UI not ready for combat result, storing for later');
+      _pendingCombatResult = { result, stage };
+      
+      // Check again in 500ms
+      setTimeout(() => {
+        if (_pendingCombatResult) {
+          _log('Processing pending combat result');
+          const { result, stage } = _pendingCombatResult;
+          _pendingCombatResult = null;
+          _processCombatResult(result, stage);
+        }
+      }, 500);
+      
+      return;
+    }
+    
+    // Process the combat result immediately
+    _processCombatResult(result, stage);
+  }
+  
+  // Process combat result when UI is ready
+  function _processCombatResult(result, stage) {
+    // Trigger combat end event
+    _trigger('combatEnd', { 
+      mission: _currentMission,
+      stage: stage,
+      result: result
+    });
     
     // Process based on result
     if (result === 'victory') {
       if (stage.success) {
-        setNarrative(stage.success);
+        if (typeof window.setNarrative === 'function') {
+          window.setNarrative(stage.success);
+        }
       } else {
-        setNarrative("You've emerged victorious from the battle!");
+        if (typeof window.setNarrative === 'function') {
+          window.setNarrative("You've emerged victorious from the battle!");
+        }
       }
       
       // Advance mission after a short delay
@@ -397,9 +597,13 @@ window.MissionSystem = (function() {
       }, 2000);
     } else {
       if (stage.failure) {
-        setNarrative(stage.failure);
+        if (typeof window.setNarrative === 'function') {
+          window.setNarrative(stage.failure);
+        }
       } else {
-        setNarrative("You've been defeated in battle, but manage to escape with your life.");
+        if (typeof window.setNarrative === 'function') {
+          window.setNarrative("You've been defeated in battle, but manage to escape with your life.");
+        }
       }
       
       // Failed mission
@@ -407,11 +611,13 @@ window.MissionSystem = (function() {
         _completeMission(false);
       }, 2000);
     }
-  };
+  }
   
   // Process a skill check stage
-  const _processSkillCheckStage = function(stage) {
-    setNarrative(stage.text);
+  function _processSkillCheckStage(stage) {
+    if (typeof window.setNarrative === 'function') {
+      window.setNarrative(stage.text);
+    }
     
     // Create attempt check button
     const actionsContainer = document.getElementById('actions');
@@ -426,11 +632,17 @@ window.MissionSystem = (function() {
       };
       
       actionsContainer.appendChild(attemptBtn);
+    } else {
+      console.warn("[MissionSystem] Actions container not found for skill check stage");
+      // Auto-perform skill check as fallback
+      setTimeout(() => {
+        _performSkillCheck(stage);
+      }, 1000);
     }
-  };
+  }
   
   // Perform a skill check
-  const _performSkillCheck = function(stage) {
+  function _performSkillCheck(stage) {
     let playerSkill = 0;
     
     // Handle different skill path formats
@@ -465,11 +677,15 @@ window.MissionSystem = (function() {
     const success = roll <= successChance;
     
     // Show result
-    addToNarrative(`\n\nYou attempt to use your ${stage.skill} skill...`);
+    if (typeof window.addToNarrative === 'function') {
+      window.addToNarrative(`\n\nYou attempt to use your ${stage.skill} skill...`);
+    }
     
     setTimeout(() => {
       if (success) {
-        addToNarrative(`\n\nSuccess! ${stage.success}`);
+        if (typeof window.addToNarrative === 'function') {
+          window.addToNarrative(`\n\nSuccess! ${stage.success}`);
+        }
         
         // Apply rewards if any
         if (stage.rewards) {
@@ -481,7 +697,9 @@ window.MissionSystem = (function() {
           _advanceMissionStage();
         }, 2000);
       } else {
-        addToNarrative(`\n\nFailure. ${stage.failure}`);
+        if (typeof window.addToNarrative === 'function') {
+          window.addToNarrative(`\n\nFailure. ${stage.failure}`);
+        }
         
         if (stage.failureOutcome === 'continue') {
           // Continue to next stage despite failure
@@ -496,12 +714,12 @@ window.MissionSystem = (function() {
         }
       }
     }, 1500);
-  };
+  }
   
   // Process a dialogue stage
-  const _processDialogueStage = function(stage) {
+  function _processDialogueStage(stage) {
     if (!stage.dialogue || stage.dialogue.length === 0) {
-      console.warn("Empty dialogue in mission stage");
+      console.warn("[MissionSystem] Empty dialogue in mission stage");
       _advanceMissionStage();
       return;
     }
@@ -517,9 +735,13 @@ window.MissionSystem = (function() {
     
     // Set or add to narrative based on dialogue index
     if (_dialogueStage === 0) {
-      setNarrative(`${dialogue.speaker}: "${dialogue.text}"`);
+      if (typeof window.setNarrative === 'function') {
+        window.setNarrative(`${dialogue.speaker}: "${dialogue.text}"`);
+      }
     } else {
-      addToNarrative(`\n\n${dialogue.speaker}: "${dialogue.text}"`);
+      if (typeof window.addToNarrative === 'function') {
+        window.addToNarrative(`\n\n${dialogue.speaker}: "${dialogue.text}"`);
+      }
     }
     
     // Create continue button
@@ -536,11 +758,18 @@ window.MissionSystem = (function() {
       };
       
       actionsContainer.appendChild(continueBtn);
+    } else {
+      console.warn("[MissionSystem] Actions container not found for dialogue stage");
+      // Auto-advance dialogue as fallback
+      setTimeout(() => {
+        _dialogueStage++;
+        _processDialogueStage(stage);
+      }, 2000);
     }
-  };
+  }
   
   // Advance to the next mission stage
-  const _advanceMissionStage = function() {
+  function _advanceMissionStage() {
     _missionStage++;
     _dialogueStage = 0;
     
@@ -552,77 +781,125 @@ window.MissionSystem = (function() {
       // Process the next stage
       _processMissionStage();
     }
-  };
-
-  // Discovery chance calculations for gambling and brawling
-  const _calculateDiscoveryChance = function(facility) {
-    // Default discovery chance for most origins
-    let chance = 0.15; // 15% chance
+  }
+  
+  // Safely return to normal game state
+  function _returnToNormalGameState() {
+    // Ensure all mission flags are cleared
+    window.gameState.inMission = false;
+    window.gameState.currentMission = null;
+    window.gameState.missionStage = 0;
+    window.gameState.inMissionCombat = false;
     
-    // If player is from Lunarine, they automatically know
-    if (window.player.origin === 'Lunarine') {
-      return 1.0; // 100% chance
+    // Clear mission state
+    _currentMission = null;
+    _missionStage = 0;
+    _dialogueStage = 0;
+    _combatCallback = null;
+    _pendingCombatResult = null;
+    
+    // Show regular action buttons
+    const actionsContainer = document.getElementById('actions');
+    if (actionsContainer) {
+      actionsContainer.style.display = 'flex';
     }
     
-    // Adjust based on skills
-    const survivalSkill = (window.player.skills || {}).survival || 0;
-    const tacticsSkill = (window.player.skills || {}).tactics || 0;
+    // Unlock narrative for updates if it was locked
+    if (window.UI && window.UI.state) {
+      window.UI.state.narrativeLock = false;
+    }
     
-    // Survival helps find places, tactics helps understand their significance
-    chance += (survivalSkill * 0.01) + (tacticsSkill * 0.01); // Up to 10% more chance combined if skills are 5 each
+    // Update UI
+    if (typeof window.updateActionButtons === 'function') {
+      window.updateActionButtons();
+    }
     
-    return chance;
-  };
-
+    // Set a return narrative
+    if (typeof window.setNarrative === 'function') {
+      window.setNarrative("You have returned to camp.");
+    }
+    
+    return true;
+  }
+  
   // Public API
   return {
     // Initialize the mission system
     init: function() {
-      console.log("Initializing mission system...");
-      
-      // Ensure compatibility with main.js
-      if (!window.missionSystem) {
-        window.missionSystem = {
-          availableMissions: []
-        };
-      } else if (!window.missionSystem.availableMissions) {
-        window.missionSystem.availableMissions = [];
-      }
+      _log("Initializing mission system...");
       
       // Register mission templates
       this.registerMissionTemplates();
       
-      // Setup data from game state if available
-      const currentMissionData = window.gameState.currentMission;
-      const missionStage = window.gameState.missionStage;
-      const inMission = window.gameState.inMission;
+      // Register event handlers
+      this.registerEventHandlers();
       
-      if (inMission && currentMissionData) {
-        _currentMission = currentMissionData;
-        _missionStage = missionStage || 0;
-        _missionInProgress = true;
-      }
+      // Setup compatibility layer with global missionSystem
+      this.setupCompatibilityLayer();
       
-      // Check for facility discovery rolls on first load
-      if (!window.gameState.facilitiesRolled) {
-        // Roll for gambling tent discovery
-        const gamblingChance = _calculateDiscoveryChance('gambling');
-        window.gameState.discoveredGamblingTent = Math.random() < gamblingChance;
-        
-        // Roll for brawler pits discovery
-        const brawlerChance = _calculateDiscoveryChance('brawler');
-        window.gameState.discoveredBrawlerPits = Math.random() < brawlerChance;
-        
-        // Mark as rolled so we don't re-roll
-        window.gameState.facilitiesRolled = true;
-        
-        console.log("Facilities discovery rolled:", {
-          gambling: window.gameState.discoveredGamblingTent,
-          brawler: window.gameState.discoveredBrawlerPits
+      _log("Mission system initialized!");
+    },
+    
+    // Register event handlers
+    registerEventHandlers: function() {
+      // Listen for combat end events
+      if (window.CombatSystem && typeof window.CombatSystem.on === 'function') {
+        window.CombatSystem.on('combatEnd', function(data) {
+          _log('Received combatEnd event from CombatSystem', data);
+          
+          // Check if we're in a mission combat
+          if (window.gameState.inMissionCombat && _combatCallback) {
+            // Call our callback with the result
+            _combatCallback(data.result);
+          }
         });
       }
       
-      console.log("Mission system initialized!");
+      // Register window-level error handling for missions
+      window.addEventListener('error', function(event) {
+        if (window.gameState.inMission) {
+          console.error("[MissionSystem] Error detected during mission:", event.error);
+          
+          // If we're in a broken state, try to recover
+          const actionsContainer = document.getElementById('actions');
+          if (!actionsContainer || actionsContainer.children.length === 0) {
+            console.warn("[MissionSystem] Detected broken UI state, attempting recovery");
+            _returnToNormalGameState();
+          }
+        }
+      });
+    },
+    
+    // Set up backward compatibility layer
+    setupCompatibilityLayer: function() {
+      // Create/update global missionSystem object for backward compatibility
+      window.missionSystem = window.missionSystem || {};
+      
+      // Link core functions to global object
+      window.missionSystem.getAvailableMissionsFrom = this.getAvailableMissionsFrom.bind(this);
+      window.missionSystem.canGetMissionsFrom = this.canGetMissionsFrom.bind(this);
+      window.missionSystem.startMission = this.startMission.bind(this);
+      window.missionSystem.getMissionHistory = () => _missionHistory;
+      window.missionSystem.getMissionCooldowns = () => _missionCooldowns;
+      window.missionSystem.getCurrentMission = () => _currentMission;
+      
+      // Legacy method for generating available missions
+      window.missionSystem.generateAvailableMissions = function() {
+        console.log("[Legacy] Generating available missions");
+        return true;
+      };
+      
+      // Track available missions for backward compatibility
+      window.missionSystem.availableMissions = window.missionSystem.availableMissions || [];
+      window.missionSystem.missionHistory = _missionHistory;
+      window.missionSystem.missionCooldowns = _missionCooldowns;
+      
+      // Support continueMissionAfterCombat for backward compatibility
+      window.missionSystem.continueMissionAfterCombat = this.continueMissionAfterCombat.bind(this);
+      
+      // Set up global functions
+      window.startMission = this.startMission.bind(this);
+      window.continueMissionAfterCombat = this.continueMissionAfterCombat.bind(this);
     },
     
     // Get available missions from an NPC
@@ -637,28 +914,6 @@ window.MissionSystem = (function() {
             continue;
           }
           
-          missions.push({
-            type: type,
-            title: template.title,
-            description: template.description,
-            difficulty: template.difficulty
-          });
-        }
-      }
-      
-      return missions;
-    },
-    
-    // Check if player can get missions from an NPC
-    canGetMissionsFrom: function(npcId) {
-      // Check if any missions are available from this NPC
-      for (const template of Object.values(_missionTemplates)) {
-        if (template.giver === npcId) {
-          // Check if mission is on cooldown
-          if (_missionCooldowns[template.type] && window.gameState.day < _missionCooldowns[template.type].until) {
-            continue;
-          }
-          
           // Check requirements if any
           if (template.requires) {
             let meetsRequirements = true;
@@ -666,7 +921,7 @@ window.MissionSystem = (function() {
             for (const [requirement, value] of Object.entries(template.requires)) {
               if (requirement === 'level') {
                 // Check player level
-                if (window.gameState.level < value) {
+                if ((window.gameState.level || 1) < value) {
                   meetsRequirements = false;
                   break;
                 }
@@ -705,32 +960,41 @@ window.MissionSystem = (function() {
             }
           }
           
-          // If we got here, at least one mission is available
-          return true;
+          missions.push({
+            type: type,
+            title: template.title,
+            description: template.description,
+            difficulty: template.difficulty
+          });
         }
       }
       
-      return false;
+      return missions;
+    },
+    
+    // Check if player can get missions from an NPC
+    canGetMissionsFrom: function(npcId) {
+      return this.getAvailableMissionsFrom(npcId).length > 0;
     },
     
     // Start a mission
     startMission: function(type) {
-      if (_missionInProgress) {
-        console.warn("Cannot start a new mission while one is in progress");
+      // Check if already in a mission
+      if (window.gameState.inMission) {
+        console.warn("[MissionSystem] Cannot start a new mission while one is in progress");
         return false;
       }
       
       // Generate the mission
       const mission = _generateMission(type);
       if (!mission) {
-        console.warn("Failed to generate mission of type:", type);
+        console.warn("[MissionSystem] Failed to generate mission of type:", type);
         return false;
       }
       
       // Set mission state
       _currentMission = mission;
       _missionStage = 0;
-      _missionInProgress = true;
       _dialogueStage = 0;
       
       // Update game state
@@ -738,10 +1002,59 @@ window.MissionSystem = (function() {
       window.gameState.currentMission = mission;
       window.gameState.missionStage = 0;
       
+      // Lock narrative updates during mission if UI system supports it
+      if (window.UI && window.UI.state) {
+        window.UI.state.narrativeLock = true;
+      }
+      
+      // Trigger mission start event
+      _trigger('missionStart', { mission });
+      
       // Start the mission
       _processMissionStage();
       
       return true;
+    },
+    
+    // Continue mission after combat (for backward compatibility)
+    continueMissionAfterCombat: function(result) {
+      if (_pendingCombatResult) {
+        _log('Already have pending combat result, ignoring duplicate call');
+        return;
+      }
+      
+      if (!window.gameState.inMission || !_currentMission) {
+        console.warn("[MissionSystem] No active mission to continue after combat");
+        return;
+      }
+      
+      // Get the current stage
+      const stage = _currentMission.stages[_missionStage];
+      if (stage.type !== 'combat') {
+        console.warn("[MissionSystem] Current mission stage is not combat");
+        return;
+      }
+      
+      // Handle the combat result
+      _handleCombatResult(result, stage);
+    },
+    
+    // Update mission cooldowns (called at day change)
+    updateCooldowns: function() {
+      const currentDay = window.gameState.day;
+      
+      // Remove expired cooldowns
+      for (const [missionType, cooldown] of Object.entries(_missionCooldowns)) {
+        if (currentDay >= cooldown.until) {
+          delete _missionCooldowns[missionType];
+        }
+      }
+    },
+    
+    // Emergency recovery function
+    emergencyRecover: function() {
+      _log("Performing emergency recovery");
+      return _returnToNormalGameState();
     },
     
     // Register mission templates
@@ -752,7 +1065,7 @@ window.MissionSystem = (function() {
         'patrol': {
           title: "Border Patrol",
           description: "Patrol the border area to ensure no enemy forces are approaching.",
-          difficulty: "Easy",
+          difficulty: 1,
           giver: "sergeant",
           cooldown: 2,
           stages: [
@@ -820,7 +1133,7 @@ window.MissionSystem = (function() {
         'recon': {
           title: "Reconnaissance Mission",
           description: "Gather intelligence on enemy positions beyond the river.",
-          difficulty: "Medium",
+          difficulty: 2,
           giver: "commander",
           requires: { "level": 2 },
           cooldown: 3,
@@ -956,7 +1269,7 @@ window.MissionSystem = (function() {
         'supplies': {
           title: "Supply Procurement",
           description: "Secure vital supplies for the Kasvaari camp.",
-          difficulty: "Easy",
+          difficulty: 1,
           giver: "quartermaster",
           cooldown: 2,
           stages: [
@@ -1034,667 +1347,185 @@ window.MissionSystem = (function() {
           }
         }
       };
-    },
-    
-    // Update mission cooldowns (called at day change)
-    updateCooldowns: function() {
-      // Nothing to do if no cooldowns
-      if (Object.keys(_missionCooldowns).length === 0) return;
-      
-      const currentDay = window.gameState.day;
-      
-      // Remove expired cooldowns
-      for (const [missionType, cooldown] of Object.entries(_missionCooldowns)) {
-        if (currentDay >= cooldown.until) {
-          delete _missionCooldowns[missionType];
-        }
-      }
-    },
-    
-    // Continue mission after combat (for backward compatibility)
-    continueMissionAfterCombat: function(result) {
-      if (!_missionInProgress || !_currentMission) {
-        console.warn("No active mission to continue after combat");
-        return;
-      }
-      
-      // Get the current stage
-      const stage = _currentMission.stages[_missionStage];
-      if (stage.type !== 'combat') {
-        console.warn("Current mission stage is not combat");
-        return;
-      }
-      
-      // Handle the combat result
-      _handleCombatResult(result, stage);
-    },
-    
-    // Generate available missions for compatibility with main.js
-    generateAvailableMissions: function() {
-      console.log("Generating available missions");
-      
-      // Make sure missionSystem is set up for backward compatibility
-      if (!window.missionSystem) {
-        window.missionSystem = {};
-      }
-      
-      // Ensure the array exists
-      window.missionSystem.availableMissions = window.missionSystem.availableMissions || [];
-      
-      // This function is called by the old code - we can just make sure templates are registered
-      this.registerMissionTemplates();
       
       return true;
     },
     
-    // Getters for external access
-    getCurrentMission: function() {
-      return _currentMission;
+    // Event registration
+    on: function(event, callback) {
+      return _on(event, callback);
     },
     
+    off: function(event, index) {
+      _off(event, index);
+    },
+    
+    // Public getters
     getMissionHistory: function() {
-      return _missionHistory;
+      return [..._missionHistory];
     },
     
     getMissionCooldowns: function() {
-      return _missionCooldowns;
+      return {..._missionCooldowns};
+    },
+    
+    getCurrentMission: function() {
+      return _currentMission;
     }
   };
 })();
 
 // Initialize the mission system when document is ready
 document.addEventListener('DOMContentLoaded', function() {
-  // Create missionSystem object immediately if it doesn't exist
-  window.missionSystem = window.missionSystem || {};
-  window.missionSystem.availableMissions = window.missionSystem.availableMissions || [];
-  
-  // Generate missions for compatibility
-  if (window.MissionSystem && typeof window.MissionSystem.generateAvailableMissions === 'function') {
-    window.MissionSystem.generateAvailableMissions();
-  }
-  
-  // Initialize the system
   window.MissionSystem.init();
 });
 
-// Enhanced Training Button Implementation
-window.handleTrain = function() {
-  // Check time of day - can only train during day and dawn
-  const timeOfDay = window.getTimeOfDay();
-  if (timeOfDay !== 'day' && timeOfDay !== 'dawn') {
-    showNotification("It's too late to train. Come back tomorrow during daylight hours.", 'warning');
-    return;
-  }
-  
-  // Check daily training limit
-  if (window.gameState.dailyTrainingCount >= 3) {
-    showNotification("You've already trained enough today. Your muscles need rest.", 'warning');
-    return;
-  }
-  
-  // Check stamina
-  if (window.gameState.stamina < 25) {
-    showNotification("You're too exhausted to train effectively. Rest first.", 'warning');
-    return;
-  }
-  
-  // Choose training type
-  const trainingOptions = document.createElement('div');
-  trainingOptions.className = 'training-options';
-  
-  // Get current attributes and their limits
-  const currentPhy = Number(window.player.phy);
-  const currentMen = Number(window.player.men);
-  const phyCap = 15;
-  const menCap = 15;
-  
-  // Create enhanced physical training option
-  const phyOption = document.createElement('button');
-  phyOption.className = 'action-btn';
-  phyOption.innerHTML = `💪 Physical Training <span class="attribute-display">(PHY: ${currentPhy.toFixed(2)}/${phyCap})</span>`;
-  
-  if (currentPhy >= phyCap) {
-    phyOption.disabled = true;
-    phyOption.title = "You've reached the maximum physical attribute level.";
-    phyOption.classList.add('disabled');
-  }
-  
-  phyOption.onclick = function() {
-    handleAttributeTraining('phy', 25, phyCap);
-  };
-  
-  // Create enhanced mental training option
-  const menOption = document.createElement('button');
-  menOption.className = 'action-btn';
-  menOption.innerHTML = `🧠 Mental Training <span class="attribute-display">(MEN: ${currentMen.toFixed(2)}/${menCap})</span>`;
-  
-  if (currentMen >= menCap) {
-    menOption.disabled = true;
-    menOption.title = "You've reached the maximum mental attribute level.";
-    menOption.classList.add('disabled');
-  }
-  
-  menOption.onclick = function() {
-    handleAttributeTraining('men', 20, menCap);
-  };
-  
-  // Create enhanced skills training option
-  const skillsOption = document.createElement('button');
-  skillsOption.className = 'action-btn';
-  skillsOption.innerHTML = `🎯 Skills Training <span class="skills-note">Improve combat & survival skills</span>`;
-  skillsOption.onclick = function() {
-    handleSkillsTraining();
-  };
-  
-  // Cancel button
-  const cancelOption = document.createElement('button');
-  cancelOption.className = 'action-btn cancel-btn';
-  cancelOption.textContent = 'Cancel';
-  cancelOption.onclick = function() {
-    setNarrative("You decide not to train right now.");
-    
-    // Restore regular action buttons
-    updateActionButtons();
-  };
-  
-  // Add options to container
-  trainingOptions.appendChild(phyOption);
-  trainingOptions.appendChild(menOption);
-  trainingOptions.appendChild(skillsOption);
-  trainingOptions.appendChild(cancelOption);
-  
-  // Replace action buttons with training options
-  const actionsContainer = document.getElementById('actions');
-  if (actionsContainer) {
-    actionsContainer.innerHTML = '';
-    actionsContainer.appendChild(trainingOptions);
-  }
-  
-  // Update narrative
-  setNarrative("What type of training would you like to focus on?");
-};
 
-// Gambling Tent Implementation
-window.handleGambling = function() {
-  // Check time of day - only available in evening and night
-  const timeOfDay = window.getTimeOfDay();
-  if (timeOfDay !== 'evening' && timeOfDay !== 'night') {
-    showNotification("The gambling tent is not open during the day.", 'warning');
-    return;
-  }
-  
-  // Check if player has discovered the gambling tent
-  if (!window.gameState.discoveredGamblingTent) {
-    showNotification("You don't know where the gambling tent is located.", 'warning');
-    return;
-  }
-  
-  // Show gambling options
-  showGamblingOptions();
-};
+// COMBAT-MISSION INTEGRATION FIX
+// Add this to the end of your missions.js file or as a separate file
 
-// Show gambling options
-function showGamblingOptions() {
-  setNarrative("You enter a dimly lit tent on the outskirts of camp. Inside, soldiers gather around makeshift tables, trying their luck at games of chance. The air is thick with excitement and tension.");
+// Fix for mission combat callback handling
+(function fixMissionCombatIntegration() {
+  console.log("Applying mission-combat integration fix");
   
-  const actionsContainer = document.getElementById('actions');
-  if (!actionsContainer) return;
-  
-  actionsContainer.innerHTML = '';
-  
-  // Add gambling options
-  addActionButton('🃏 Card Game - Higher Card Wins', 'play_cards', actionsContainer);
-  addActionButton('🎲 Dice Game - Lucky Sevens', 'play_dice', actionsContainer);
-  
-  // Add back button
-  addActionButton('← Return to Camp', 'back_from_gambling', actionsContainer);
-}
-
-// Process gambling action
-window.handleAction = window.handleAction || function() {};
-const originalHandleAction = window.handleAction;
-window.handleAction = function(action) {
-  // Handle special gambling and brawling actions
-  if (action === 'play_cards' || action === 'play_dice') {
-    showGamblingGame(action);
-    return;
-  } else if (action === 'back_from_gambling') {
-    setNarrative("You leave the gambling tent and return to the main camp area.");
-    updateActionButtons();
-    return;
-  } else if (action === 'back_from_brawler') {
-    setNarrative("You leave the brawler pits and return to the main camp area.");
-    updateActionButtons();
-    return;
-  } else if (action === 'novice_match' || action === 'standard_match' || action === 'veteran_match') {
-    handleBrawl(action);
-    return;
-  }
-  
-  // For all other actions, use the original handler
-  originalHandleAction(action);
-};
-
-// Show gambling game interface
-function showGamblingGame(action) {
-  const actionsContainer = document.getElementById('actions');
-  if (!actionsContainer) return;
-  
-  actionsContainer.innerHTML = '';
-  
-  // Create game interface elements
-  const gameTitle = document.createElement('h3');
-  
-  const bettingContainer = document.createElement('div');
-  bettingContainer.className = 'betting-container';
-  bettingContainer.innerHTML = `
-    <div class="betting-label">Your taelors: ${window.player.taelors}</div>
-    <div class="betting-input-group">
-      <label for="betAmount">Bet amount:</label>
-      <input type="number" id="betAmount" min="1" max="${window.player.taelors}" value="5">
-    </div>
-  `;
-  
-  const buttonContainer = document.createElement('div');
-  buttonContainer.className = 'button-container';
-  
-  const confirmButton = document.createElement('button');
-  confirmButton.className = 'action-btn confirm-btn';
-  confirmButton.textContent = 'Place Bet';
-  
-  const cancelButton = document.createElement('button');
-  cancelButton.className = 'action-btn cancel-btn';
-  cancelButton.textContent = 'Cancel';
-  
-  buttonContainer.appendChild(confirmButton);
-  buttonContainer.appendChild(cancelButton);
-  
-  // Update based on game type
-  if (action === 'play_cards') {
-    gameTitle.textContent = 'Card Game - Higher Card Wins';
-    setNarrative("You approach a table where soldiers are playing a simple card game. Each player draws a card from the deck, and the highest card wins. Aces are high, and ties result in a draw with bets returned.");
-  } else if (action === 'play_dice') {
-    gameTitle.textContent = 'Dice Game - Lucky Sevens';
-    setNarrative("The dice game is simple but popular. Each player rolls two dice, aiming for a sum of seven. If you roll a seven, you win double your bet. If you roll a sum of 2 or 12, you lose everything. Any other number means you lose your bet.");
-  }
-  
-  // Add to DOM
-  actionsContainer.appendChild(gameTitle);
-  actionsContainer.appendChild(bettingContainer);
-  actionsContainer.appendChild(buttonContainer);
-  
-  // Add event listeners
-  confirmButton.addEventListener('click', function() {
-    const betInput = document.getElementById('betAmount');
-    if (!betInput) return;
-    
-    const betAmount = parseInt(betInput.value);
-    
-    // Check if bet is valid
-    if (isNaN(betAmount) || betAmount <= 0 || betAmount > window.player.taelors) {
-      showNotification("Please enter a valid bet amount.", 'warning');
-      return;
-    }
-    
-    // Process the bet
-    processGambling(action, betAmount);
-  });
-  
-  cancelButton.addEventListener('click', function() {
-    // Return to gambling options
-    showGamblingOptions();
-  });
-}
-
-// Process gambling outcome
-function processGambling(gameType, betAmount) {
-  // Deduct the bet amount
-  window.player.taelors -= betAmount;
-  
-  let outcome = "";
-  let winnings = 0;
-  
-  if (gameType === 'play_cards') {
-    // Card game logic
-    const playerCard = Math.floor(Math.random() * 13) + 1; // 1-13 (Ace to King)
-    const opponentCard = Math.floor(Math.random() * 13) + 1;
-    
-    const cardNames = {
-      1: "Ace", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7", 
-      8: "8", 9: "9", 10: "10", 11: "Jack", 12: "Queen", 13: "King"
-    };
-    
-    if (playerCard > opponentCard) {
-      // Win
-      winnings = betAmount * 2;
-      outcome = `You draw a ${cardNames[playerCard]} while your opponent draws a ${cardNames[opponentCard]}. You win ${winnings} taelors!`;
-      showNotification(`You won ${winnings} taelors!`, 'success');
-    } else if (playerCard < opponentCard) {
-      // Lose
-      outcome = `You draw a ${cardNames[playerCard]} while your opponent draws a ${cardNames[opponentCard]}. You lose your bet of ${betAmount} taelors.`;
-      showNotification(`You lost ${betAmount} taelors!`, 'warning');
-    } else {
-      // Tie
-      winnings = betAmount; // Return the bet
-      outcome = `You both draw a ${cardNames[playerCard]}. It's a tie! Your bet is returned.`;
-      showNotification(`It's a tie! Bet returned.`, 'info');
-    }
-  } else if (gameType === 'play_dice') {
-    // Dice game logic
-    const dice1 = Math.floor(Math.random() * 6) + 1;
-    const dice2 = Math.floor(Math.random() * 6) + 1;
-    const diceSum = dice1 + dice2;
-    
-    if (diceSum === 7) {
-      // Win
-      winnings = betAmount * 2;
-      outcome = `You roll a ${dice1} and a ${dice2}, summing to 7. A perfect roll! You win ${winnings} taelors!`;
-      showNotification(`Lucky Seven! You won ${winnings} taelors!`, 'success');
-    } else if (diceSum === 2 || diceSum === 12) {
-      // Lose everything
-      outcome = `You roll a ${dice1} and a ${dice2}, summing to ${diceSum}. Snake eyes! You lose your bet of ${betAmount} taelors.`;
-      showNotification(`Unlucky roll! You lost ${betAmount} taelors!`, 'warning');
-    } else {
-      // Lose bet
-      outcome = `You roll a ${dice1} and a ${dice2}, summing to ${diceSum}. Not a seven! You lose your bet of ${betAmount} taelors.`;
-      showNotification(`No luck! You lost ${betAmount} taelors!`, 'warning');
-    }
-  }
-  
-  // Add winnings to player's taelors
-  window.player.taelors += winnings;
-  
-  // Update narrative
-  addToNarrative("\n\n" + outcome);
-  
-  // Return to gambling options after a short delay
-  setTimeout(function() {
-    showGamblingOptions();
-  }, 2000);
-}
-
-// Brawler Pits Implementation
-window.handleBrawlerPits = function() {
-  // Check time of day - only available in evening and night
-  const timeOfDay = window.getTimeOfDay();
-  if (timeOfDay !== 'evening' && timeOfDay !== 'night') {
-    showNotification("The brawler pits are not active during the day.", 'warning');
-    return;
-  }
-  
-  // Check if player has discovered the brawler pits
-  if (!window.gameState.discoveredBrawlerPits) {
-    showNotification("You don't know where the brawler pits are located.", 'warning');
-    return;
-  }
-  
-  // Show brawler pit options
-  showBrawlerPitOptions();
-};
-
-// Show brawler pit options
-function showBrawlerPitOptions() {
-  setNarrative("You approach the brawler pits on the edge of camp. A makeshift arena has been constructed, surrounded by cheering soldiers. The fights are brutal but organized, with clear rules and bets placed on the outcomes.");
-  
-  const actionsContainer = document.getElementById('actions');
-  if (!actionsContainer) return;
-  
-  actionsContainer.innerHTML = '';
-  
-  // Add brawler pit options with buy-in amounts
-  addActionButton('👊 Novice Match (10 taelors buy-in)', 'novice_match', actionsContainer);
-  addActionButton('⚔️ Standard Match (25 taelors buy-in)', 'standard_match', actionsContainer);
-  addActionButton('🔥 Veteran Match (50 taelors buy-in)', 'veteran_match', actionsContainer);
-  
-  // Add watch option
-  addActionButton('👁️ Watch the Fights', 'watch_fights', actionsContainer);
-  
-  // Add back button
-  addActionButton('← Return to Camp', 'back_from_brawler', actionsContainer);
-}
-
-// Handle brawler pit activities
-function handleBrawl(action) {
-  // Check stamina requirement
-  if (window.gameState.stamina < 30) {
-    showNotification("You're too exhausted to fight in the pits. Rest first.", 'warning');
-    showBrawlerPitOptions();
-    return;
-  }
-  
-  // Determine buy-in amount and difficulty
-  let buyIn = 0;
-  let difficultyMod = 0;
-  let matchType = "";
-  
-  if (action === 'novice_match') {
-    buyIn = 10;
-    difficultyMod = 0;
-    matchType = "Novice";
-  } else if (action === 'standard_match') {
-    buyIn = 25;
-    difficultyMod = 0.25;
-    matchType = "Standard";
-  } else if (action === 'veteran_match') {
-    buyIn = 50;
-    difficultyMod = 0.5;
-    matchType = "Veteran";
-  }
-  
-  // Check if player has enough taelors
-  if (window.player.taelors < buyIn) {
-    showNotification(`You don't have enough taelors for the ${matchType} match.`, 'warning');
-    showBrawlerPitOptions();
-    return;
-  }
-  
-  // Deduct buy-in amount
-  window.player.taelors -= buyIn;
-  
-  // Deduct stamina
-  window.gameState.stamina -= 30;
-  
-  // Process the brawl
-  processBrawl(matchType, buyIn, difficultyMod);
-}
-
-// Process brawl outcome
-function processBrawl(matchType, buyIn, difficultyMod) {
-  // Determine opponent based on match type
-  let opponentName, opponentSkill, opponentStrength;
-  
-  if (matchType === "Novice") {
-    opponentName = "Midan, a young recruit";
-    opponentSkill = 2 + Math.random() * 2; // 2-4
-    opponentStrength = 3 + Math.random() * 2; // 3-5
-  } else if (matchType === "Standard") {
-    opponentName = "Cavanath, a seasoned fighter";
-    opponentSkill = 4 + Math.random() * 3; // 4-7
-    opponentStrength = 5 + Math.random() * 3; // 5-8
-  } else if (matchType === "Veteran") {
-    opponentName = "Dralka the Scarred, camp champion";
-    opponentSkill = 7 + Math.random() * 4; // 7-11
-    opponentStrength = 8 + Math.random() * 4; // 8-12
-  }
-  
-  // Show fight beginning
-  setNarrative(`You step into the pit to face ${opponentName}. The crowd forms a circle around you, cheering and placing bets.`);
-  
-  // Calculate player's combat effectiveness
-  const playerMelee = window.player.skills?.melee || 0;
-  const playerStrength = window.player.phy || 0;
-  
-  // Apply difficulty modifier to opponent
-  opponentSkill *= (1 + difficultyMod);
-  opponentStrength *= (1 + difficultyMod);
-  
-  // Calculate success chance
-  let baseChance = 50 + (playerMelee * 5) + (playerStrength * 3) - (opponentSkill * 5) - (opponentStrength * 2);
-  baseChance = Math.min(90, Math.max(10, baseChance)); // Clamp between 10% and 90%
-  
-  // Roll for fight outcome
-  const roll = Math.random() * 100;
-  
-  // Add a slight delay for suspense
-  setTimeout(function() {
-    addToNarrative("\n\nThe fight begins, both of you circling each other cautiously...");
-    
-    // Process based on match type and roll
-    setTimeout(function() {
-      let outcome, reward, expGain;
+  // Fix the handleCombatEnd function in MissionSystem
+  if (window.MissionSystem) {
+    // Safely handle combat end events
+    const originalRegisterEventHandlers = window.MissionSystem.registerEventHandlers;
+    window.MissionSystem.registerEventHandlers = function() {
+      console.log("Setting up enhanced combat event handlers");
       
-      if (roll <= baseChance) {
-        // Victory
-        if (matchType === "Novice") {
-          reward = buyIn * 2;
-          expGain = 15;
-          outcome = `\n\nYou outmaneuver ${opponentName} with a quick series of strikes. After a brief exchange, your opponent yields. The crowd cheers as you're declared the winner!`;
-        } else if (matchType === "Standard") {
-          reward = buyIn * 2.5;
-          expGain = 30;
-          outcome = `\n\nThe fight with ${opponentName} is intense. After trading several hard blows, you find an opening and deliver a decisive strike. Your opponent falls to one knee and concedes the match.`;
-        } else {
-          reward = buyIn * 3;
-          expGain = 50;
-          outcome = `\n\nFacing ${opponentName} is a true test of skill. The champion is as fearsome as the stories say. But today, your determination prevails. After a grueling contest, you manage to overpower your opponent and claim a hard-earned victory.`;
-        }
-        
-        // Award rewards
-        window.player.taelors += reward;
-        window.gameState.experience += expGain;
-        
-        // Show notifications
-        showNotification(`You won ${reward} taelors!`, 'success');
-        showNotification(`You gained ${expGain} experience!`, 'success');
-        
-        // Check for level up
-        window.checkLevelUp();
-        
-      } else {
-        // Defeat
-        if (matchType === "Novice") {
-          expGain = 5;
-          outcome = `\n\nDespite your efforts, ${opponentName} proves to be more skilled than you anticipated. The young recruit catches you off guard with a quick maneuver, and you find yourself pinned down. You concede the match.`;
-        } else if (matchType === "Standard") {
-          expGain = 10;
-          outcome = `\n\n${opponentName} lives up to their reputation. After a competitive start, your opponent finds an opening and lands a powerful blow that sends you staggering. You're unable to recover your footing and must yield.`;
-        } else {
-          expGain = 15;
-          outcome = `\n\n${opponentName} shows why they're the camp champion. The veteran fighter reads your every move and counters with devastating precision. After a valiant effort, you're thoroughly outmatched and forced to concede.`;
-        }
-        
-        // Award experience for trying
-        window.gameState.experience += expGain;
-        
-        // Show notifications
-        showNotification(`You lost the match and your buy-in of ${buyIn} taelors.`, 'warning');
-        showNotification(`You gained ${expGain} experience from the fight.`, 'info');
-        
-        // Check for level up
-        window.checkLevelUp();
+      // Listen for combat end events safely
+      if (window.CombatSystem && typeof window.CombatSystem.on === 'function') {
+        window.CombatSystem.on('combatEnd', function(data) {
+          console.log('Received combatEnd event from CombatSystem', data);
+          
+          // Check if we're in a mission combat and have a valid callback
+          if (window.gameState.inMissionCombat && 
+              typeof window.MissionSystem._combatCallback === 'function') {
+            try {
+              // Call our callback with the result
+              window.MissionSystem._combatCallback(data.result);
+            } catch (error) {
+              console.error("Error in combat callback:", error);
+              
+              // Force narrative unlock in case of error
+              if (window.UI && window.UI.state) {
+                window.UI.state.narrativeLock = false;
+              }
+              
+              // Reset combat mission state
+              window.gameState.inMissionCombat = false;
+            }
+          } else if (window.gameState.inMissionCombat) {
+            console.warn("Combat ended during mission but no valid callback exists");
+            
+            // Force narrative unlock
+            if (window.UI && window.UI.state) {
+              window.UI.state.narrativeLock = false;
+            }
+            
+            // Reset mission combat state
+            window.gameState.inMissionCombat = false;
+          }
+        });
       }
       
-      // Apply skill gain regardless of outcome
-      const meleeGain = 0.2 + (difficultyMod * 0.3); // More skill gain from harder fights
-      const currentMelee = window.player.skills?.melee || 0;
-      const meleeCap = Math.floor((window.player.phy || 0) / 1.5);
+      // Call original if it exists
+      if (typeof originalRegisterEventHandlers === 'function') {
+        originalRegisterEventHandlers.call(window.MissionSystem);
+      }
+    };
+    
+    // Fix retreat handling during missions
+    const originalAttemptRetreat = window.attemptRetreat || function() {};
+    window.attemptRetreat = function() {
+      console.log("Enhanced retreat function");
       
-      if (!window.player.skills) window.player.skills = {};
-      window.player.skills.melee = Math.min(meleeCap, currentMelee + meleeGain);
+      // Check if we're in a mission
+      if (window.gameState.inMission && window.gameState.inMissionCombat) {
+        // Show retreat message
+        const combatLog = document.getElementById('combatLog');
+        if (combatLog) {
+          combatLog.innerHTML += `<p>You attempt to retreat from combat...</p>`;
+        }
+        
+        // Force UI cleanup first
+        if (typeof window.cleanupCombatUI === 'function') {
+          window.cleanupCombatUI();
+        }
+        
+        // Mark combat as over
+        window.gameState.inBattle = false;
+        window.gameState.currentEnemy = null;
+        
+        // Clear mission combat flag
+        window.gameState.inMissionCombat = false;
+        
+        // Ensure UI elements are visible
+        const narrativeContainer = document.getElementById('narrative-container');
+        if (narrativeContainer) narrativeContainer.style.display = 'block';
+        
+        const statusBars = document.querySelector('.status-bars');
+        if (statusBars) statusBars.style.display = 'flex';
+        
+        // Unlock narrative
+        if (window.UI && window.UI.state) {
+          window.UI.state.narrativeLock = false;
+        }
+        
+        // Set a retreat narrative
+        if (typeof window.setNarrative === 'function') {
+          window.setNarrative("You've managed to retreat from combat and return to safety, though you're exhausted from running.");
+        }
+        
+        // Show a notification
+        if (typeof window.showNotification === 'function') {
+          window.showNotification("Retreated from combat", "info");
+        }
+        
+        // End the mission with failure
+        if (window.MissionSystem && 
+            typeof window.MissionSystem._completeMission === 'function') {
+          setTimeout(function() {
+            window.MissionSystem._completeMission(false);
+          }, 1000);
+        } else {
+          // Force mission state reset as fallback
+          window.gameState.inMission = false;
+          window.gameState.currentMission = null;
+          window.gameState.missionStage = 0;
+          
+          // Update action buttons
+          if (typeof window.updateActionButtons === 'function') {
+            setTimeout(window.updateActionButtons, 500);
+          }
+        }
+        
+        return;
+      }
       
-      // Apply health reduction (more for losses, less for wins)
-      const healthLoss = roll <= baseChance ? 5 + (10 * difficultyMod) : 15 + (15 * difficultyMod);
-      window.gameState.health = Math.max(1, window.gameState.health - healthLoss);
-      
-      // Update UI
-      updateStatusBars();
-      
-      // Add outcome to narrative
-      addToNarrative(outcome);
-      
-      // Return to brawler options after a delay
-      setTimeout(function() {
-        showBrawlerPitOptions();
-      }, 3000);
-    }, 1500);
-  }, 1500);
-}
-
-// Handle watch fights option
-window.handleAction = function(action) {
-  if (action === 'watch_fights') {
-    // Add time (1 hour)
-    window.updateTimeAndDay(60);
+      // Otherwise use original retreat function
+      originalAttemptRetreat();
+    };
     
-    // Small amount of experience from observing techniques
-    const expGain = 5;
-    window.gameState.experience += expGain;
+    // Ensure narrative gets unlocked after missions
+    const originalCompleteMission = window.MissionSystem._completeMission;
+    if (typeof originalCompleteMission === 'function') {
+      window.MissionSystem._completeMission = function(success, rewards) {
+        // Force unlock narrative before completing
+        if (window.UI && window.UI.state) {
+          window.UI.state.narrativeLock = false;
+        }
+        
+        // Call original
+        return originalCompleteMission.call(window.MissionSystem, success, rewards);
+      };
+    }
     
-    // Update UI
-    updateStatusBars();
-    
-    // Set narrative
-    setNarrative("You spend an hour watching the fights, studying the techniques of the various combatants. It's entertaining and educational at the same time. You notice how the more experienced fighters use feints and leverage to overcome stronger opponents.");
-    
-    // Give a small melee skill boost
-    if (!window.player.skills) window.player.skills = {};
-    const currentMelee = window.player.skills.melee || 0;
-    const meleeCap = Math.floor((window.player.phy || 0) / 1.5);
-    window.player.skills.melee = Math.min(meleeCap, currentMelee + 0.1);
-    
-    showNotification(`Gained ${expGain} experience from observing fights.`, 'success');
-    
-    // Check for level up
-    window.checkLevelUp();
-    
-    // Return to options after a delay
-    setTimeout(function() {
-      showBrawlerPitOptions();
-    }, 2000);
-    return;
+    // Run the fixed event handler registration
+    window.MissionSystem.registerEventHandlers();
   }
   
-  // Call original handler for other actions
-  originalHandleAction(action);
-};
-
-// Backward compatibility functions
-window.getMissionsByNPC = function(npcId) {
-  if (window.MissionSystem && typeof window.MissionSystem.getAvailableMissionsFrom === 'function') {
-    return window.MissionSystem.getAvailableMissionsFrom(npcId);
-  }
-  return [];
-};
-
-window.startMission = function(type) {
-  if (window.MissionSystem && typeof window.MissionSystem.startMission === 'function') {
-    return window.MissionSystem.startMission(type);
-  }
-  return false;
-};
-
-window.updateMissionCooldowns = function() {
-  if (window.MissionSystem && typeof window.MissionSystem.updateCooldowns === 'function') {
-    window.MissionSystem.updateCooldowns();
-  }
-};
-
-window.continueMissionAfterCombat = function(result) {
-  if (window.MissionSystem && typeof window.MissionSystem.continueMissionAfterCombat === 'function') {
-    window.MissionSystem.continueMissionAfterCombat(result);
-  }
-};
-
-// Add a helper function for adding action buttons (for code reuse)
-function addActionButton(label, action, container) {
-  if (!container) return;
-  
-  const btn = document.createElement('button');
-  btn.className = 'action-btn';
-  btn.textContent = label;
-  btn.setAttribute('data-action', action);
-  btn.onclick = function() {
-    handleAction(action);
-  };
-  container.appendChild(btn);
-}
+  console.log("Mission-combat integration fix applied");
+})();

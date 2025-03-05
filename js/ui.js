@@ -137,69 +137,87 @@ window.UI = {
     
     actionsContainer.innerHTML = '';
     
-    const timeOfDay = this.getTimeOfDay();
+    // Define local addActionButton function if the method isn't available yet
+    const addButton = (label, action, container) => {
+      if (!container) return;
+      
+      const btn = document.createElement('button');
+      btn.className = 'action-btn';
+      btn.textContent = label;
+      btn.setAttribute('data-action', action);
+      btn.onclick = function() {
+        if (window.ActionSystem && typeof window.ActionSystem.handleAction === 'function') {
+          window.ActionSystem.handleAction(action);
+        } else if (typeof window.handleAction === 'function') {
+          window.handleAction(action);
+        }
+      };
+      container.appendChild(btn);
+    };
+    
+    // Use either this.addActionButton if it exists, or our local function
+    const addActionButton = typeof this.addActionButton === 'function' ? 
+      this.addActionButton.bind(this) : addButton;
+    
+    const timeOfDay = this.getTimeOfDay ? this.getTimeOfDay() : 
+      (typeof window.getTimeOfDay === 'function' ? window.getTimeOfDay() : 'day');
     const hours = Math.floor(window.gameState.time / 60);
     
     // Standard actions available in camp
     if (!window.gameState.inBattle && !window.gameState.inMission) {
       // Training available during the day
       if (timeOfDay === 'day' || timeOfDay === 'dawn') {
-        this.addActionButton('Train', 'train', actionsContainer);
+        addActionButton('Train', 'train', actionsContainer);
       }
       
       // Rest always available
-      this.addActionButton('Rest', 'rest', actionsContainer);
+      addActionButton('Rest', 'rest', actionsContainer);
       
       // Patrol available during day and evening
       if (timeOfDay === 'day' || timeOfDay === 'evening') {
-        this.addActionButton('Patrol', 'patrol', actionsContainer);
+        addActionButton('Patrol', 'patrol', actionsContainer);
       }
       
       // Mess hall available during meal times
       if ((hours >= 7 && hours <= 9) || (hours >= 12 && hours <= 14) || (hours >= 18 && hours <= 20)) {
-        this.addActionButton('Mess Hall', 'mess', actionsContainer);
+        addActionButton('Mess Hall', 'mess', actionsContainer);
       }
       
       // Guard duty available all times
-      this.addActionButton('Guard Duty', 'guard', actionsContainer);
+      addActionButton('Guard Duty', 'guard', actionsContainer);
       
       // Gambling and Brawler Pits visibility logic
       if (timeOfDay === 'evening' || timeOfDay === 'night') {
         // Only show if player has discovered it or has the right background
         if (window.gameState.discoveredGamblingTent) {
-          this.addActionButton('Gambling Tent', 'gambling', actionsContainer);
+          addActionButton('Gambling Tent', 'gambling', actionsContainer);
         }
         
         if (window.gameState.discoveredBrawlerPits) {
-          this.addActionButton('Brawler Pits', 'brawler_pits', actionsContainer);
+          addActionButton('Brawler Pits', 'brawler_pits', actionsContainer);
         }
       }
       
       // Add mission-related NPC interactions if mission system exists
       if (window.missionSystem && typeof window.missionSystem.canGetMissionsFrom === 'function') {
         if (window.missionSystem.canGetMissionsFrom('commander')) {
-          this.addActionButton('Talk to Commander', 'talk_commander', actionsContainer);
+          addActionButton('Talk to Commander', 'talk_commander', actionsContainer);
         }
         
         if (window.missionSystem.canGetMissionsFrom('sergeant')) {
-          this.addActionButton('Talk to Sergeant', 'talk_sergeant', actionsContainer);
+          addActionButton('Talk to Sergeant', 'talk_sergeant', actionsContainer);
         }
         
         if (window.missionSystem.canGetMissionsFrom('quartermaster')) {
-          this.addActionButton('Talk to Quartermaster', 'talk_quartermaster', actionsContainer);
+          addActionButton('Talk to Quartermaster', 'talk_quartermaster', actionsContainer);
         }
-      }
-      
-      // Add more actions based on game progression
-      if (window.gameState.mainQuest.stage >= 1) {
-        // Add more mission options as the game progresses
       }
     }
     
     // Menu buttons - always available
-    this.addActionButton('Profile', 'profile', actionsContainer);
-    this.addActionButton('Inventory', 'inventory', actionsContainer);
-    this.addActionButton('Quest Log', 'questLog', actionsContainer);
+    addActionButton('Profile', 'profile', actionsContainer);
+    addActionButton('Inventory', 'inventory', actionsContainer);
+    addActionButton('Quest Log', 'questLog', actionsContainer);
   },
   
   // Function to add action button
