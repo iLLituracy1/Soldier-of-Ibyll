@@ -1,253 +1,168 @@
-// COMBAT-MISSION INTEGRATION
-// This module enhances the integration between the combat system and mission system
+// ENHANCED COMBAT-MISSION INTEGRATION
+// This module provides a clean, consolidated integration point between
+// the combat system and mission system, fixing transition issues
 
-(function() {
-  // Store original functions for backward compatibility
-  const originalEndCombatWithResult = window.endCombatWithResult || function() {};
-  const originalCleanupCombatUI = window.cleanupCombatUI || function() {};
+window.CombatMissionIntegration = (function() {
+  // Private state
+  let _missionCombatCallback = null;  // Callback for after combat
+  let _pendingCombatResult = null;    // Store result when UI isn't ready
+  let _originalStates = {};           // Store original states for restoration
   
-  // Central tracking for mission combat callback
-  let _missionCombatCallback = null;
+  // Debug logging helper
+  function _log(message, data) {
+    console.log(`[CombatMissionIntegration] ${message}`, data || '');
+  }
   
-  // Enhanced combat end function with robust mission integration
-  window.endCombatWithResult = function(result) {
-    console.log("[Combat Integration] Ending combat with result:", result);
+  // Error logging helper
+  function _error(message, data) {
+    console.error(`[CombatMissionIntegration] ERROR: ${message}`, data || '');
+  }
+  
+  // Save original state before combat
+  function _saveOriginalState() {
+    _originalStates = {
+      weather: window.gameState.weather,
+      narrativeLock: window.UI && window.UI.state ? window.UI.state.narrativeLock : false
+    };
     
-    // First, ensure UI is cleaned up properly
-    try {
-      if (typeof window.cleanupCombatUI === 'function') {
-        window.cleanupCombatUI();
+    _log("Saved original state", _originalStates);
+  }
+  
+  // Restore UI elements after combat
+  function _ensureUIRestored() {
+    _log("Ensuring UI elements are restored");
+    
+    // List of elements to restore with their display style
+    const elementsToRestore = [
+      {id: 'narrative-container', style: 'block'},
+      {selector: '.status-bars', style: 'flex'},
+      {id: 'actions', style: 'flex'},
+      {id: 'location', style: 'block'},
+      {id: 'timeDisplay', style: 'block'},
+      {id: 'dayDisplay', style: 'block'},
+      {id: 'dayNightIndicator', style: 'block'}
+    ];
+    
+    // Restore each element
+    elementsToRestore.forEach(item => {
+      const element = item.id 
+        ? document.getElementById(item.id) 
+        : document.querySelector(item.selector);
+        
+      if (element) {
+        element.style.display = item.style;
       }
-    } catch (error) {
-      console.error("[Combat Integration] Error during combat UI cleanup:", error);
+    });
+    
+    // Ensure combat interface is hidden
+    const combatInterface = document.getElementById('combatInterface');
+    if (combatInterface) {
+      combatInterface.classList.add('hidden');
+      combatInterface.classList.remove('combat-fullscreen');
     }
     
-    // Determine if we're in a mission combat
-    const inMissionCombat = window.gameState.inMissionCombat;
-    
-    // Clear combat state
-    window.gameState.inBattle = false;
-    window.gameState.currentEnemy = null;
-    
-    // Process result based on context
-    if (inMissionCombat) {
-      console.log("[Combat Integration] Handling mission combat result:", result);
-      
-      // Always set mission combat flag to false before continuing to avoid duplicate calls
-      window.gameState.inMissionCombat = false;
-      
-      // First, try the modern mission system
-      if (window.MissionSystem && typeof window.MissionSystem.continueMissionAfterCombat === 'function') {
-        try {
-          // Continue mission with the result after a short delay
-          setTimeout(() => {
-            window.MissionSystem.continueMissionAfterCombat(result);
-          }, 500);
-        } catch (error) {
-          console.error("[Combat Integration] Error continuing mission after combat:", error);
-          
-          // Fallback to legacy behavior
-          handleCombatResultLegacy(result);
-          
-          // Reset mission state in case of error
-          safelyResetMissionState();
-        }
-      } 
-      // Try the legacy mission system
-      else if (window.missionSystem && typeof window.missionSystem.continueMissionAfterCombat === 'function') {
-        try {
-          // Continue mission with the result after a short delay
-          setTimeout(() => {
-            window.missionSystem.continueMissionAfterCombat(result);
-          }, 500);
-        } catch (error) {
-          console.error("[Combat Integration] Error continuing mission (legacy) after combat:", error);
-          
-          // Fallback to legacy behavior
-          handleCombatResultLegacy(result);
-          
-          // Reset mission state in case of error
-          safelyResetMissionState();
-        }
-      }
-      // No mission system available, use direct fallback
-      else {
-        console.warn("[Combat Integration] No mission system available to continue mission after combat");
-        
-        // Fallback to legacy behavior
-        handleCombatResultLegacy(result);
-        
-        // Reset mission state as a last resort
-        safelyResetMissionState();
-      }
-    } 
-    // Not in a mission combat, handle normally
-    else {
-      handleCombatResultLegacy(result);
+    // Restore original states
+    if (_originalStates.weather) {
+      window.gameState.weather = _originalStates.weather;
     }
     
-    // Always restore UI elements that should be visible
-    restoreUIAfterCombat();
-    
-    // Update UI after ending combat
-    setTimeout(updateUIAfterCombat, 300);
-  };
-  
-  // Enhanced combat cleanup with better UI restoration
-  window.cleanupCombatUI = function() {
-    console.log("[Combat Integration] Cleaning up combat UI elements");
-    
-    try {
-      // First try the original cleanup
-      originalCleanupCombatUI();
-    } catch (error) {
-      console.error("[Combat Integration] Error in original combat UI cleanup:", error);
-    }
-    
-    // Do our own cleanup as a backup
-    try {
-      // Clean up any combat-specific UI elements
-      const combatContainers = [
-        'distanceContainer', 
-        'stanceContainer', 
-        'environmentContainer',
-        'momentumContainer', 
-        'combatActions', 
-        'combatLog',
-        'staminaContainer'
-      ];
-      
-      for (const id of combatContainers) {
-        const element = document.getElementById(id);
-        if (element && element.parentNode) {
-          element.parentNode.removeChild(element);
-        }
-      }
-      
-      // Hide combat interface
-      const combatInterface = document.getElementById('combatInterface');
-      if (combatInterface) {
-        combatInterface.classList.add('hidden');
-        combatInterface.classList.remove('combat-fullscreen');
-      }
-    } catch (error) {
-      console.error("[Combat Integration] Error in enhanced combat UI cleanup:", error);
-    }
-  };
-  
-  // Legacy combat result handler
-  function handleCombatResultLegacy(result) {
-    // Process based on result
-    if (result === 'victory') {
-      if (typeof window.setNarrative === 'function') {
-        window.setNarrative("You have defeated your opponent!");
-      }
-      
-      // Add experience reward for victory if not in a mission
-      if (!window.gameState.inMission) {
-        const expGain = 25;
-        window.gameState.experience += expGain;
-        
-        if (typeof window.showNotification === 'function') {
-          window.showNotification(`You gained ${expGain} experience!`, 'success');
-        }
-        
-        // Check for level up
-        if (typeof window.checkLevelUp === 'function') {
-          window.checkLevelUp();
-        }
-      }
-    } 
-    else if (result === 'defeat') {
-      if (typeof window.setNarrative === 'function') {
-        window.setNarrative("You have been defeated, but manage to escape with your life.");
-      }
-      
-      // Apply health and stamina penalties for defeat
-      const healthReduction = Math.floor(window.gameState.maxHealth * 0.5);
-      const staminaReduction = Math.floor(window.gameState.maxStamina * 0.5);
-      
-      window.gameState.health = Math.max(1, window.gameState.health - healthReduction);
-      window.gameState.stamina = Math.max(0, window.gameState.stamina - staminaReduction);
-      
-      // Add time (unconscious for 2 hours)
-      if (typeof window.updateTimeAndDay === 'function') {
-        window.updateTimeAndDay(120);
-      }
-    } 
-    else if (result === 'retreat') {
-      if (typeof window.setNarrative === 'function') {
-        window.setNarrative("You've managed to retreat from combat and return to safety, though you're exhausted from running.");
-      }
-      
-      // Reduce stamina from running
-      const staminaLoss = Math.floor(window.gameState.maxStamina * 0.3);
-      window.gameState.stamina = Math.max(0, window.gameState.stamina - staminaLoss);
-      
-      // Add some time (30 minutes of running/recovery)
-      if (typeof window.updateTimeAndDay === 'function') {
-        window.updateTimeAndDay(30);
-      }
+    // Unlock narrative if it was locked during mission
+    if (window.UI && window.UI.state) {
+      window.UI.state.narrativeLock = false;
     }
   }
   
-  // Safely reset mission state in case of errors
-  function safelyResetMissionState() {
-    console.warn("[Combat Integration] Performing emergency mission state reset");
+  // Clean up combat UI elements
+  function _cleanupCombatUI() {
+    _log("Cleaning up combat UI elements");
     
-    // Reset all mission-related state flags
+    // First try the CombatSystem's cleanup if available
+    if (window.CombatSystem && typeof window.CombatSystem.cleanupCombatUI === 'function') {
+      try {
+        window.CombatSystem.cleanupCombatUI();
+      } catch (error) {
+        _error("Error in CombatSystem.cleanupCombatUI", error);
+        // Continue with manual cleanup
+      }
+    }
+    
+    // Backup manual cleanup for combat containers
+    const combatContainers = [
+      'distanceContainer', 
+      'stanceContainer', 
+      'environmentContainer',
+      'momentumContainer', 
+      'combatActions', 
+      'combatLog',
+      'staminaContainer'
+    ];
+    
+    for (const id of combatContainers) {
+      const element = document.getElementById(id);
+      if (element && element.parentNode) {
+        element.parentNode.removeChild(element);
+      }
+    }
+    
+    // Ensure other UI is restored
+    _ensureUIRestored();
+  }
+  
+  // Process combat end event
+  function _handleCombatEnd(result) {
+    _log("Handling combat end with result:", result);
+    
+    // Clear mission combat flag first to prevent duplicate calls
+    window.gameState.inMissionCombat = false;
+    
+    // Clean up UI
+    _cleanupCombatUI();
+    
+    // If there's a mission callback, call it after a short delay
+    if (_missionCombatCallback && typeof _missionCombatCallback === 'function') {
+      // Use setTimeout to ensure UI has time to update
+      setTimeout(() => {
+        try {
+          _log("Executing mission combat callback");
+          _missionCombatCallback(result);
+          _missionCombatCallback = null; // Clear after use
+        } catch (error) {
+          _error("Error in mission combat callback", error);
+          _emergencyRecovery();
+        }
+      }, 300);
+    } else {
+      _log("No callback registered for mission combat");
+    }
+  }
+  
+  // Emergency recovery function for critical failures
+  function _emergencyRecovery() {
+    _log("Performing emergency recovery");
+    
+    // Reset all critical state flags
+    window.gameState.inBattle = false;
+    window.gameState.currentEnemy = null;
     window.gameState.inMission = false;
     window.gameState.currentMission = null;
     window.gameState.missionStage = 0;
     window.gameState.inMissionCombat = false;
     
-    // Try the mission system's emergency recovery if available
-    if (window.MissionSystem && typeof window.MissionSystem.emergencyRecover === 'function') {
-      window.MissionSystem.emergencyRecover();
-    }
-  }
-  
-  // Restore UI elements after combat
-  function restoreUIAfterCombat() {
-    // Show the narrative container
-    const narrativeContainer = document.getElementById('narrative-container');
-    if (narrativeContainer) {
-      narrativeContainer.style.display = 'block';
+    // Clear internal state
+    _missionCombatCallback = null;
+    _pendingCombatResult = null;
+    
+    // Restore UI elements
+    _ensureUIRestored();
+    
+    // Set an emergency recovery message
+    if (typeof window.setNarrative === 'function') {
+      window.setNarrative("You've returned to camp after a momentary disorientation.");
     }
     
-    // Show status bars
-    const statusBars = document.querySelector('.status-bars');
-    if (statusBars) {
-      statusBars.style.display = 'flex';
-    }
-    
-    // Show game header elements
-    const elementsToRestore = [
-      'location',
-      'timeDisplay',
-      'dayDisplay',
-      'dayNightIndicator'
-    ];
-    
-    for (const id of elementsToRestore) {
-      const element = document.getElementById(id);
-      if (element) {
-        element.style.display = 'block';
-      }
-    }
-    
-    // Ensure action buttons container is visible
-    const actionsContainer = document.getElementById('actions');
-    if (actionsContainer) {
-      actionsContainer.style.display = 'flex';
-    }
-  }
-  
-  // Update UI after combat ends
-  function updateUIAfterCombat() {
-    // Update status bars
-    if (typeof window.updateStatusBars === 'function') {
-      window.updateStatusBars();
+    // Show notification
+    if (typeof window.showNotification === 'function') {
+      window.showNotification("Emergency recovery completed. Game state has been reset.", "info");
     }
     
     // Update action buttons
@@ -255,34 +170,192 @@
       window.updateActionButtons();
     }
     
-    // Double check action buttons appeared
-    setTimeout(() => {
-      const actionsContainer = document.getElementById('actions');
-      if (actionsContainer && actionsContainer.children.length === 0) {
-        console.warn("[Combat Integration] No action buttons found after combat! Running safeguard...");
-        
-        // Force action buttons update
-        if (typeof window.updateActionButtons === 'function') {
-          window.updateActionButtons();
-        }
-        
-        // If we're in a mission but have no action buttons, there's likely a problem
-        if (window.gameState.inMission && actionsContainer.children.length === 0) {
-          console.warn("[Combat Integration] Still no action buttons in mission! Attempting recovery...");
-          safelyResetMissionState();
-        }
-      }
-    }, 600);
+    return true;
   }
   
-  // Fix the retreat functionality to properly handle mission-combat integration
-  const originalAttemptRetreat = window.attemptRetreat || function() {};
-  window.attemptRetreat = function() {
-    console.log("[Combat Integration] Player attempting retreat from combat");
+  // Public API
+  return {
+    // Start mission combat with enhanced error handling
+    startMissionCombat: function(enemyType, environment, callback) {
+      _log("Starting mission combat", { enemyType, environment });
+      
+      // Validate parameters
+      if (!enemyType) {
+        _error("Missing enemy type");
+        return false;
+      }
+      
+      // Set mission combat flag
+      window.gameState.inMissionCombat = true;
+      
+      // Save original state
+      _saveOriginalState();
+      
+      // Store callback for after combat
+      if (typeof callback === 'function') {
+        _missionCombatCallback = callback;
+      }
+      
+      // Start combat with appropriate system
+      if (window.CombatSystem && typeof window.CombatSystem.startCombat === 'function') {
+        window.CombatSystem.startCombat(enemyType, environment || null);
+      } else if (typeof window.startCombat === 'function') {
+        window.startCombat(enemyType, environment || null);
+      } else {
+        _error("No combat system available to start combat");
+        window.gameState.inMissionCombat = false;
+        return false;
+      }
+      
+      return true;
+    },
     
-    // Check if we're in a mission-related combat
+    // Handle end of combat for mission integration
+    handleCombatEnd: function(result) {
+      _handleCombatEnd(result);
+    },
+    
+    // Register a callback for after mission combat
+    registerCallback: function(callback) {
+      if (typeof callback !== 'function') {
+        _error("Invalid callback provided", callback);
+        return false;
+      }
+      
+      _missionCombatCallback = callback;
+      return true;
+    },
+    
+    // Continue mission after combat
+    continueMissionAfterCombat: function(result) {
+      _log("Continuing mission after combat", { result });
+      
+      // Check if we're in a mission
+      if (!window.gameState.inMission) {
+        _error("Not in a mission when continueMissionAfterCombat was called");
+        return false;
+      }
+      
+      // Clear mission combat flag
+      window.gameState.inMissionCombat = false;
+      
+      // Handle based on mission system
+      if (window.MissionSystem && typeof window.MissionSystem.continueMissionAfterCombat === 'function') {
+        try {
+          window.MissionSystem.continueMissionAfterCombat(result);
+          return true;
+        } catch (error) {
+          _error("Error in MissionSystem.continueMissionAfterCombat", error);
+          _emergencyRecovery();
+          return false;
+        }
+      } else if (window.missionSystem && typeof window.missionSystem.continueMissionAfterCombat === 'function') {
+        try {
+          window.missionSystem.continueMissionAfterCombat(result);
+          return true;
+        } catch (error) {
+          _error("Error in missionSystem.continueMissionAfterCombat", error);
+          _emergencyRecovery();
+          return false;
+        }
+      } else {
+        _error("No mission system available to continue mission after combat");
+        _emergencyRecovery();
+        return false;
+      }
+    },
+    
+    // Emergency recovery function
+    emergencyRecovery: function() {
+      return _emergencyRecovery();
+    },
+    
+    // Check if in mission combat
+    isInMissionCombat: function() {
+      return window.gameState.inMissionCombat;
+    },
+    
+    // Add emergency recovery button to the UI
+    addEmergencyRecoveryButton: function() {
+      _log("Adding emergency recovery button");
+      
+      // Check if it already exists
+      if (document.getElementById('emergency-recovery-btn')) {
+        return;
+      }
+      
+      // Create button
+      const button = document.createElement('button');
+      button.id = 'emergency-recovery-btn';
+      button.textContent = '🛟 Emergency Recovery';
+      button.style.position = 'fixed';
+      button.style.bottom = '10px';
+      button.style.right = '10px';
+      button.style.zIndex = '9999';
+      button.style.backgroundColor = '#ff4b4b';
+      button.style.color = 'white';
+      button.style.padding = '10px';
+      button.style.border = 'none';
+      button.style.borderRadius = '5px';
+      
+      // Add click handler
+      button.onclick = function() {
+        _emergencyRecovery();
+        
+        // Remove button after use
+        if (this.parentNode) this.parentNode.removeChild(this);
+      };
+      
+      document.body.appendChild(button);
+    }
+  };
+})();
+
+// Hook into CombatSystem if available
+(function integrateCombatSystem() {
+  if (window.CombatSystem) {
+    console.log("Enhancing CombatSystem with mission integration");
+    
+    // Store original functions
+    const originalEndCombat = window.CombatSystem.endCombat;
+    
+    // Enhance endCombat method with mission integration
+    window.CombatSystem.endCombat = function(result) {
+      console.log("[CombatSystem] Enhanced endCombat called with:", result);
+      
+      // Store mission combat state before calling original
+      const wasInMissionCombat = window.gameState.inMissionCombat;
+      
+      // Call original function
+      originalEndCombat.call(this, result);
+      
+      // Handle mission integration if needed
+      if (wasInMissionCombat) {
+        window.CombatMissionIntegration.handleCombatEnd(result);
+      }
+    };
+    
+    // Add startMissionCombat function if not already present
+    if (!window.CombatSystem.startMissionCombat) {
+      window.CombatSystem.startMissionCombat = function(enemyType, environment, callback) {
+        return window.CombatMissionIntegration.startMissionCombat(enemyType, environment, callback);
+      };
+    }
+  }
+})();
+
+// Enhanced retreat functionality
+(function enhanceRetreatFunctionality() {
+  // Store original function
+  const originalAttemptRetreat = window.attemptRetreat || function() {};
+  
+  // Replace with enhanced version
+  window.attemptRetreat = function() {
+    console.log("Enhanced retreat function called");
+    
+    // Special handling for mission combat
     if (window.gameState.inMissionCombat) {
-      console.log("[Combat Integration] Handling retreat during mission combat");
+      console.log("Handling retreat during mission combat");
       
       // Show retreat message
       const combatLog = document.getElementById('combatLog');
@@ -291,152 +364,123 @@
         combatLog.scrollTop = combatLog.scrollHeight;
       }
       
-      // Force UI cleanup before ending combat to avoid glitches
+      // Force UI cleanup
       if (typeof window.cleanupCombatUI === 'function') {
         window.cleanupCombatUI();
       }
       
-      // Clear combat state
-      window.gameState.inBattle = false;
-      window.gameState.currentEnemy = null;
-      
-      // Ensure we safely handle mission continuation
+      // End combat with retreat result after a slight delay
       setTimeout(() => {
+        // Clear combat state
+        window.gameState.inBattle = false;
+        window.gameState.currentEnemy = null;
+        
         // End combat with retreat result
-        window.endCombatWithResult('retreat');
+        if (typeof window.endCombatWithResult === 'function') {
+          window.endCombatWithResult('retreat');
+        } else if (window.CombatSystem && typeof window.CombatSystem.endCombat === 'function') {
+          window.CombatSystem.endCombat('retreat');
+        }
       }, 500);
       
       return;
     }
     
-    // For non-mission combat, use the original retreat function
+    // For non-mission combat, use the original function
     originalAttemptRetreat();
   };
+})();
+
+// Enhanced endCombatWithResult function that works with both systems
+(function enhanceEndCombatWithResult() {
+  // Store original function
+  const originalEndCombatWithResult = window.endCombatWithResult || function() {};
   
-  // Enhanced mission combat start function
-  window.startMissionCombat = function(enemyType, environment, callbackOnCompletion) {
-    console.log("[Combat Integration] Starting mission combat with enemy:", enemyType);
+  // Replace with enhanced version
+  window.endCombatWithResult = function(result) {
+    console.log("Enhanced endCombatWithResult called with:", result);
     
-    // Set mission combat flag
-    window.gameState.inMissionCombat = true;
-    
-    // Store callback for later use
-    _missionCombatCallback = callbackOnCompletion;
-    
-    // Start the combat
-    if (window.CombatSystem && typeof window.CombatSystem.startCombat === 'function') {
-      window.CombatSystem.startCombat(enemyType, environment);
-    } else if (typeof window.startCombat === 'function') {
-      window.startCombat(enemyType, environment);
-    } else {
-      console.error("[Combat Integration] No combat system available to start combat");
+    try {
+      // Call original function
+      originalEndCombatWithResult(result);
+    } catch (error) {
+      console.error("Error in original endCombatWithResult:", error);
       
-      // Reset mission combat flag
-      window.gameState.inMissionCombat = false;
-      
-      // Call the callback with defeat result as a fallback
-      if (typeof callbackOnCompletion === 'function') {
-        callbackOnCompletion('defeat');
+      // Fallback implementation
+      if (window.CombatSystem && typeof window.CombatSystem.endCombat === 'function') {
+        window.CombatSystem.endCombat(result);
+      } else {
+        // Clear combat state as a final fallback
+        window.gameState.inBattle = false;
+        window.gameState.currentEnemy = null;
+        
+        // Update UI
+        if (typeof window.cleanupCombatUI === 'function') {
+          window.cleanupCombatUI();
+        }
       }
     }
-  };
-  
-  // Create a direct function to continue mission after combat
-  window.continueMissionAfterCombat = function(result) {
-    console.log("[Combat Integration] Continuing mission after combat with result:", result);
     
-    // Clear mission combat flag first to prevent duplicate calls
+    // Check for mission combat state
+    if (window.gameState.inMissionCombat) {
+      // Use our integrated handler
+      window.CombatMissionIntegration.handleCombatEnd(result);
+    }
+  };
+})();
+
+// Global function to fix mission state after combat
+window.fixMissionStateAfterCombat = function() {
+  console.log("Checking and fixing mission state after combat");
+  
+  // Check if combat has ended but mission combat flag is still set
+  if (!window.gameState.inBattle && window.gameState.inMissionCombat) {
+    console.log("Found stale mission combat flag! Clearing it...");
     window.gameState.inMissionCombat = false;
     
-    // Call the stored callback if available
-    if (typeof _missionCombatCallback === 'function') {
-      setTimeout(() => {
-        _missionCombatCallback(result);
-        
-        // Clear the callback after use
-        _missionCombatCallback = null;
-      }, 300);
-    }
-    // Try to use the mission system directly if no callback is set
-    else if (window.MissionSystem && typeof window.MissionSystem.continueMissionAfterCombat === 'function') {
-      setTimeout(() => {
-        window.MissionSystem.continueMissionAfterCombat(result);
-      }, 300);
-    }
-    else if (window.missionSystem && typeof window.missionSystem.continueMissionAfterCombat === 'function') {
-      setTimeout(() => {
-        window.missionSystem.continueMissionAfterCombat(result);
-      }, 300);
-    }
-    else {
-      console.warn("[Combat Integration] No method available to continue mission after combat");
+    // If we're in a mission, try to continue
+    if (window.gameState.inMission) {
+      console.log("Attempting to continue mission after combat fix");
       
-      // Reset mission state as a last resort
-      safelyResetMissionState();
+      // Default to victory result if we're in a stuck state
+      window.CombatMissionIntegration.continueMissionAfterCombat('victory');
     }
-  };
-  
-  // Enhance CombatSystem if available
-  if (window.CombatSystem) {
-    console.log("[Combat Integration] Enhancing CombatSystem with mission integration");
     
-    // Add startMissionCombat method to CombatSystem
-    window.CombatSystem.startMissionCombat = function(enemyType, environment, callbackOnCompletion) {
-      console.log("[Combat Integration] CombatSystem starting mission combat with:", enemyType);
-      
-      // Set mission combat flag
-      window.gameState.inMissionCombat = true;
-      
-      // Store callback for mission continuation
-      _missionCombatCallback = callbackOnCompletion;
-      
-      // Start the combat
-      this.startCombat(enemyType, environment);
-    };
-    
-    // Enhance endCombat method with mission integration
-    const originalEndCombat = window.CombatSystem.endCombat;
-    window.CombatSystem.endCombat = function(result) {
-      console.log("[Combat Integration] CombatSystem ending combat with result:", result);
-      
-      // Store mission combat state before calling original function
-      const wasInMissionCombat = window.gameState.inMissionCombat;
-      
-      // Call original method to handle normal combat end
-      originalEndCombat.call(this, result);
-      
-      // If this was a mission combat, handle mission continuation
-      if (wasInMissionCombat) {
-        // Continue mission after a delay to ensure UI is clean
-        setTimeout(() => {
-          window.continueMissionAfterCombat(result);
-        }, 500);
-      }
-    };
+    return true;
   }
   
-  console.log("[Combat Integration] Combat-mission integration module initialized");
+  return false; // No fix was needed
+};
+
+// Automatically check for mission combat state issues on load
+(function checkMissionCombatStateOnLoad() {
+  console.log("Setting up automatic mission combat state checker");
   
-  // Final check after a slight delay to ensure everything is ready
-  setTimeout(() => {
-    // Add enhanced retreat functionality to CombatSystem if it exists
-    if (window.CombatSystem && !window.CombatSystem._hasEnhancedRetreat) {
-      // Enhanced retreat handling
-      const originalHandleCombatAction = window.CombatSystem.handleCombatAction;
-      
-      window.CombatSystem.handleCombatAction = function(action) {
-        // Special handling for retreat_combat action
-        if (action === 'retreat_combat' && window.gameState.inMissionCombat) {
-          window.attemptRetreat();
-          return;
+  // Run after DOM is ready
+  function performCheck() {
+    // Use setTimeout to allow other scripts to initialize first
+    setTimeout(() => {
+      if (window.gameState) {
+        // Check for inconsistent state
+        if (window.gameState.inMissionCombat && !window.gameState.inBattle) {
+          console.log("Detected inconsistent mission-combat state on page load!");
+          
+          // Try to fix it
+          window.fixMissionStateAfterCombat();
+          
+          // Add emergency button if still in a bad state
+          if (window.gameState.inMission && !window.gameState.inBattle) {
+            window.CombatMissionIntegration.addEmergencyRecoveryButton();
+          }
         }
-        
-        // Normal handling for other actions
-        originalHandleCombatAction.call(this, action);
-      };
-      
-      // Flag to prevent duplicate enhancements
-      window.CombatSystem._hasEnhancedRetreat = true;
-    }
-  }, 1000);
+      }
+    }, 1000);
+  }
+  
+  // Check if DOM is already loaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', performCheck);
+  } else {
+    performCheck();
+  }
 })();

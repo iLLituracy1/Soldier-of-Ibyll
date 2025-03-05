@@ -1,181 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Soldier of Ibyll</title>
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/modernUI.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soldier of Ibyll</title>
+    
+    <!-- CSS Styles -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Data files (unchanged) -->
+<script src="js/data/origins.js"></script>
+<script src="js/data/careers.js"></script>
+<script src="js/data/narrative.js"></script>
+<script src="js/data/quests.js"></script>
+
+<!-- Core game state (REPLACE with enhanced version) -->
+<script src="js/gameState.js"></script>
+
+<!-- Game systems (unchanged) -->
+<script src="js/characterCreation.js"></script>
+<script src="js/combat.js"></script>
+<script src="js/missions.js"></script>
+<script src="js/npcInteractions.js"></script>
+<script src="js/actions.js"></script>
+
+<!-- UI system (REPLACE with consolidated version) -->
+<script src="js/consolidated-ui.js"></script>
+
+<!-- Integration system (REPLACE with enhanced version) -->
+<script src="js/combat-integration.js"></script>
+
+<!-- Phase 4: Optimization & Utilities (NEW or REPLACE) -->
+<script src="js/game-utilities.js"></script>
+<script src="js/data-validation.js"></script>
+<script src="js/event-system.js"></script>
+
+<!-- Application startup (unchanged) -->
+<script src="js/main-js-compat.js"></script>
+<script src="js/main.js"></script>
 </head>
 <body>
-  <!-- CHARACTER CREATION AND PROLOGUE SECTIONS -->
-  <div id="creator">
-    <!-- Step 1: Narrative Introduction & Heritage Selection -->
-    <div id="intro" class="section">
-      <h1>Character Creator</h1>
-      <p>
-        The drums of war echo across the land. From the fertile heartlands of the Paanic Empire to the rugged hills of Arras, armies gather beneath proud banners. You are one of many conscripts—an ordinary soul swept into a grand design of conquest. Whether you march across the Crownward Steppe or sail to the Arrasi Peninsula, your fate is to stand shoulder to shoulder with thousands, forging your destiny amid the chaos of the front lines.
-      </p>
-      <p>
-        In this life of discipline and bloodshed, it matters little what station you once held; all that remains is your loyalty to the Empire, your courage under fire, and the memories of home. Yet each heritage carries its own stories, burdens, and hopes. Will you uphold the traditions of your homeland or carve a new path beneath the Empire's sun? The choice is yours, soldier.
-      </p>
-      <h2>Select Your Heritage</h2>
-      <button id="paanic-button" class="menu-button">Heritage: Paanic</button>
-      <button id="nesian-button" class="menu-button">Heritage: Nesian</button>
-      <button id="lunarine-button" class="menu-button">Heritage: Lunarine</button>
-      <button id="wyrdman-button" class="menu-button">Heritage: Wyrdman</button>
-    </div>
-
-    <!-- Step 2: Career Selection -->
-    <div id="originSection" class="section hidden">
-      <button id="back-to-intro-button" class="menu-button">&#8592; Back to Heritage Selection</button>
-      <div id="originDescription"></div>
-      <h2>Select Your Career</h2>
-      <div id="careerOptions"></div>
-      <div id="extraButtons"></div>
-    </div>
-
-    <!-- Step 3: Name Entry -->
-    <div id="nameSection" class="section hidden">
-      <button id="back-to-origin-button" class="menu-button">&#8592; Back to Career Selection</button>
-      <h2>Enter Your Name</h2>
-      <input type="text" id="nameInput" placeholder="Your character's name">
-      <br>
-      <button id="confirm-name-button" class="menu-button">Confirm Name</button>
-    </div>
-
-    <!-- Step 4: Final Character Summary -->
-    <div id="finalOutput" class="section hidden">
-      <button id="back-to-name-button" class="menu-button">&#8592; Back to Name Entry</button>
-      <h2>Your Character</h2>
-      <p id="characterSummary"></p>
-      <button id="confirm-character-button" class="menu-button">Confirm Character</button>
-    </div>
-
-    <!-- Step 5: Prologue Screen (Career-Specific) -->
-    <div id="prologueSection" class="section hidden">
-      <h2>Prologue</h2>
-      <div id="prologueText"></div>
-      <button id="continue-to-empire-button" class="menu-button">Continue</button>
-    </div>
-
-    <!-- Step 6: Empire Update / Prologue Follow-Up -->
-    <div id="empireSection" class="section hidden">
-      <h2>The Empire's Crossroads</h2>
-      <div id="empireText"></div>
-      <button id="start-adventure-button" class="menu-button">Begin Your Adventure</button>
-    </div>
-  </div>
-
-  <!-- MAIN GAME SECTION (Kasvaari Camp) -->
-  <div id="gameContainer" class="hidden">
-    <header>
-      <h1>Kasvaari Camp</h1>
-      <div id="location">Location: Kasvaari Camp, somewhere in the Western Hierarchate of Nesia</div>
-      <div class="day-night-indicator" id="dayNightIndicator"></div>
-      <div id="timeDisplay"></div>
-      <div id="dayDisplay"></div>
-    </header>
-    
-    <!-- Status bars -->
-    <div class="status-bars">
-      <div class="status-bar">
-        <div class="status-label">Health</div>
-        <div class="bar-container">
-          <div id="healthBar" class="bar health-bar" style="width: 100%;"></div>
+    <!-- Game Container -->
+    <div id="game-container">
+        <!-- Status Bars -->
+        <div class="status-bars">
+            <div class="status-bar">
+                <div class="bar-label">Health</div>
+                <div class="bar-container">
+                    <div id="healthBar" class="bar-fill health"></div>
+                </div>
+                <div id="healthValue" class="bar-value">100/100</div>
+            </div>
+            
+            <div class="status-bar">
+                <div class="bar-label">Stamina</div>
+                <div class="bar-container">
+                    <div id="staminaBar" class="bar-fill stamina"></div>
+                </div>
+                <div id="staminaValue" class="bar-value">100/100</div>
+            </div>
+            
+            <div class="status-bar">
+                <div class="bar-label">Morale</div>
+                <div class="bar-container">
+                    <div id="moraleBar" class="bar-fill morale"></div>
+                </div>
+                <div id="moraleValue" class="bar-value">75/100</div>
+            </div>
         </div>
-        <div id="healthValue" class="bar-value">100/100</div>
-      </div>
-      <div class="status-bar">
-        <div class="status-label">Stamina</div>
-        <div class="bar-container">
-          <div id="staminaBar" class="bar stamina-bar" style="width: 100%;"></div>
+        
+        <!-- Game Info -->
+        <div class="game-info">
+            <div id="location">Kasvaari Camp</div>
+            <div id="timeDisplay">Time: 8:00 AM</div>
+            <div id="dayDisplay">Day 1</div>
+            <div id="dayNightIndicator" class="day-night-indicator time-day"></div>
         </div>
-        <div id="staminaValue" class="bar-value">100/100</div>
-      </div>
-      <div class="status-bar">
-        <div class="status-label">Morale</div>
-        <div class="bar-container">
-          <div id="moraleBar" class="bar morale-bar" style="width: 75%;"></div>
+        
+        <!-- Narrative Area -->
+        <div id="narrative-container">
+            <div id="narrative">
+                <p>Welcome to Soldier of Ibyll. Your journey begins here...</p>
+            </div>
         </div>
-        <div id="moraleValue" class="bar-value">75/100</div>
-      </div>
-    </div>
-    
-    <div id="narrative">
-    </div>
-    
-    <div id="actions">
-      <!-- Action buttons will be dynamically populated by updateActionButtons() -->
-    </div>
-    
-    <!-- Combat Interface (Hidden by default) -->
-    <div id="combatInterface" class="hidden">
-      <h3>Combat Encounter</h3>
-      <div id="combatHeader">
-        <div class="combat-health-container">
-          <div>You: <span id="playerHealthDisplay">100 HP</span></div>
-          <div class="combat-health-bar">
-            <div id="playerCombatHealth"></div>
-          </div>
+        
+        <!-- Action Buttons -->
+        <div id="actions" class="action-buttons">
+            <!-- Action buttons will be generated by the UI system -->
         </div>
-        <div class="combat-health-container">
-          <div><span id="enemyName">Enemy</span>: <span id="enemyHealthDisplay">100 HP</span></div>
-          <div class="combat-health-bar">
-            <div id="enemyCombatHealth"></div>
-          </div>
+        
+        <!-- Combat Interface (hidden by default) -->
+        <div id="combatInterface" class="hidden">
+            <div id="combatHeader">
+                <div id="enemyName">Enemy</div>
+                <div class="combat-health-display">
+                    <div class="enemy-health">
+                        <div id="enemyHealthDisplay">100 HP</div>
+                        <div class="combat-health-bar">
+                            <div id="enemyCombatHealth" class="combat-health-fill enemy"></div>
+                        </div>
+                    </div>
+                    <div class="player-health">
+                        <div id="playerHealthDisplay">100 HP</div>
+                        <div class="combat-health-bar">
+                            <div id="playerCombatHealth" class="combat-health-fill player"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="combatLog" class="combat-log"></div>
+            <div id="combatActions" class="combat-actions"></div>
         </div>
-      </div>
-      <div id="combatLog">
-        <p>Combat begins! Prepare yourself...</p>
-      </div>
-      <div id="combatActions">
-        <!-- Combat buttons will be dynamically populated -->
-      </div>
     </div>
     
-    <!-- Profile Panel -->
-    <div id="profile" class="hidden">
-      <h3>Your Profile</h3>
-      <p id="profileText"></p>
-      <button class="menu-button profile-close">Close</button>
-    </div>
+    <!-- Game Panels (hidden by default) -->
+    <div id="profile" class="hidden"></div>
+    <div id="inventory" class="hidden"></div>
+    <div id="questLog" class="hidden"></div>
     
-    <!-- Inventory Panel -->
-    <div id="inventory" class="hidden">
-      <h3>Inventory</h3>
-      <div id="inventoryList">
-        <!-- Inventory items will be dynamically populated -->
-      </div>
-      <button class="menu-button inventory-close">Close</button>
-    </div>
-    
-    <!-- Quest Log Panel -->
-    <div id="questLog" class="hidden">
-      <h3>Quest Log</h3>
-      <div id="questList">
-        <!-- Quests will be dynamically populated -->
-      </div>
-      <button class="menu-button quest-log-close">Close</button>
-    </div>
-  </div>
-  
-  <div id="notification" class="notification"></div>
-
-  <!-- Load all JavaScript modules in the correct order -->
-  <script src="js/data/origins.js"></script>
-  <script src="js/data/careers.js"></script>
-  <script src="js/data/narrative.js"></script>
-  <script src="js/data/quests.js"></script>
-  <script src="js/gameState.js"></script>
-  <script src="js/characterCreation.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/actions.js"></script>
-  <script src="js/combat.js"></script>
-  <script src="js/missions.js"></script>
-  <script src="js/npcInteractions.js"></script>
-  <script src="js/combat-integration.js"></script>
-  <script src="js/game-utilities.js"></script>
-  <script src="js/main-js-compat.js"></script>
-  <script src="js/main.js"></script>
+    <!-- Notification Area -->
+    <div id="notification" class="notification"></div>
 </body>
 </html>
