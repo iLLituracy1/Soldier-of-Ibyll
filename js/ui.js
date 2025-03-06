@@ -301,31 +301,20 @@ window.showAchievement = function(achievementId) {
 };
 
 window.showCampaignIntroduction = function() {
+  console.log("Showing campaign introduction");
+  
   // Add narrative about being summoned to commander's tent
   window.addToNarrative(`
     <p>A messenger arrives at your quarters, bearing the seal of Commander Valarius. "Your presence is requested at the command tent immediately," they state formally before departing.</p>
     <p>This could be the deployment you've been waiting for...</p>
   `);
   
-   // Add special flag to game state
-   window.gameState.awaitingCommanderReport = true;
+  // Add special flag to game state
+  window.gameState.awaitingCommanderReport = true;
   
-   // Force update of action buttons to show the special button
-   window.updateActionButtons();
- };
+  // Force update of action buttons to show the special button
+  window.updateActionButtons();
+};
   
-    // Show campaign briefing
-    window.setNarrative(`
-      <p>You enter the command tent to find Commander Valarius bent over maps of the western territories. He looks up as you enter, acknowledging you with a curt nod.</p>
-      <p>"We've received orders from high command," he says, gesturing to the map. "The Empire is pushing west, into Arrasi territory. Your unit will be deployed to secure the borderlands."</p>
-      <p>The commander outlines the strategic importance of the peninsula and the resources it would bring to the Empire. You can tell this is a major campaign, not just a border skirmish.</p>
-      <p>"Prepare yourself," Valarius concludes. "Report back here tomorrow for your specific mission assignments. This campaign will test everything you've learned so far."</p>
-    `);
-    
-    // Initialize campaign
-    window.initiateCampaign('arrasi_campaign');
-    
-    // Restore action buttons
-    actionsContainer.innerHTML = originalHTML;
-    window.updateActionButtons();
+  
   
