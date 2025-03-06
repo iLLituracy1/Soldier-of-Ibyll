@@ -1,1980 +1,2387 @@
-// SIMPLIFIED COMBAT SYSTEM
-// Weapon-based turn-based combat system with terrain and distance elements
+// COMBAT SYSTEM MODULE
+// Implements an event-based approach to combat mechanics
 
-// Combat state template
-const combatStateTemplate = {
-  inBattle: false,
-  currentEnemy: null,
-  combatTurn: 1,  // Track number of turns for effect duration
-  activeCharacter: null, // 'player' or 'enemy'
-  combatDistance: 2, // 0-close, 1-medium, 2-far
-  playerAP: 0,  // Action Points for player
-  enemyAP: 0,   // Action Points for enemy
-  maxAP: 10,    // Maximum AP per turn
-  terrain: "normal", // normal, rocky, slippery, confined, etc.
-  weather: "clear", // clear, rain, fog, wind, heat
-  combatLog: [],
-  combatEffects: [], // Active effects like bleeding, stun, etc.
-  playerBuffs: [],   // Active buffs on player
-  enemyBuffs: [],    // Active buffs on enemy
-  ambushAdvantage: null // 'player' or 'enemy' if there was an ambush
-};
+// Create the combat system namespace
+window.CombatSystem = (function() {
+  // Private state
+  let _inBattle = false;
+  let _currentEnemy = null;
+  let _originalEndCombatFunction = null;
+  
+  // Internal event system
+  const _events = {};
+  
+  // List of all combat-related UI elements to ensure proper cleanup
+  const _combatUIElements = [
+    'distanceContainer',
+    'stanceContainer',
+    'environmentContainer',
+    'momentumContainer',
+    'combatActions',
+    'combatLog'
+  ];
+  
+  // Private methods
+  const _resetCombatState = function() {
+    // Reset all combat-related state
+    window.GameState.set('inBattle', false);
+    window.GameState.set('currentEnemy', null);
+    window.GameState.set('combatPhase', 'neutral');
+    window.GameState.set('combatDistance', 2);
+    window.GameState.set('combatStance', 'neutral');
+    window.GameState.set('enemyStance', 'neutral');
+    window.GameState.set('initiativeOrder', []);
+    window.GameState.set('currentInitiative', 0);
+    window.GameState.set('playerQueuedAction', null);
+    window.GameState.set('enemyQueuedAction', null);
+    window.GameState.set('counterAttackAvailable', false);
+    window.GameState.set('playerMomentum', 0);
+    window.GameState.set('enemyMomentum', 0);
+    window.GameState.set('consecutiveHits', 0);
+    window.GameState.set('perfectParries', 0);
+    window.GameState.set('dodgeCount', 0);
+    window.GameState.set('playerStaggered', false);
+    window.GameState.set('playerInjuries', []);
+    
+    // If we saved the original weather during combat, restore it
+    if (window.GameState.get('originalWeather')) {
+      window.GameState.set('weather', window.GameState.get('originalWeather'));
+      window.GameState.set('originalWeather', null);
+    }
+    
+    // Inform mission system if needed
+    if (window.GameState.get('inMissionCombat')) {
+      window.GameState.set('inMissionCombat', false);
+    }
+    
+    _inBattle = false;
+    _currentEnemy = null;
+  };
 
-// Initialize combat with a specific enemy type
-window.startCombat = function(enemyType, options = {}) {
-  // Create enemy
-  const enemy = createEnemy(enemyType);
-  if (!enemy) {
-    console.error(`Failed to create enemy of type: ${enemyType}`);
-    return;
-  }
-  
-  // Determine environmental factors
-  const environment = determineEnvironmentalFactors();
-  
-  // Initialize combat state
-  window.gameState.combat = JSON.parse(JSON.stringify(combatStateTemplate));
-  window.gameState.combat.inBattle = true;
-  window.gameState.combat.currentEnemy = enemy;
-  window.gameState.combat.terrain = environment.terrain;
-  window.gameState.combat.weather = environment.weather;
-  
-  // Determine starting distance based on environment and enemy type
-  if (environment.terrain === "confined") {
-    window.gameState.combat.combatDistance = 1; // Medium in confined spaces
-  } else if (enemyType.includes("archer") || enemyType.includes("scout")) {
-    window.gameState.combat.combatDistance = 2; // Far for ranged enemies
-  }
-  
-  // Check for ambush situation
-  if (options.ambush) {
-    window.gameState.combat.ambushAdvantage = options.ambush;
-  }
-  
-  // Store original health values
-  window.gameState.combat.originalPlayerHealth = window.gameState.health;
-  window.gameState.combat.originalEnemyHealth = enemy.health;
-  
-  // Setup combat UI
-  setupCombatUI(enemy, environment);
-  
-  // Determine who goes first (initiative)
-  determineInitiative(enemy);
-  
-  // Start combat
-  beginCombatTurn();
-};
-
-// Create an enemy based on enemy type
-function createEnemy(enemyType) {
-  // Enemy templates
-  const enemyTemplates = {
-    "arrasi_scout": {
-      name: "Arrasi Scout",
-      phy: 3,
-      men: 3,
-      health: 35,
-      maxHealth: 35,
-      stamina: 70,
-      maxStamina: 70,
-      skills: {
-        melee: 2,
-        marksmanship: 3,
-        tactics: 2,
-        survival: 3
-      },
-      equipment: {
-        weapon: {
-          id: "arrasi_shortbow",
-          name: "Arrasi Short Bow",
-          category: "WEAPON",
-          type: "BOW",
-          stats: {
-            damage: [4, 7],
-            toHit: 5,
-            critChance: 10
+  // Public API
+  const api = {
+    // Initialize the combat system
+    init: function() {
+      console.log("Initializing combat system...");
+      
+      // Subscribe to state changes that affect combat
+      window.GameState.subscribe(function(property, value, oldValue) {
+        if (property === 'combatDistance') {
+          if (window.UI && window.UI.combat) {
+            window.UI.combat.updateDistanceIndicator();
           }
-        },
-        armor: {
-          id: "light_leather",
-          name: "Light Leather Armor",
-          category: "ARMOR",
-          stats: {
-            defense: 20
+        } else if (property === 'combatStance' || property === 'enemyStance') {
+          if (window.UI && window.UI.combat) {
+            window.UI.combat.updateStanceIndicator();
+          }
+        } else if (property === 'playerMomentum' || property === 'enemyMomentum') {
+          if (window.UI && window.UI.combat) {
+            window.UI.combat.updateMomentumIndicator();
           }
         }
-      },
-      preferredDistance: 2, // Prefers ranged combat
-      tactics: {
-        aggressive: 0.2,  // Rarely aggressive
-        defensive: 0.3,   // Sometimes defensive
-        cautious: 0.5     // Often cautious
-      },
-      description: "A lightly armored scout from the Arrasi tribes. Quick and precise with a preference for ranged attacks."
+      });
+      
+      console.log("Combat system initialized!");
     },
     
-    "arrasi_warrior": {
-      name: "Arrasi Warrior",
-      phy: 5,
-      men: 2,
-      health: 50,
-      maxHealth: 50,
-      stamina: 80,
-      maxStamina: 80,
-      skills: {
-        melee: 4,
-        marksmanship: 1,
-        tactics: 1,
-        survival: 2
-      },
-      equipment: {
-        weapon: {
-          id: "arrasi_axe",
-          name: "Arrasi War Axe",
-          category: "WEAPON",
-          type: "AXE",
-          stats: {
-            damage: [6, 10],
-            toHit: 0,
-            critChance: 10
-          }
-        },
-        armor: {
-          id: "arrasi_mail",
-          name: "Arrasi Mail",
-          category: "ARMOR",
-          stats: {
-            defense: 30
-          }
-        },
-        shield: {
-          id: "tribal_shield",
-          name: "Tribal Shield",
-          category: "SHIELD",
-          stats: {
-            defense: 15,
-            blockChance: 25
-          }
-        }
-      },
-      preferredDistance: 0, // Prefers close combat
-      tactics: {
-        aggressive: 0.6,  // Often aggressive
-        defensive: 0.3,   // Sometimes defensive
-        cautious: 0.1     // Rarely cautious
-      },
-      description: "A hardened tribal warrior wielding an axe and shield. Prefers to close distance and engage in melee combat."
+    // Event system methods
+    on: function(event, callback) {
+      if (!_events[event]) {
+        _events[event] = [];
+      }
+      _events[event].push(callback);
+      return _events[event].length - 1; // Return index for potential removal
     },
     
-    "imperial_deserter": {
-      name: "Imperial Deserter",
-      phy: 4,
-      men: 3,
-      health: 40,
-      maxHealth: 40,
-      stamina: 75,
-      maxStamina: 75,
-      skills: {
-        melee: 3,
-        marksmanship: 2,
-        tactics: 2,
-        survival: 2
-      },
-      equipment: {
-        weapon: {
-          id: "imperial_sword",
-          name: "Imperial Sword",
-          category: "WEAPON",
-          type: "SWORD",
-          stats: {
-            damage: [5, 8],
-            toHit: 5,
-            critChance: 5
-          }
-        },
-        armor: {
-          id: "worn_mail",
-          name: "Worn Mail Shirt",
-          category: "ARMOR",
-          stats: {
-            defense: 25
-          }
-        }
-      },
-      preferredDistance: 1, // Comfortable at medium range
-      tactics: {
-        aggressive: 0.3,  // Sometimes aggressive
-        defensive: 0.4,   // Often defensive
-        cautious: 0.3     // Sometimes cautious
-      },
-      description: "A former soldier who abandoned their post. Desperate and dangerous, but has military training."
+    off: function(event, index) {
+      if (!_events[event] || index === undefined) return;
+      _events[event].splice(index, 1);
     },
     
-    "wild_beast": {
-      name: "Wild Beast",
-      phy: 6,
-      men: 1,
-      health: 45,
-      maxHealth: 45,
-      stamina: 90,
-      maxStamina: 90,
-      skills: {
-        melee: 3,
-        survival: 4
-      },
-      equipment: {
-        // Natural weapons
-        weapon: {
-          id: "beast_claws",
-          name: "Sharp Claws",
-          category: "WEAPON",
-          type: "CLEAVER", // Using cleaver mechanics for natural weapons
-          stats: {
-            damage: [5, 9],
-            toHit: 0,
-            critChance: 15
+    trigger: function(event, data) {
+      if (!_events[event]) return;
+      
+      for (let callback of _events[event]) {
+        callback(data);
+      }
+    },
+    
+    // Core combat methods
+    startCombat: function(enemyType, environment = null) {
+      // Make sure we're not already in combat
+      if (_inBattle) {
+        console.warn("Attempted to start combat while already in battle");
+        return;
+      }
+      
+      // Clean up any previous combat state
+      this.cleanupCombatUI();
+      
+      // Get enemy from database
+      const enemy = this.getEnemyByType(enemyType);
+      if (!enemy) {
+        console.error("Enemy type not found:", enemyType);
+        return;
+      }
+      
+      // Setup combat environment
+      if (!environment) {
+        environment = this.generateCombatEnvironment();
+      }
+      
+      // Save original weather
+      window.GameState.set('originalWeather', window.GameState.get('weather'));
+      
+      // Set initial combat state
+      _inBattle = true;
+      _currentEnemy = enemy;
+      window.GameState.set('inBattle', true);
+      window.GameState.set('currentEnemy', enemy);
+      window.GameState.set('combatPhase', 'preparation');
+      window.GameState.set('combatDistance', 2); // Start at far distance
+      window.GameState.set('combatStance', 'neutral');
+      window.GameState.set('enemyStance', 'neutral');
+      window.GameState.set('playerMomentum', 0);
+      window.GameState.set('enemyMomentum', 0);
+      
+      // Determine initiative
+      this.rollInitiative();
+      
+      // Log start of combat
+      console.log("Starting combat with", enemy.name, "in", environment.terrain, "terrain,", environment.weather, "weather");
+      
+      // Setup the UI
+      if (window.UI && window.UI.combat) {
+        window.UI.combat.setup(enemy, environment);
+      }
+      
+      // Update available combat actions
+      this.updateCombatActions();
+      
+      // Trigger combat start event
+      this.trigger('combatStart', { enemy, environment });
+    },
+    
+    endCombat: function(result) {
+      // Ensure we're in combat
+      if (!_inBattle) {
+        console.warn("Attempted to end combat when not in battle");
+        return;
+      }
+      
+      console.log("Ending combat with result:", result);
+      
+      // First, clean up the UI
+      this.cleanupCombatUI();
+      
+      // Handle the result
+      switch(result) {
+        case 'victory':
+          this.handleVictory();
+          break;
+        case 'defeat':
+          this.handleDefeat();
+          break;
+        case 'retreat':
+          this.handleRetreat();
+          break;
+        default:
+          console.warn("Unknown combat result:", result);
+      }
+      
+      // Trigger the combat end event
+      this.trigger('combatEnd', { result, enemy: _currentEnemy });
+      
+      // Reset the combat state
+      _resetCombatState();
+      
+      // Update UI after ending combat
+      if (window.UI) {
+        window.UI.updateStatusBars();
+        window.UI.updateActionButtons();
+      }
+    },
+    
+    handleVictory: function() {
+      // Add experience
+      const expGain = _currentEnemy.expValue || 25;
+      window.GameState.set('experience', window.GameState.get('experience') + expGain);
+      
+      // Check for level up
+      window.GameState.checkLevelUp();
+      
+      // Award loot
+      if (_currentEnemy.loot) {
+        this.handleLoot(_currentEnemy.loot);
+      }
+      
+      // Add to narrative
+      if (window.UI) {
+        window.UI.setNarrative(`You have defeated the ${_currentEnemy.name}! You gain ${expGain} experience.`);
+      }
+      
+      // Check for first victory achievement
+      if (!window.GameState.get('combatVictoryAchieved')) {
+        window.GameState.set('combatVictoryAchieved', true);
+        window.GameState.updateAchievementProgress('first_blood');
+      }
+      
+      // Update various achievement counters
+      window.GameState.updateAchievementProgress('combat_mastery');
+      
+      if (_currentEnemy.type && _currentEnemy.type === 'arrasi') {
+        window.GameState.updateAchievementProgress('arrasi_hunter');
+      }
+    },
+    
+    handleDefeat: function() {
+      // Handle player defeat (non-fatal)
+      const healthReduction = Math.floor(window.GameState.get('maxHealth') * 0.5);
+      const staminaReduction = Math.floor(window.GameState.get('maxStamina') * 0.5);
+      
+      // Set health and stamina to reduced values
+      window.GameState.set('health', window.GameState.get('maxHealth') - healthReduction);
+      window.GameState.set('stamina', window.GameState.get('maxStamina') - staminaReduction);
+      
+      // Add to narrative
+      if (window.UI) {
+        window.UI.setNarrative(`You have been defeated by the ${_currentEnemy.name} and wake up later, injured and exhausted.`);
+      }
+      
+      // Add time (unconscious for 2 hours)
+      window.updateTimeAndDay(120);
+      
+      // Reduce morale
+      window.GameState.set('morale', Math.max(0, window.GameState.get('morale') - 10));
+    },
+    
+    handleRetreat: function() {
+      // Handle player retreat
+      // Lose some stamina from running
+      const staminaLoss = Math.floor(window.GameState.get('maxStamina') * 0.3);
+      window.GameState.set('stamina', Math.max(0, window.GameState.get('stamina') - staminaLoss));
+      
+      // Add to narrative
+      if (window.UI) {
+        window.UI.setNarrative(`You have retreated from the ${_currentEnemy.name}, escaping mostly unharmed but exhausted from running.`);
+      }
+      
+      // Add some time (30 minutes of running/recovery)
+      window.updateTimeAndDay(30);
+    },
+    
+    handleLoot: function(loot) {
+      if (!loot) return;
+      
+      let lootText = "You search the defeated enemy and find:";
+      
+      // Handle various loot types
+      if (loot.taelors) {
+        const taelorAmount = typeof loot.taelors === 'number' ? loot.taelors : Math.floor(Math.random() * (loot.taelors.max - loot.taelors.min + 1)) + loot.taelors.min;
+        window.Player.set('taelors', window.Player.get('taelors') + taelorAmount);
+        lootText += `\n- ${taelorAmount} taelors`;
+      }
+      
+      if (loot.items && loot.items.length > 0) {
+        for (const item of loot.items) {
+          // Check if item should be added based on chance
+          if (item.chance && Math.random() > item.chance) continue;
+          
+          // Add item to inventory
+          window.Player.addItem({
+            name: item.name,
+            effect: item.effect || "No special effects",
+            value: item.value || 0
+          });
+          
+          lootText += `\n- ${item.name}`;
+        }
+      }
+      
+      // Add loot narrative
+      if (window.UI) {
+        window.UI.addToNarrative(lootText);
+      }
+    },
+    
+    rollInitiative: function() {
+      // Calculate player's initiative score
+      const player = 'player';
+      const enemy = 'enemy';
+      
+      const playerInitiativeBase = 10;
+      const playerSkillBonus = (window.Player.get('skills.tactics') || 0) * 0.5;
+      const playerAttributeBonus = (window.Player.get('men') || 0) * 0.3;
+      const playerInitRoll = Math.floor(Math.random() * 6) + 1;
+      
+      const playerInit = playerInitiativeBase + playerSkillBonus + playerAttributeBonus + playerInitRoll;
+      
+      // Calculate enemy initiative
+      const enemyInit = _currentEnemy.initiative + Math.floor(Math.random() * 6) + 1;
+      
+      // Determine order
+      const initiativeOrder = playerInit >= enemyInit ? [player, enemy] : [enemy, player];
+      
+      window.GameState.set('initiativeOrder', initiativeOrder);
+      window.GameState.set('currentInitiative', 0);
+      
+      return initiativeOrder;
+    },
+    
+    updateCombatActions: function() {
+      // Get the combat actions container
+      const actionsContainer = document.getElementById('combatActions');
+      if (!actionsContainer) {
+        console.warn("Combat actions container not found");
+        return;
+      }
+      
+      // Clear previous actions
+      actionsContainer.innerHTML = '';
+      
+      // Get current combat state
+      const distance = window.GameState.get('combatDistance');
+      const playerStance = window.GameState.get('combatStance');
+      const playerStamina = window.GameState.get('stamina');
+      
+      // Basic actions always available
+      this.addCombatAction('advance', 'Advance', actionsContainer);
+      this.addCombatAction('retreat', 'Retreat', actionsContainer);
+      
+      // Actions based on distance
+      if (distance === 0) { // Close range
+        this.addCombatAction('attack', 'Attack', actionsContainer);
+        this.addCombatAction('grapple', 'Grapple', actionsContainer);
+        this.addCombatAction('defend', 'Defend', actionsContainer);
+        this.addCombatAction('dodge', 'Dodge', actionsContainer);
+      } else if (distance === 1) { // Medium range
+        this.addCombatAction('attack', 'Attack', actionsContainer);
+        this.addCombatAction('defend', 'Defend', actionsContainer);
+        this.addCombatAction('dodge', 'Dodge', actionsContainer);
+        
+        // If player has ranged weapon
+        if (this.playerHasRangedWeapon()) {
+          this.addCombatAction('aim', 'Aim', actionsContainer);
+          this.addCombatAction('shoot', 'Shoot', actionsContainer);
+        }
+      } else { // Far range
+        // Only ranged options at far range
+        if (this.playerHasRangedWeapon()) {
+          this.addCombatAction('aim', 'Aim', actionsContainer);
+          this.addCombatAction('shoot', 'Shoot', actionsContainer);
+        }
+        
+        // Can observe enemy
+        this.addCombatAction('observe', 'Observe', actionsContainer);
+      }
+      
+      // Stance change options
+      if (playerStance !== 'aggressive') {
+        this.addCombatAction('stance_aggressive', 'Aggressive Stance', actionsContainer);
+      }
+      
+      if (playerStance !== 'defensive') {
+        this.addCombatAction('stance_defensive', 'Defensive Stance', actionsContainer);
+      }
+      
+      if (playerStance !== 'evasive') {
+        this.addCombatAction('stance_evasive', 'Evasive Stance', actionsContainer);
+      }
+      
+      if (playerStance !== 'neutral') {
+        this.addCombatAction('stance_neutral', 'Neutral Stance', actionsContainer);
+      }
+      
+      // Special actions based on player skills
+      if (playerStamina >= 10 && window.Player.get('skills.tactics') >= 2) {
+        this.addCombatAction('feint', 'Feint', actionsContainer);
+      }
+      
+      // Retreat from battle option
+      this.addCombatAction('retreat_combat', 'Retreat from Battle', actionsContainer);
+    },
+    
+    // UI Helper Functions
+    cleanupCombatUI: function() {
+      console.log("Cleaning up combat UI elements");
+      
+      // First use the UI combat cleanup if available
+      if (window.UI && window.UI.combat && typeof window.UI.combat.cleanup === 'function') {
+        window.UI.combat.cleanup();
+      } else {
+        // Manual cleanup as fallback
+        // Remove all combat UI containers
+        _combatUIElements.forEach(id => {
+          const element = document.getElementById(id);
+          if (element) {
+            element.remove();
           }
-        },
-        // Natural armor
-        armor: {
-          id: "thick_hide",
-          name: "Thick Hide",
-          category: "ARMOR",
-          stats: {
-            defense: 15
+        });
+        
+        // Hide combat interface if it exists
+        const combatInterface = document.getElementById('combatInterface');
+        if (combatInterface) {
+          combatInterface.classList.add('hidden');
+          combatInterface.classList.remove('combat-fullscreen');
+        }
+        
+        // Restore visibility of regular UI elements
+        const elementsToRestore = [
+          { id: 'narrative-container', style: 'block' },
+          { selector: '.status-bars', style: 'flex' },
+          { id: 'location', style: 'block' },
+          { id: 'timeDisplay', style: 'block' },
+          { id: 'dayDisplay', style: 'block' },
+          { id: 'dayNightIndicator', style: 'block' },
+          { id: 'actions', style: 'flex' }
+        ];
+        
+        elementsToRestore.forEach(item => {
+          const element = item.id 
+            ? document.getElementById(item.id) 
+            : document.querySelector(item.selector);
+            
+          if (element) {
+            element.style.display = item.style;
           }
-        }
-      },
-      preferredDistance: 0, // Must be in close range
-      tactics: {
-        aggressive: 0.8,  // Very aggressive
-        defensive: 0.1,   // Rarely defensive
-        cautious: 0.1     // Rarely cautious
-      },
-      description: "A large predator native to these lands, driven to attack by hunger. Extremely aggressive in close combat."
-    }
-  };
-  
-  // Get the template
-  const template = enemyTemplates[enemyType];
-  if (!template) return null;
-  
-  // Create a copy to avoid modifying the template
-  return JSON.parse(JSON.stringify(template));
-}
-
-// Determine environmental factors for combat
-function determineEnvironmentalFactors() {
-  // Base the terrain and weather on current game conditions or random chance
-  let terrain = "normal";
-  let weather = window.gameState.weather || "clear";
-  
-  // 40% chance for special terrain based on location
-  if (Math.random() < 0.4) {
-    const terrainOptions = ["normal", "rocky", "slippery", "confined"];
-    terrain = terrainOptions[Math.floor(Math.random() * terrainOptions.length)];
-  }
-  
-  // If game already has weather, use it, otherwise randomize for combat
-  if (weather === "clear" && Math.random() < 0.3) {
-    const weatherOptions = ["clear", "rain", "fog", "wind", "heat"];
-    weather = weatherOptions[Math.floor(Math.random() * weatherOptions.length)];
-  }
-  
-  // Special case: if weather is rainy and terrain is normal, 50% chance to make it slippery
-  if (weather === "rain" && terrain === "normal" && Math.random() < 0.5) {
-    terrain = "slippery";
-  }
-  
-  return { terrain, weather };
-}
-
-// Set up the combat UI
-function setupCombatUI(enemy, environment) {
-  // Prepare combat interface
-  document.getElementById('enemyName').textContent = enemy.name;
-  
-  // Update health displays
-  document.getElementById('playerHealthDisplay').textContent = `${Math.round(window.gameState.health)} HP`;
-  document.getElementById('enemyHealthDisplay').textContent = `${enemy.health} HP`;
-  
-  // Update health bars
-  document.getElementById('playerCombatHealth').style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
-  document.getElementById('enemyCombatHealth').style.width = '100%';
-  
-  // Clear combat log
-  const combatLog = document.getElementById('combatLog');
-  combatLog.innerHTML = '';
-  
-  // Add initial combat description
-  addToCombatLog(`Combat begins! You face a ${enemy.name} on ${environment.terrain} terrain in ${environment.weather} weather.`);
-  addToCombatLog(enemy.description);
-  
-  // Display terrain effects
-  const terrainEffects = getTerrainEffects(environment.terrain);
-  if (terrainEffects) {
-    addToCombatLog(`Terrain Effects: ${terrainEffects}`);
-  }
-  
-  // Display weather effects
-  const weatherEffects = getWeatherEffects(environment.weather);
-  if (weatherEffects) {
-    addToCombatLog(`Weather Effects: ${weatherEffects}`);
-  }
-  
-  // Show combat distance
-  const distanceText = getDistanceText(window.gameState.combat.combatDistance);
-  addToCombatLog(`Starting at ${distanceText} distance.`);
-  
-  // Create distance indicator
-  createDistanceIndicator();
-  
-  // Show combat interface
-  document.getElementById('combatInterface').classList.remove('hidden');
-  
-  // Hide regular action buttons during combat
-  document.getElementById('actions').style.display = 'none';
-}
-
-// Get description of terrain effects
-function getTerrainEffects(terrain) {
-  switch(terrain) {
-    case "rocky":
-      return "Uneven ground gives a bonus to ranged attacks from high positions, but makes movement difficult.";
-    case "slippery":
-      return "Wet or icy ground increases chance of movement failures and makes dodging harder.";
-    case "confined":
-      return "Limited space restricts maximum distance and gives advantage to melee combat.";
-    default:
-      return null;
-  }
-}
-
-// Get description of weather effects
-function getWeatherEffects(weather) {
-  switch(weather) {
-    case "rain":
-      return "Rainfall reduces visibility and may affect ranged weapons.";
-    case "fog":
-      return "Thick fog severely limits visibility and accuracy of ranged attacks.";
-    case "wind":
-      return "Strong winds affect trajectory of ranged attacks.";
-    case "heat":
-      return "Sweltering heat causes stamina to drain more quickly.";
-    default:
-      return null;
-  }
-}
-
-// Create distance indicator for combat UI
-function createDistanceIndicator() {
-  // Check if container exists already
-  let distanceContainer = document.getElementById('distanceContainer');
-  
-  if (!distanceContainer) {
-    // Create container
-    distanceContainer = document.createElement('div');
-    distanceContainer.id = 'distanceContainer';
-    distanceContainer.style.margin = '15px 0';
-    distanceContainer.style.textAlign = 'center';
+        });
+      }
+    },
     
-    // Create label
-    const distanceLabel = document.createElement('div');
-    distanceLabel.textContent = 'Combat Distance:';
-    distanceLabel.style.marginBottom = '5px';
-    distanceContainer.appendChild(distanceLabel);
+    addCombatAction: function(action, label, container) {
+      if (!container) {
+        console.warn("Container not provided when adding combat action");
+        return;
+      }
+      
+      // Check if action should be disabled based on stamina
+      let disabled = false;
+      const staminaCost = window.GameState.get('staminaPerAction')[action] || 0;
+      
+      if (staminaCost > window.GameState.get('stamina')) {
+        disabled = true;
+      }
+      
+      const btn = document.createElement('button');
+      btn.className = 'action-btn' + (disabled ? ' disabled' : '');
+      btn.textContent = label;
+      btn.setAttribute('data-action', action);
+      
+      if (!disabled) {
+        btn.onclick = () => this.handleCombatAction(action);
+      } else {
+        // Show tooltip explaining why button is disabled
+        btn.title = `Not enough stamina (Requires ${staminaCost})`;
+      }
+      
+      container.appendChild(btn);
+    },
     
-    // Create distance bar
-    const distanceBar = document.createElement('div');
-    distanceBar.style.height = '20px';
-    distanceBar.style.width = '100%';
-    distanceBar.style.background = '#333';
-    distanceBar.style.borderRadius = '10px';
-    distanceBar.style.position = 'relative';
-    
-    // Add distance markers
-    const distances = ['Close', 'Medium', 'Far'];
-    distances.forEach((label, index) => {
-      const marker = document.createElement('div');
-      marker.textContent = label;
-      marker.style.position = 'absolute';
-      marker.style.top = '-20px';
-      marker.style.left = `${index * 50}%`;
-      marker.style.transform = 'translateX(-50%)';
-      distanceBar.appendChild(marker);
-    });
-    
-    // Add position indicator
-    const positionMarker = document.createElement('div');
-    positionMarker.id = 'distanceMarker';
-    positionMarker.style.width = '20px';
-    positionMarker.style.height = '20px';
-    positionMarker.style.background = '#4b6bff';
-    positionMarker.style.borderRadius = '50%';
-    positionMarker.style.position = 'absolute';
-    positionMarker.style.top = '0';
-    positionMarker.style.left = '0';
-    positionMarker.style.transform = 'translateX(-50%)';
-    positionMarker.style.transition = 'left 0.3s ease';
-    distanceBar.appendChild(positionMarker);
-    
-    distanceContainer.appendChild(distanceBar);
-    
-    // Insert after combat header
-    const combatHeader = document.getElementById('combatHeader');
-    combatHeader.parentNode.insertBefore(distanceContainer, combatHeader.nextSibling);
-  }
-  
-  // Update position marker
-  updateDistanceIndicator();
-}
-
-// Update the distance indicator
-function updateDistanceIndicator() {
-  const marker = document.getElementById('distanceMarker');
-  if (marker) {
-    // Calculate position based on distance (0 = 0%, 1 = 50%, 2 = 100%)
-    const position = window.gameState.combat.combatDistance * 50;
-    marker.style.left = `${position}%`;
-  }
-}
-
-// Get text description for distance
-function getDistanceText(distance) {
-  switch(distance) {
-    case 0: return "close";
-    case 1: return "medium";
-    case 2: return "far";
-    default: return "unknown";
-  }
-}
-
-// Determine initiative (who goes first)
-function determineInitiative(enemy) {
-  // Base player initiative on skills and PHY/MEN
-  let playerInitiative = (window.player.skills.tactics || 0) * 2 + 
-                         (window.player.phy || 0) + 
-                         (window.player.men || 0);
-  
-  // Base enemy initiative on similar calculations                     
-  let enemyInitiative = (enemy.skills.tactics || 0) * 2 +
-                        (enemy.phy || 0) +
-                        (enemy.men || 0);
-  
-  // Add randomness element
-  playerInitiative += Math.floor(Math.random() * 6); // d6 roll
-  enemyInitiative += Math.floor(Math.random() * 6);  // d6 roll
-  
-  // Apply ambush advantage if applicable
-  if (window.gameState.combat.ambushAdvantage === 'player') {
-    playerInitiative += 10; // Huge advantage for ambusher
-    addToCombatLog("You've caught the enemy by surprise!");
-  } else if (window.gameState.combat.ambushAdvantage === 'enemy') {
-    enemyInitiative += 10;
-    addToCombatLog("The enemy has ambushed you!");
-  }
-  
-  // Determine who goes first
-  if (playerInitiative >= enemyInitiative) {
-    window.gameState.combat.activeCharacter = 'player';
-    addToCombatLog("You have the initiative!");
-  } else {
-    window.gameState.combat.activeCharacter = 'enemy';
-    addToCombatLog("The enemy has the initiative!");
-  }
-  
-  // Store initiative values for potential future use
-  window.gameState.combat.playerInitiative = playerInitiative;
-  window.gameState.combat.enemyInitiative = enemyInitiative;
-}
-
-// Begin a new combat turn
-function beginCombatTurn() {
-  // Process ongoing effects
-  processCombatEffects();
-  
-  // Determine action points for both sides
-  calculateActionPoints();
-  
-  // Update combat log
-  addToCombatLog(`Turn ${window.gameState.combat.combatTurn}: ${window.gameState.combat.activeCharacter === 'player' ? 'Your' : 'Enemy\'s'} turn.`);
-  
-  if (window.gameState.combat.activeCharacter === 'player') {
-    // Player's turn - show available actions
-    addToCombatLog(`You have ${window.gameState.combat.playerAP} action points.`);
-    showPlayerActions();
-  } else {
-    // Enemy's turn - process AI decision
-    addToCombatLog(`Enemy has ${window.gameState.combat.enemyAP} action points.`);
-    setTimeout(() => {
-      processEnemyTurn();
-    }, 500); // Small delay for UI
-  }
-}
-
-// Process ongoing combat effects
-function processCombatEffects() {
-  // Process each active effect
-  const effects = window.gameState.combat.combatEffects;
-  const newEffects = [];
-  
-  for (let i = 0; i < effects.length; i++) {
-    const effect = effects[i];
-    
-    // Check if effect has expired
-    if (effect.duration <= 1) {
-      addToCombatLog(`${effect.name} effect has expired.`);
-    } else {
-      // Process effect
-      if (effect.type === 'bleed') {
-        // Apply bleeding damage
-        const target = effect.target;
-        const damage = effect.value;
+    // Combat Action Handlers
+    handleCombatAction: function(action) {
+      console.log("Player chose combat action:", action);
+      
+      // Get the current combat state
+      const staminaCost = window.GameState.get('staminaPerAction')[action] || 0;
+      
+      // Deduct stamina if applicable
+      if (staminaCost > 0) {
+        window.GameState.set('stamina', window.GameState.get('stamina') - staminaCost);
+      }
+      
+      // Handle stance changes separately
+      if (action.startsWith('stance_')) {
+        const stance = action.replace('stance_', '');
+        window.GameState.set('combatStance', stance);
         
-        if (target === 'player') {
-          window.gameState.health = Math.max(1, window.gameState.health - damage);
-          document.getElementById('playerHealthDisplay').textContent = `${Math.round(window.gameState.health)} HP`;
-          document.getElementById('playerCombatHealth').style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
-          addToCombatLog(`You take ${damage} bleeding damage.`);
-        } else if (target === 'enemy') {
-          const enemy = window.gameState.combat.currentEnemy;
-          enemy.health = Math.max(0, enemy.health - damage);
-          document.getElementById('enemyHealthDisplay').textContent = `${enemy.health} HP`;
-          document.getElementById('enemyCombatHealth').style.width = `${(enemy.health / enemy.maxHealth) * 100}%`;
-          addToCombatLog(`Enemy takes ${damage} bleeding damage.`);
+        const combatLog = document.getElementById('combatLog');
+        if (combatLog) {
+          combatLog.innerHTML += `<p>You switch to a ${stance} stance.</p>`;
+          combatLog.scrollTop = combatLog.scrollHeight;
         }
-      }
-      
-      // Decrease duration and keep effect if it's still active
-      effect.duration--;
-      newEffects.push(effect);
-    }
-  }
-  
-  // Update combat effects
-  window.gameState.combat.combatEffects = newEffects;
-  
-  // Check combat end conditions
-  checkCombatEndConditions();
-}
-
-// Calculate action points for combat turns
-function calculateActionPoints() {
-  const player = window.player;
-  const enemy = window.gameState.combat.currentEnemy;
-  const maxAP = window.gameState.combat.maxAP;
-  
-  // Base AP on PHY and MEN attributes
-  let playerAP = 5 + Math.floor((player.phy + player.men) / 3);
-  let enemyAP = 5 + Math.floor((enemy.phy + enemy.men) / 3);
-  
-  // Apply stamina modifiers
-  const playerStaminaPercent = window.gameState.stamina / window.gameState.maxStamina;
-  const enemyStaminaPercent = enemy.stamina / enemy.maxStamina;
-  
-  // Reduce AP if low on stamina
-  if (playerStaminaPercent < 0.5) {
-    playerAP -= Math.floor((0.5 - playerStaminaPercent) * 10);
-  }
-  
-  if (enemyStaminaPercent < 0.5) {
-    enemyAP -= Math.floor((0.5 - enemyStaminaPercent) * 10);
-  }
-  
-  // Apply stun effects
-  if (hasEffect('player', 'stun')) {
-    playerAP = Math.floor(playerAP / 2);
-    addToCombatLog("You are stunned and have reduced action points.");
-  }
-  
-  if (hasEffect('enemy', 'stun')) {
-    enemyAP = Math.floor(enemyAP / 2);
-    addToCombatLog("The enemy is stunned and has reduced action points.");
-  }
-  
-  // Weather effects - heat reduces AP
-  if (window.gameState.combat.weather === 'heat') {
-    playerAP -= 1;
-    enemyAP -= 1;
-  }
-  
-  // Ensure minimum AP
-  playerAP = Math.max(2, playerAP);
-  enemyAP = Math.max(2, enemyAP);
-  
-  // Cap maximum AP
-  playerAP = Math.min(maxAP, playerAP);
-  enemyAP = Math.min(maxAP, enemyAP);
-  
-  // Store calculated AP
-  window.gameState.combat.playerAP = playerAP;
-  window.gameState.combat.enemyAP = enemyAP;
-}
-
-// Check if a combatant has a specific effect
-function hasEffect(target, effectType) {
-  return window.gameState.combat.combatEffects.some(
-    effect => effect.target === target && effect.type === effectType
-  );
-}
-
-// Add an effect to a combatant
-function addEffect(target, effectType, value, duration, name) {
-  // Check if effect already exists
-  const existingEffectIndex = window.gameState.combat.combatEffects.findIndex(
-    effect => effect.target === target && effect.type === effectType
-  );
-  
-  if (existingEffectIndex !== -1) {
-    // Update existing effect
-    const effect = window.gameState.combat.combatEffects[existingEffectIndex];
-    // Either extend duration or use the longer duration
-    effect.duration = Math.max(effect.duration, duration);
-    // Use the higher value
-    effect.value = Math.max(effect.value, value);
-  } else {
-    // Add new effect
-    window.gameState.combat.combatEffects.push({
-      target: target,
-      type: effectType,
-      value: value,
-      duration: duration,
-      name: name
-    });
-  }
-  
-  addToCombatLog(`${target === 'player' ? 'You are' : 'Enemy is'} affected by ${name}.`);
-}
-
-// Show available player actions
-function showPlayerActions() {
-  const combatActions = document.getElementById('combatActions');
-  combatActions.innerHTML = '';
-  
-  // Get remaining AP
-  const remainingAP = window.gameState.combat.playerAP;
-  
-  // If no AP left, add end turn button
-  if (remainingAP <= 0) {
-    addCombatButton('End Turn', 'end_turn', combatActions);
-    return;
-  }
-  
-  // Get all available combat actions
-  const availableActions = window.getCombatActions();
-  
-  // Filter actions based on AP and distance
-  const currentDistance = window.gameState.combat.combatDistance;
-  const filteredActions = availableActions.filter(action => {
-    // Check if enough AP
-    if (action.actionPoints > remainingAP) return false;
-    
-    // Check if valid at current distance
-    if (action.range !== undefined && action.range < currentDistance) return false;
-    
-    return true;
-  });
-  
-  // Distance change options
-  if (currentDistance < 2) {
-    addCombatButton('Retreat (2 AP)', 'retreat', combatActions);
-  }
-  
-  if (currentDistance > 0) {
-    addCombatButton('Advance (2 AP)', 'advance', combatActions);
-  }
-  
-  // Movement then attack combination button if enough AP
-  if (currentDistance === 2 && remainingAP >= 6) {
-    const playerWeapon = window.player.equipment.weapon;
-    if (playerWeapon && window.WEAPON_TYPES[playerWeapon.type].range < 2) {
-      addCombatButton('Charge Attack (6 AP)', 'charge_attack', combatActions);
-    }
-  }
-  
-  // Sort actions by type
-  const attackActions = filteredActions.filter(action => !action.isSpecial);
-  const specialActions = filteredActions.filter(action => action.isSpecial);
-  
-  // Add attack actions
-  if (attackActions.length > 0) {
-    attackActions.forEach(action => {
-      let buttonText = `${action.name} (${action.actionPoints} AP)`;
-      if (action.damage) {
-        buttonText += ` [${action.damage[0]}-${action.damage[1]}]`;
-      }
-      addCombatButton(buttonText, action.id, combatActions);
-    });
-  }
-  
-  // Add special actions
-  if (specialActions.length > 0) {
-    specialActions.forEach(action => {
-      addCombatButton(`${action.name} (${action.actionPoints} AP)`, action.id, combatActions);
-    });
-  }
-  
-  // Add utility buttons
-  addCombatButton('End Turn', 'end_turn', combatActions);
-  
-  // Add retreat from battle button
-  if (currentDistance === 2) {
-    addCombatButton('Flee Battle', 'flee_battle', combatActions);
-  }
-}
-
-// Add a button to the combat actions area
-function addCombatButton(text, action, container) {
-  const button = document.createElement('button');
-  button.className = 'action-btn';
-  button.textContent = text;
-  button.onclick = function() {
-    handleCombatAction(action);
-  };
-  container.appendChild(button);
-}
-
-// Handle player combat action
-function handleCombatAction(action) {
-  // Get current state
-  const combat = window.gameState.combat;
-  const remainingAP = combat.playerAP;
-  
-  // Check if this is a system action
-  if (action === 'end_turn') {
-    endPlayerTurn();
-    return;
-  }
-  
-  if (action === 'flee_battle') {
-    attemptToFlee();
-    return;
-  }
-  
-  // Distance change actions
-  if (action === 'retreat') {
-    if (remainingAP >= 2 && combat.combatDistance < 2) {
-      // Check for potential terrain failures
-      if (combat.terrain === 'slippery' && Math.random() < 0.3) {
-        addToCombatLog("You slip while trying to retreat!");
-        combat.playerAP -= 2; // Still costs AP
         
-        // Check for enemy opportunity attack
-        if (combat.combatDistance === 0 && Math.random() < 0.5) {
-          addToCombatLog("The enemy takes advantage of your stumble!");
-          executeOpportunityAttack('enemy');
-        }
-      } else {
-        combat.combatDistance += 1;
-        combat.playerAP -= 2;
-        addToCombatLog(`You move back to ${getDistanceText(combat.combatDistance)} distance.`);
-        updateDistanceIndicator();
+        // Update available actions after stance change
+        this.updateCombatActions();
+        return;
       }
       
-      // Update available actions
-      showPlayerActions();
-      return;
-    }
-  }
-  
-  if (action === 'advance') {
-    if (remainingAP >= 2 && combat.combatDistance > 0) {
-      // Check for potential terrain failures
-      if (combat.terrain === 'slippery' && Math.random() < 0.3) {
-        addToCombatLog("You slip while trying to advance!");
-        combat.playerAP -= 2; // Still costs AP
-      } else {
-        combat.combatDistance -= 1;
-        combat.playerAP -= 2;
-        addToCombatLog(`You move forward to ${getDistanceText(combat.combatDistance)} distance.`);
-        updateDistanceIndicator();
+      // Handle retreat from combat separately
+      if (action === 'retreat_combat') {
+        this.attemptRetreat();
+        return;
       }
       
-      // Update available actions
-      showPlayerActions();
-      return;
-    }
-  }
-  
-  // Charge attack (move then attack combo)
-  if (action === 'charge_attack') {
-    if (remainingAP >= 6 && combat.combatDistance === 2) {
-      // Move to close distance then attack
-      combat.combatDistance = 0;
-      combat.playerAP -= 4; // 4 AP for movement
-      addToCombatLog("You charge forward into melee range!");
-      updateDistanceIndicator();
-      
-      // Execute an attack with bonus damage
-      const weapon = window.player.equipment.weapon;
-      if (weapon) {
-        const weaponType = window.WEAPON_TYPES[weapon.type];
-        if (weaponType && weaponType.attacks && weaponType.attacks.length > 0) {
-          // Use first attack of weapon with +25% damage bonus
-          const attackType = weaponType.attacks[0];
-          executePlayerAttack(attackType, 2, 1.25); // 2 AP for the attack, 25% damage bonus
-          return;
-        }
+      // Process normal combat actions
+      switch(action) {
+        case 'attack':
+          this.performAttack();
+          break;
+        case 'defend':
+          this.performDefend();
+          break;
+        case 'dodge':
+          this.performDodge();
+          break;
+        case 'advance':
+          this.performAdvance();
+          break;
+        case 'retreat':
+          this.performRetreat();
+          break;
+        case 'aim':
+          this.performAim();
+          break;
+        case 'shoot':
+          this.performShoot();
+          break;
+        case 'grapple':
+          this.performGrapple();
+          break;
+        case 'observe':
+          this.performObserve();
+          break;
+        case 'feint':
+          this.performFeint();
+          break;
+        default:
+          console.warn("Unknown combat action:", action);
       }
       
-      // Fallback if no weapon
-      executePlayerAttack('unarmed_strike', 2);
-      return;
-    }
-  }
-  
-  // Find the action data
-  const availableActions = window.getCombatActions();
-  const actionData = availableActions.find(a => a.id === action);
-  
-  if (!actionData) {
-    console.error(`Action not found: ${action}`);
-    return;
-  }
-  
-  // Check if enough AP
-  if (actionData.actionPoints > remainingAP) {
-    addToCombatLog("Not enough action points for this action.");
-    return;
-  }
-  
-  // Process different action types
-  if (actionData.isSpecial) {
-    // Special abilities
-    executePlayerSpecialAbility(actionData);
-  } else {
-    // Regular attacks
-    executePlayerAttack(action, actionData.actionPoints);
-  }
-}
-
-// Execute a player attack
-function executePlayerAttack(attackType, apCost, damageMultiplier = 1) {
-  const combat = window.gameState.combat;
-  const enemy = combat.currentEnemy;
-  
-  // Check for ranged attack with no ammo
-  const weapon = window.player.equipment.weapon;
-  const isRangedWeapon = weapon && weapon.type && 
-                         ['BOW', 'CROSSBOW', 'MATCHLOCK'].includes(weapon.type);
-  
-  if (isRangedWeapon && !window.hasEnoughAmmo()) {
-    addToCombatLog("You don't have enough ammunition!");
-    return;
-  }
-  
-  // Get attack details
-  const attackDetails = getAttackDetails(attackType);
-  
-  // Reduce AP
-  combat.playerAP -= apCost;
-  
-  // If ranged, consume ammo
-  if (isRangedWeapon) {
-    window.consumeAmmo();
-  }
-  
-  // Calculate to-hit chance
-  let toHitChance = 65 + attackDetails.toHitMod; // Base 65% chance
-  
-  // Apply skill bonuses
-  if (attackType.includes('stab') || attackType.includes('slash')) {
-    toHitChance += (window.player.skills.melee || 0) * 3;
-  } else if (attackType.includes('shot')) {
-    toHitChance += (window.player.skills.marksmanship || 0) * 3;
-  }
-  
-  // Apply stance and distance modifiers
-  if (combat.combatDistance > 1 && !attackType.includes('shot')) {
-    toHitChance -= 20; // Hard to hit at range with melee
-  }
-  
-  // Apply terrain and weather modifiers
-  if (combat.weather === 'fog' && combat.combatDistance > 0) {
-    toHitChance -= 15; // Hard to see at range in fog
-  }
-  
-  if (combat.weather === 'rain' && isRangedWeapon) {
-    toHitChance -= 10; // Rain affects ranged weapons
-  }
-  
-  if (combat.terrain === 'rocky' && combat.combatDistance > 0) {
-    toHitChance += 5; // Slight bonus for ranged from rocky terrain
-  }
-  
-  // Apply enemy defense from equipment
-  const enemyDefense = calculateEnemyDefense();
-  toHitChance -= Math.floor(enemyDefense / 5); // Reduce hit chance based on armor
-  
-  // Apply stagger effect
-  if (hasEffect('enemy', 'stun')) {
-    toHitChance += 15; // Easier to hit stunned enemy
-  }
-  
-  // Cap hit chance
-  toHitChance = Math.max(5, Math.min(95, toHitChance));
-  
-  // Roll to hit
-  const hitRoll = Math.floor(Math.random() * 100) + 1;
-  
-  if (hitRoll <= toHitChance) {
-    // Hit! Calculate damage
-    let damage = attackDetails.damage;
+      // Update UI and process enemy turn
+      this.updateCombatActions();
+      this.processEnemyTurn();
+    },
     
-    // Apply damage multiplier
-    damage = Math.round(damage * damageMultiplier);
-    
-    // Apply enemy defense reduction
-    const defenseReduction = Math.min(damage - 1, Math.floor(enemyDefense / 3));
-    damage -= defenseReduction;
-    
-    // Check for critical hit (10% base chance)
-    let critChance = 10;
-    if (weapon && weapon.stats && weapon.stats.critChance) {
-      critChance = weapon.stats.critChance;
-    }
-    
-    const critRoll = Math.floor(Math.random() * 100) + 1;
-    let isCrit = false;
-    
-    if (critRoll <= critChance) {
-      damage = Math.floor(damage * 1.5);
-      isCrit = true;
-    }
-    
-    // Apply damage to enemy
-    enemy.health = Math.max(0, enemy.health - damage);
-    
-    // Update enemy health display
-    document.getElementById('enemyHealthDisplay').textContent = `${enemy.health} HP`;
-    document.getElementById('enemyCombatHealth').style.width = `${Math.max(0, (enemy.health / enemy.maxHealth) * 100)}%`;
-    
-    // Log the attack
-    if (isCrit) {
-      addToCombatLog(`Critical hit! Your ${attackDetails.name} deals ${damage} damage.`);
-    } else {
-      addToCombatLog(`Your ${attackDetails.name} hits for ${damage} damage.`);
-    }
-    
-    // Apply special effects based on weapon/attack type
-    applyAttackEffects(attackType, 'enemy');
-    
-    // Use stamina
-    window.gameState.stamina = Math.max(0, window.gameState.stamina - 5);
-  } else {
-    // Miss
-    addToCombatLog(`Your ${attackDetails.name} misses.`);
-    
-    // Use less stamina for a miss
-    window.gameState.stamina = Math.max(0, window.gameState.stamina - 3);
-  }
-  
-  // Update UI
-  window.updateStatusBars();
-  
-  // After attack, show updated actions
-  showPlayerActions();
-  
-  // Check combat end conditions
-  checkCombatEndConditions();
-}
-
-// Get attack details based on attack type
-function getAttackDetails(attackType) {
-  // Default values
-  let toHitMod = 0;
-  let damage = 3;
-  let name = "Attack";
-  
-  // Check if this is an unarmed attack
-  if (attackType === 'unarmed_strike') {
-    return {
-      name: "Unarmed Strike",
-      damage: 2,
-      toHitMod: 0
-    };
-  }
-  
-  // Check if it's a weapon attack
-  const weapon = window.player.equipment.weapon;
-  if (!weapon) {
-    return {
-      name: "Unarmed Strike",
-      damage: 2,
-      toHitMod: 0
-    };
-  }
-  
-  // Base damage on weapon
-  const baseDamageLow = weapon.stats.damage[0];
-  const baseDamageHigh = weapon.stats.damage[1];
-  
-  // Attack-specific modifications
-  if (attackType.includes('slash')) {
-    name = "Slash";
-    toHitMod = 5;
-    damage = Math.floor(Math.random() * (baseDamageHigh - baseDamageLow + 1)) + baseDamageLow;
-  } else if (attackType.includes('stab')) {
-    name = "Stab";
-    toHitMod = 10;
-    damage = Math.floor(Math.random() * (baseDamageHigh - baseDamageLow)) + baseDamageLow;
-  } else if (attackType.includes('chop')) {
-    name = "Chop";
-    toHitMod = 0;
-    damage = Math.floor(Math.random() * (baseDamageHigh - baseDamageLow + 1)) + baseDamageLow + 1;
-  } else if (attackType.includes('heft')) {
-    name = "Hefty Swing";
-    toHitMod = -10;
-    damage = Math.floor(Math.random() * (baseDamageHigh - baseDamageLow + 1)) + baseDamageLow + 2;
-  } else if (attackType.includes('quick_shot')) {
-    name = "Quick Shot";
-    toHitMod = -5;
-    damage = Math.floor(Math.random() * (baseDamageHigh - baseDamageLow)) + baseDamageLow;
-  } else if (attackType.includes('aimed_shot')) {
-    name = "Aimed Shot";
-    toHitMod = 10;
-    damage = Math.floor(Math.random() * (baseDamageHigh - baseDamageLow + 1)) + baseDamageLow + 1;
-  } else if (attackType.includes('shield_bash')) {
-    name = "Shield Bash";
-    toHitMod = 0;
-    // Shield bash uses shield stats + some base damage
-    const shield = window.player.equipment.offhand;
-    if (shield && shield.category === "SHIELD") {
-      damage = 2 + Math.floor(shield.stats.defense / 5);
-    } else {
-      damage = 2;
-    }
-  }
-  
-  return {
-    name,
-    damage,
-    toHitMod
-  };
-}
-
-// Calculate enemy defense from equipment
-function calculateEnemyDefense() {
-  const enemy = window.gameState.combat.currentEnemy;
-  let defense = 0;
-  
-  // Add armor defense
-  if (enemy.equipment.armor) {
-    defense += enemy.equipment.armor.stats.defense || 0;
-  }
-  
-  // Add shield defense if at appropriate distance
-  if (enemy.equipment.shield && window.gameState.combat.combatDistance <= 1) {
-    defense += enemy.equipment.shield.stats.defense || 0;
-  }
-  
-  // Apply any defense buffs/debuffs
-  if (hasEffect('enemy', 'defense_up')) {
-    defense = Math.floor(defense * 1.25);
-  }
-  
-  if (hasEffect('enemy', 'defense_down')) {
-    defense = Math.floor(defense * 0.75);
-  }
-  
-  return defense;
-}
-
-// Apply special effects based on attack type
-function applyAttackEffects(attackType, target) {
-  // Weapon-specific effects
-  if (attackType.includes('cleaver') || attackType.includes('chop')) {
-    // Cleavers have chance to cause bleeding
-    if (Math.random() < 0.25) {
-      addEffect(target, 'bleed', 2, 3, 'Bleeding');
-    }
-  } else if (attackType.includes('mace') || attackType.includes('shield_bash')) {
-    // Maces and shield bashes have chance to stun
-    if (Math.random() < 0.20) {
-      addEffect(target, 'stun', 0, 1, 'Stunned');
-    }
-  } else if (attackType.includes('axe') && target === 'enemy') {
-    // Axes have chance to break shields
-    const enemy = window.gameState.combat.currentEnemy;
-    if (enemy.equipment.shield && Math.random() < 0.15) {
-      addToCombatLog("Your axe damages the enemy's shield!");
-      enemy.equipment.shield.stats.defense = Math.max(0, enemy.equipment.shield.stats.defense - 5);
-    }
-  }
-}
-
-// Execute a player special ability
-function executePlayerSpecialAbility(actionData) {
-  const combat = window.gameState.combat;
-  const enemy = combat.currentEnemy;
-  
-  // Reduce AP
-  combat.playerAP -= actionData.actionPoints;
-  
-  // Process different special abilities
-  switch (actionData.id) {
-    case 'dodge':
-      // Increase dodge chance for next enemy attack
-      addEffect('player', 'dodge_up', 25, 1, 'Evasive Stance');
-      addToCombatLog("You prepare to dodge the next attack.");
-      break;
+    attemptRetreat: function() {
+      // Calculate retreat success chance
+      const playerDexterity = (window.Player.get('phy') || 0) * 0.5;
+      const enemySpeed = _currentEnemy.speed || 5;
+      const distanceBonus = window.GameState.get('combatDistance') * 15;
+      const staminaPenalty = Math.max(0, (window.GameState.get('maxStamina') - window.GameState.get('stamina')) / 10);
       
-    case 'brace':
-      // Reduce incoming damage
-      addEffect('player', 'damage_resist', 30, 1, 'Braced Stance');
-      addToCombatLog("You brace yourself, reducing incoming damage.");
-      break;
+      let retreatChance = 50 + playerDexterity - enemySpeed + distanceBonus - staminaPenalty;
       
-    case 'shield_block':
-      // Increase block chance
-      addEffect('player', 'block_up', 30, 1, 'Shield Block');
-      addToCombatLog("You raise your shield, preparing to block incoming attacks.");
-      break;
-      
-    case 'sword_parry':
-      // Parry has chance to counter
-      addEffect('player', 'parry', 20, 1, 'Parry Stance');
-      addToCombatLog("You prepare to parry the next attack.");
-      break;
-      
-    case 'axe_shield_break':
-      // Special shield break attack
-      if (enemy.equipment.shield) {
-        const damage = 10;
-        enemy.equipment.shield.stats.defense = Math.max(0, enemy.equipment.shield.stats.defense - damage);
-        addToCombatLog(`Your powerful strike damages the enemy's shield, reducing its defense by ${damage}.`);
-      } else {
-        // If no shield, deal damage instead
-        const damage = 5;
-        enemy.health = Math.max(0, enemy.health - damage);
-        document.getElementById('enemyHealthDisplay').textContent = `${enemy.health} HP`;
-        document.getElementById('enemyCombatHealth').style.width = `${Math.max(0, (enemy.health / enemy.maxHealth) * 100)}%`;
-        addToCombatLog(`Your attack strikes the enemy for ${damage} damage.`);
-      }
-      break;
-      
-    case 'cleaver_bleed':
-      // Guaranteed bleeding attack
-      executePlayerAttack('cleaver_chop', 0); // 0 additional AP cost
-      addEffect('enemy', 'bleed', 3, 3, 'Severe Bleeding');
-      break;
-      
-    default:
-      // Generic special ability
-      addToCombatLog(`You use ${actionData.name}.`);
-      break;
-  }
-  
-  // Use stamina
-  window.gameState.stamina = Math.max(0, window.gameState.stamina - 5);
-  
-  // Update UI
-  window.updateStatusBars();
-  
-  // After ability, show updated actions
-  showPlayerActions();
-  
-  // Check combat end conditions
-  checkCombatEndConditions();
-}
-
-// End player turn and start enemy turn
-function endPlayerTurn() {
-  // Reset player AP
-  window.gameState.combat.playerAP = 0;
-  
-  // Switch active character
-  window.gameState.combat.activeCharacter = 'enemy';
-  
-  // Add turn end to combat log
-  addToCombatLog("You end your turn.");
-  
-  // Process enemy turn after a short delay
-  setTimeout(() => {
-    processEnemyTurn();
-  }, 500);
-}
-
-// Process the enemy's turn
-function processEnemyTurn() {
-  const combat = window.gameState.combat;
-  const enemy = combat.currentEnemy;
-  const currentDistance = combat.combatDistance;
-  
-  // If this function is called multiple times, prevent it
-  if (combat.activeCharacter !== 'enemy') return;
-  
-  // If enemy has no AP left, end their turn
-  if (combat.enemyAP <= 0) {
-    endEnemyTurn();
-    return;
-  }
-  
-  // Get enemy preferred distance and tactics
-  const preferredDistance = enemy.preferredDistance;
-  const tactics = enemy.tactics;
-  
-  // Determine enemy action based on situation
-  let action = null;
-  
-  // Move to preferred distance if needed and possible
-  if (currentDistance !== preferredDistance && combat.enemyAP >= 2) {
-    if (currentDistance < preferredDistance) {
-      // Try to retreat
-      action = 'retreat';
-    } else if (currentDistance > preferredDistance) {
-      // Try to advance
-      action = 'advance';
-    }
-  } 
-  // If already at preferred distance or can't move, attack or use special
-  else {
-    // Determine action based on tactics
-    let tactic = 'aggressive';
-    const roll = Math.random();
-    let cumulative = 0;
-    
-    for (const [t, chance] of Object.entries(tactics)) {
-      cumulative += chance;
-      if (roll < cumulative) {
-        tactic = t;
-        break;
-      }
-    }
-    
-    // Choose action based on tactic
-    if (tactic === 'aggressive') {
-      // Prefer attack
-      if (canEnemyAttack()) {
-        action = 'attack';
-      } else if (combat.enemyAP >= 2) {
-        action = 'advance';
-      }
-    } else if (tactic === 'defensive') {
-      // Prefer defense if health is low
-      if (enemy.health < enemy.maxHealth * 0.4 && combat.enemyAP >= 2) {
-        action = 'defend';
-      } else if (canEnemyAttack()) {
-        action = 'attack';
-      }
-    } else if (tactic === 'cautious') {
-      // Mix of advance, attack, and retreat based on health
-      if (enemy.health < enemy.maxHealth * 0.3 && currentDistance < 2 && combat.enemyAP >= 2) {
-        action = 'retreat';
-      } else if (canEnemyAttack()) {
-        action = 'attack';
-      } else if (combat.enemyAP >= 2) {
-        action = 'advance';
-      }
-    }
-  }
-  
-  // If no action determined or not enough AP, end turn
-  if (!action || (action === 'attack' && !canEnemyAttack())) {
-    endEnemyTurn();
-    return;
-  }
-  
-  // Execute the chosen action
-  executeEnemyAction(action);
-}
-
-// Check if enemy can attack at current distance
-function canEnemyAttack() {
-  const combat = window.gameState.combat;
-  const enemy = combat.currentEnemy;
-  const currentDistance = combat.combatDistance;
-  
-  // Check if enemy has a weapon
-  if (!enemy.equipment.weapon) return false;
-  
-  // Get weapon type
-  const weaponType = enemy.equipment.weapon.type;
-  
-  // Determine weapon range based on type
-  let range = 0;
-  
-  if (weaponType === 'BOW' || weaponType === 'CROSSBOW') {
-    range = 2; // Bows and crossbows can attack at any distance
-  } else if (weaponType === 'SPEAR' || weaponType === 'POLEARM') {
-    range = 1; // Spears and polearms can attack at close and medium
-  } else {
-    range = 0; // Most weapons are melee only
-  }
-  
-  // Check if current distance is within weapon range
-  return currentDistance <= range;
-}
-
-// Execute an enemy action
-function executeEnemyAction(action) {
-  const combat = window.gameState.combat;
-  const enemy = combat.currentEnemy;
-  
-  // Process based on action type
-  if (action === 'retreat') {
-    // Try to retreat
-    if (combat.enemyAP >= 2 && combat.combatDistance < 2) {
-      // Check for terrain failures
-      if (combat.terrain === 'slippery' && Math.random() < 0.3) {
-        addToCombatLog("The enemy slips while trying to retreat!");
-        combat.enemyAP -= 2; // Still costs AP
-        
-        // Player opportunity attack
-        if (combat.combatDistance === 0 && Math.random() < 0.5) {
-          addToCombatLog("You take advantage of the enemy's stumble!");
-          executeOpportunityAttack('player');
-        }
-      } else {
-        combat.combatDistance += 1;
-        combat.enemyAP -= 2;
-        addToCombatLog(`The enemy moves back to ${getDistanceText(combat.combatDistance)} distance.`);
-        updateDistanceIndicator();
+      // Evasive stance helps with retreat
+      if (window.GameState.get('combatStance') === 'evasive') {
+        retreatChance += 20;
       }
       
-      // Continue processing enemy turn
+      // Clamp chance between 5% and 95%
+      retreatChance = Math.min(95, Math.max(5, retreatChance));
+      
+      // Roll for retreat success
+      const roll = Math.random() * 100;
+      
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        combatLog.innerHTML += `<p>You attempt to retreat from combat...</p>`;
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      // Add a slight delay before showing the result
       setTimeout(() => {
-        processEnemyTurn();
-      }, 500);
-      return;
-    }
-  } else if (action === 'advance') {
-    // Try to advance
-    if (combat.enemyAP >= 2 && combat.combatDistance > 0) {
-      // Check for terrain failures
-      if (combat.terrain === 'slippery' && Math.random() < 0.3) {
-        addToCombatLog("The enemy slips while trying to advance!");
-        combat.enemyAP -= 2; // Still costs AP
-      } else {
-        combat.combatDistance -= 1;
-        combat.enemyAP -= 2;
-        addToCombatLog(`The enemy moves forward to ${getDistanceText(combat.combatDistance)} distance.`);
-        updateDistanceIndicator();
+        if (roll <= retreatChance) {
+          // Success
+          if (combatLog) {
+            combatLog.innerHTML += `<p>Success! You manage to escape from the ${_currentEnemy.name}.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          
+          // Wait a moment before ending combat
+          setTimeout(() => {
+            this.endCombat('retreat');
+          }, 1500);
+        } else {
+          // Failure
+          if (combatLog) {
+            combatLog.innerHTML += `<p>Failed! The ${_currentEnemy.name} prevents your escape.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          
+          // Enemy gets a free attack opportunity
+          setTimeout(() => {
+            this.processEnemyAttack("opportunity");
+            this.updateCombatActions();
+          }, 1000);
+        }
+      }, 1000);
+    },
+    
+    performAttack: function() {
+      // Get combat state
+      const playerStance = window.GameState.get('combatStance');
+      const enemyStance = window.GameState.get('enemyStance');
+      const playerSkill = window.Player.get('skills.melee') || 0;
+      const enemyDefense = _currentEnemy.defense || 5;
+      const playerMomentum = window.GameState.get('playerMomentum');
+      
+      // Calculate hit chance
+      let hitChance = 60 + playerSkill * 3 - enemyDefense * 2 + playerMomentum * 5;
+      
+      // Adjust based on stances
+      if (playerStance === 'aggressive') {
+        hitChance += 15;
+      } else if (playerStance === 'defensive') {
+        hitChance -= 5;
       }
       
-      // Continue processing enemy turn
-      setTimeout(() => {
-        processEnemyTurn();
-      }, 500);
-      return;
-    }
-  } else if (action === 'attack') {
-    // Execute attack
-    executeEnemyAttack();
-    return;
-  } else if (action === 'defend') {
-    // Defensive action
-    addEffect('enemy', 'defense_up', 25, 1, 'Defensive Stance');
-    addToCombatLog("The enemy takes a defensive posture.");
-    combat.enemyAP -= 2;
-    
-    // Continue processing enemy turn
-    setTimeout(() => {
-      processEnemyTurn();
-    }, 500);
-    return;
-  }
-  
-  // If we get here, the action failed or wasn't processed
-  endEnemyTurn();
-}
-
-// Execute an enemy attack
-function executeEnemyAttack() {
-  const combat = window.gameState.combat;
-  const enemy = combat.currentEnemy;
-  
-  // Choose attack type based on weapon
-  const weaponType = enemy.equipment.weapon.type;
-  let attackName = "attack";
-  let apCost = 4;
-  let toHitMod = 0;
-  
-  // Determine attack type based on weapon
-  if (weaponType === 'SWORD') {
-    attackName = Math.random() < 0.5 ? "slash" : "stab";
-    apCost = attackName === "slash" ? 4 : 3;
-    toHitMod = attackName === "slash" ? 5 : 10;
-  } else if (weaponType === 'AXE') {
-    attackName = Math.random() < 0.7 ? "chop" : "swing";
-    apCost = attackName === "chop" ? 5 : 4;
-    toHitMod = attackName === "chop" ? 0 : 5;
-  } else if (weaponType === 'BOW') {
-    attackName = Math.random() < 0.7 ? "quick shot" : "aimed shot";
-    apCost = attackName === "quick shot" ? 4 : 6;
-    toHitMod = attackName === "quick shot" ? -5 : 10;
-  } else if (weaponType === 'CLEAVER') {
-    attackName = Math.random() < 0.6 ? "chop" : "heft";
-    apCost = attackName === "chop" ? 5 : 6;
-    toHitMod = attackName === "chop" ? 0 : -10;
-  }
-  
-  // Check if enemy has enough AP
-  if (combat.enemyAP < apCost) {
-    endEnemyTurn();
-    return;
-  }
-  
-  // Reduce AP
-  combat.enemyAP -= apCost;
-  
-  // Calculate to-hit chance
-  let toHitChance = 65 + toHitMod; // Base 65% chance
-  
-  // Apply skill bonuses
-  if (attackName.includes("slash") || attackName.includes("stab") || 
-      attackName.includes("chop") || attackName.includes("heft")) {
-    toHitChance += (enemy.skills.melee || 0) * 3;
-  } else if (attackName.includes("shot")) {
-    toHitChance += (enemy.skills.marksmanship || 0) * 3;
-  }
-  
-  // Apply stance and distance modifiers
-  if (combat.combatDistance > 1 && !attackName.includes("shot")) {
-    toHitChance -= 20; // Hard to hit at range with melee
-  }
-  
-  // Apply terrain and weather modifiers
-  if (combat.weather === 'fog' && combat.combatDistance > 0) {
-    toHitChance -= 15; // Hard to see at range in fog
-  }
-  
-  if (combat.weather === 'rain' && attackName.includes("shot")) {
-    toHitChance -= 10; // Rain affects ranged weapons
-  }
-  
-  if (combat.terrain === 'rocky' && combat.combatDistance > 0) {
-    toHitChance += 5; // Slight bonus for ranged from rocky terrain
-  }
-  
-  // Apply player defense from equipment
-  const playerDefense = calculatePlayerDefense();
-  toHitChance -= Math.floor(playerDefense / 5); // Reduce hit chance based on armor
-  
-  // Apply dodge effect if player has it
-  if (hasEffect('player', 'dodge_up')) {
-    const dodgeBonus = combat.combatEffects.find(e => e.target === 'player' && e.type === 'dodge_up').value;
-    toHitChance -= dodgeBonus;
-  }
-  
-  // Apply parry effect if player has it and at close range
-  if (hasEffect('player', 'parry') && combat.combatDistance === 0) {
-    const parryChance = combat.combatEffects.find(e => e.target === 'player' && e.type === 'parry').value;
-    if (Math.random() * 100 < parryChance) {
-      addToCombatLog(`You parry the enemy's ${attackName}!`);
+      if (enemyStance === 'defensive') {
+        hitChance -= 15;
+      } else if (enemyStance === 'evasive') {
+        hitChance -= 20;
+      }
       
-      // Counterattack
-      const counterDamage = 3 + (window.player.skills.melee || 0);
-      enemy.health = Math.max(0, enemy.health - counterDamage);
+      // Clamp hit chance
+      hitChance = Math.min(95, Math.max(5, hitChance));
+      
+      // Roll for hit
+      const roll = Math.random() * 100;
+      
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        combatLog.innerHTML += `<p>You attack the ${_currentEnemy.name}...</p>`;
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      setTimeout(() => {
+        if (roll <= hitChance) {
+          // Hit success
+          this.resolveSuccessfulAttack();
+        } else {
+          // Miss
+          if (combatLog) {
+            combatLog.innerHTML += `<p>Miss! Your attack fails to connect.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          
+          // Lose momentum after miss
+          window.GameState.set('playerMomentum', Math.max(-5, window.GameState.get('playerMomentum') - 1));
+          window.GameState.set('consecutiveHits', 0);
+        }
+      }, 1000);
+    },
+    
+    resolveSuccessfulAttack: function() {
+      // Calculate damage
+      const playerSkill = window.Player.get('skills.melee') || 0;
+      const playerStrength = window.Player.get('phy') || 0;
+      const baseDamage = 3 + playerSkill * 0.5 + playerStrength * 0.7;
+      const momentum = window.GameState.get('playerMomentum');
+      const momentumBonus = momentum > 0 ? momentum : 0;
+      
+      let damage = baseDamage + momentumBonus;
+      
+      // Aggressive stance increases damage
+      if (window.GameState.get('combatStance') === 'aggressive') {
+        damage *= 1.3;
+      }
+      
+      // Enemy defensive stance reduces damage
+      if (window.GameState.get('enemyStance') === 'defensive') {
+        damage *= 0.7;
+      }
+      
+      // Critical hit chance
+      const critChance = 5 + playerSkill * 0.5 + (window.GameState.get('consecutiveHits') * 3);
+      const critRoll = Math.random() * 100;
+      
+      let isCritical = false;
+      if (critRoll <= critChance) {
+        isCritical = true;
+        damage *= 1.5;
+      }
+      
+      // Apply final damage
+      damage = Math.round(damage);
+      _currentEnemy.health -= damage;
       
       // Update enemy health display
-      document.getElementById('enemyHealthDisplay').textContent = `${enemy.health} HP`;
-      document.getElementById('enemyCombatHealth').style.width = `${Math.max(0, (enemy.health / enemy.maxHealth) * 100)}%`;
+      const enemyHealthDisplay = document.getElementById('enemyHealthDisplay');
+      const enemyCombatHealth = document.getElementById('enemyCombatHealth');
       
-      addToCombatLog(`Your counter-attack deals ${counterDamage} damage.`);
-      
-      // Continue enemy turn after a short delay
-      setTimeout(() => {
-        processEnemyTurn();
-      }, 500);
-      
-      return;
-    }
-  }
-  
-  // Cap hit chance
-  toHitChance = Math.max(5, Math.min(95, toHitChance));
-  
-  // Roll to hit
-  const hitRoll = Math.floor(Math.random() * 100) + 1;
-  
-  if (hitRoll <= toHitChance) {
-    // Hit! Calculate damage
-    const weaponDamage = enemy.equipment.weapon.stats.damage;
-    let damage = Math.floor(Math.random() * (weaponDamage[1] - weaponDamage[0] + 1)) + weaponDamage[0];
-    
-    // Apply player defense reduction
-    const defenseReduction = Math.min(damage - 1, Math.floor(playerDefense / 3));
-    damage -= defenseReduction;
-    
-    // Apply damage resist effect if player has it
-    if (hasEffect('player', 'damage_resist')) {
-      const resistPercent = combat.combatEffects.find(e => e.target === 'player' && e.type === 'damage_resist').value;
-      damage = Math.max(1, Math.floor(damage * (1 - (resistPercent / 100))));
-    }
-    
-    // Apply block chance if player has shield
-    const playerShield = window.player.equipment.offhand;
-    let blockChance = 0;
-    
-    if (playerShield && playerShield.category === 'SHIELD' && combat.combatDistance <= 1) {
-      blockChance = playerShield.stats.blockChance || 0;
-      
-      // Apply block up effect if player has it
-      if (hasEffect('player', 'block_up')) {
-        const blockBonus = combat.combatEffects.find(e => e.target === 'player' && e.type === 'block_up').value;
-        blockChance += blockBonus;
+      if (enemyHealthDisplay) {
+        enemyHealthDisplay.textContent = `${Math.max(0, _currentEnemy.health)} HP`;
       }
       
-      // Cap block chance
-      blockChance = Math.min(75, blockChance);
+      if (enemyCombatHealth) {
+        const healthPercent = Math.max(0, (_currentEnemy.health / _currentEnemy.maxHealth) * 100);
+        enemyCombatHealth.style.width = `${healthPercent}%`;
+      }
       
-      // Roll for block
-      if (Math.random() * 100 < blockChance) {
-        addToCombatLog(`You block the enemy's ${attackName} with your shield.`);
-        
-        // Continue enemy turn after a short delay
+      // Update combat log
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        if (isCritical) {
+          combatLog.innerHTML += `<p><span class="critical-hit">Critical hit!</span> You land a powerful blow on the ${_currentEnemy.name} for ${damage} damage!</p>`;
+        } else {
+          combatLog.innerHTML += `<p>Hit! You strike the ${_currentEnemy.name} for ${damage} damage.</p>`;
+        }
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      // Update momentum and consecutive hits
+      window.GameState.set('playerMomentum', Math.min(5, window.GameState.get('playerMomentum') + 1));
+      window.GameState.set('enemyMomentum', Math.max(-5, window.GameState.get('enemyMomentum') - 1));
+      window.GameState.set('consecutiveHits', window.GameState.get('consecutiveHits') + 1);
+      
+      // Check for enemy defeat
+      if (_currentEnemy.health <= 0) {
         setTimeout(() => {
-          processEnemyTurn();
-        }, 500);
+          if (combatLog) {
+            combatLog.innerHTML += `<p>Victory! You have defeated the ${_currentEnemy.name}!</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          
+          // End combat with victory
+          setTimeout(() => {
+            this.endCombat('victory');
+          }, 1500);
+        }, 1000);
+      }
+    },
+    
+    performDefend: function() {
+      // Set player to defensive stance
+      window.GameState.set('combatStance', 'defensive');
+      
+      // Gain a small defensive bonus
+      window.GameState.set('playerDefenseBonus', (window.GameState.get('playerDefenseBonus') || 0) + 2);
+      
+      // Log the action
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        combatLog.innerHTML += `<p>You take a defensive position, preparing to block or counter attacks.</p>`;
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      // Slightly recover stamina
+      const staminaGain = 2 + (window.Player.get('skills.discipline') || 0) * 0.5;
+      window.GameState.set('stamina', Math.min(
+        window.GameState.get('maxStamina'),
+        window.GameState.get('stamina') + staminaGain
+      ));
+    },
+    
+    performDodge: function() {
+      // Set player to evasive stance
+      window.GameState.set('combatStance', 'evasive');
+      
+      // Gain an evasion bonus
+      window.GameState.set('playerEvasionBonus', (window.GameState.get('playerEvasionBonus') || 0) + 3);
+      
+      // Log the action
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        combatLog.innerHTML += `<p>You focus on evasive movements, making yourself harder to hit.</p>`;
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      // Increment dodge count for achievements
+      window.GameState.set('dodgeCount', window.GameState.get('dodgeCount') + 1);
+    },
+    
+    performAdvance: function() {
+      // Check current distance
+      const currentDistance = window.GameState.get('combatDistance');
+      
+      if (currentDistance > 0) {
+        // Reduce distance
+        window.GameState.set('combatDistance', currentDistance - 1);
+        
+        // Log the action
+        const combatLog = document.getElementById('combatLog');
+        if (combatLog) {
+          const newDistance = this.getDistanceText(currentDistance - 1);
+          combatLog.innerHTML += `<p>You advance toward the ${_currentEnemy.name}, closing to ${newDistance} range.</p>`;
+          combatLog.scrollTop = combatLog.scrollHeight;
+        }
+        
+        // Gain momentum if advancing aggressively
+        if (window.GameState.get('combatStance') === 'aggressive') {
+          window.GameState.set('playerMomentum', Math.min(5, window.GameState.get('playerMomentum') + 1));
+        }
+      } else {
+        // Already at closest range
+        const combatLog = document.getElementById('combatLog');
+        if (combatLog) {
+          combatLog.innerHTML += `<p>You are already at close range with the ${_currentEnemy.name}.</p>`;
+          combatLog.scrollTop = combatLog.scrollHeight;
+        }
+      }
+    },
+    
+    performRetreat: function() {
+      // Check current distance
+      const currentDistance = window.GameState.get('combatDistance');
+      
+      if (currentDistance < 2) {
+        // Increase distance
+        window.GameState.set('combatDistance', currentDistance + 1);
+        
+        // Log the action
+        const combatLog = document.getElementById('combatLog');
+        if (combatLog) {
+          const newDistance = this.getDistanceText(currentDistance + 1);
+          combatLog.innerHTML += `<p>You retreat from the ${_currentEnemy.name}, moving to ${newDistance} range.</p>`;
+          combatLog.scrollTop = combatLog.scrollHeight;
+        }
+        
+        // Potentially lose momentum when retreating
+        if (window.GameState.get('combatStance') !== 'evasive') {
+          window.GameState.set('playerMomentum', Math.max(-5, window.GameState.get('playerMomentum') - 1));
+        }
+      } else {
+        // Already at furthest range
+        const combatLog = document.getElementById('combatLog');
+        if (combatLog) {
+          combatLog.innerHTML += `<p>You are already at far range from the ${_currentEnemy.name}.</p>`;
+          combatLog.scrollTop = combatLog.scrollHeight;
+        }
+      }
+    },
+    
+    getDistanceText: function(distance) {
+      switch(distance) {
+        case 0: return "close";
+        case 1: return "medium";
+        case 2: return "far";
+        default: return "unknown";
+      }
+    },
+    
+    processEnemyTurn: function() {
+      // Check if enemy is already defeated
+      if (_currentEnemy.health <= 0) return;
+      
+      // Wait a moment before processing enemy action
+      setTimeout(() => {
+        const combatLog = document.getElementById('combatLog');
+        if (combatLog) {
+          combatLog.innerHTML += `<p>The ${_currentEnemy.name} prepares to act...</p>`;
+          combatLog.scrollTop = combatLog.scrollHeight;
+        }
+        
+        // Determine enemy action based on AI
+        const enemyAction = this.determineEnemyAction();
+        
+        // Process the enemy action
+        setTimeout(() => {
+          this.processEnemyAction(enemyAction);
+        }, 1000);
+      }, 1500);
+    },
+    
+    determineEnemyAction: function() {
+      // Simple enemy AI
+      const distance = window.GameState.get('combatDistance');
+      const playerHealth = window.GameState.get('health');
+      const playerMaxHealth = window.GameState.get('maxHealth');
+      const enemyHealth = _currentEnemy.health;
+      const enemyMaxHealth = _currentEnemy.maxHealth;
+      
+      // Calculate health percentages
+      const playerHealthPercent = playerHealth / playerMaxHealth * 100;
+      const enemyHealthPercent = enemyHealth / enemyMaxHealth * 100;
+      
+      // Enemy stance strategies
+      if (enemyHealthPercent < 30 && window.GameState.get('enemyStance') !== 'defensive') {
+        // Enemy is badly hurt, go defensive
+        return 'stance_defensive';
+      }
+      
+      if (playerHealthPercent < 30 && window.GameState.get('enemyStance') !== 'aggressive') {
+        // Player is badly hurt, press the advantage
+        return 'stance_aggressive';
+      }
+      
+      // Distance strategies
+      if (distance === 2) {
+        // Enemy is at far distance
+        if (_currentEnemy.hasRanged) {
+          // If enemy has ranged weapons, use them
+          return Math.random() < 0.5 ? 'shoot' : 'aim';
+        } else {
+          // Otherwise, try to close distance
+          return 'advance';
+        }
+      } else if (distance === 1) {
+        // Enemy is at medium distance
+        if (_currentEnemy.preferredRange === 'close') {
+          return 'advance';
+        } else if (_currentEnemy.preferredRange === 'far' && _currentEnemy.hasRanged) {
+          return 'retreat';
+        } else {
+          // Mix of attack and position changes
+          const r = Math.random();
+          if (r < 0.4) return 'attack';
+          if (r < 0.6) return 'advance';
+          if (r < 0.8) return 'retreat';
+          return 'defend';
+        }
+      } else {
+        // Enemy is at close distance
+        if (_currentEnemy.preferredRange === 'far') {
+          return 'retreat';
+        } else {
+          // Mostly attack at close range
+          const r = Math.random();
+          if (r < 0.7) return 'attack';
+          if (r < 0.85) return 'defend';
+          return 'dodge';
+        }
+      }
+    },
+    
+    processEnemyAction: function(action) {
+      // Get combat log
+      const combatLog = document.getElementById('combatLog');
+      
+      // Handle stance changes separately
+      if (action.startsWith('stance_')) {
+        const stance = action.replace('stance_', '');
+        window.GameState.set('enemyStance', stance);
+        
+        if (combatLog) {
+          combatLog.innerHTML += `<p>The ${_currentEnemy.name} switches to a ${stance} stance.</p>`;
+          combatLog.scrollTop = combatLog.scrollHeight;
+        }
         
         return;
       }
-    }
-    
-    // Check for critical hit (10% base chance)
-    let critChance = 10;
-    if (enemy.equipment.weapon && enemy.equipment.weapon.stats && enemy.equipment.weapon.stats.critChance) {
-      critChance = enemy.equipment.weapon.stats.critChance;
-    }
-    
-    const critRoll = Math.floor(Math.random() * 100) + 1;
-    let isCrit = false;
-    
-    if (critRoll <= critChance) {
-      damage = Math.floor(damage * 1.5);
-      isCrit = true;
-    }
-    
-    // Apply damage to player
-    window.gameState.health = Math.max(1, window.gameState.health - damage);
-    
-    // Update player health display
-    document.getElementById('playerHealthDisplay').textContent = `${Math.round(window.gameState.health)} HP`;
-    document.getElementById('playerCombatHealth').style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
-    
-    // Log the attack
-    if (isCrit) {
-      addToCombatLog(`Critical hit! The enemy's ${attackName} deals ${damage} damage.`);
-    } else {
-      addToCombatLog(`The enemy's ${attackName} hits you for ${damage} damage.`);
-    }
-    
-    // Apply weapon effects
-    if (attackName.includes("chop") && weaponType === 'CLEAVER') {
-      // Chance to cause bleeding
-      if (Math.random() < 0.25) {
-        addEffect('player', 'bleed', 2, 3, 'Bleeding');
+      
+      // Process normal actions
+      switch(action) {
+        case 'attack':
+          this.processEnemyAttack();
+          break;
+        case 'defend':
+          if (combatLog) {
+            combatLog.innerHTML += `<p>The ${_currentEnemy.name} takes a defensive position.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          window.GameState.set('enemyStance', 'defensive');
+          break;
+        case 'dodge':
+          if (combatLog) {
+            combatLog.innerHTML += `<p>The ${_currentEnemy.name} becomes more evasive.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          window.GameState.set('enemyStance', 'evasive');
+          break;
+        case 'advance':
+          const currentDistance = window.GameState.get('combatDistance');
+          if (currentDistance > 0) {
+            window.GameState.set('combatDistance', currentDistance - 1);
+            
+            if (combatLog) {
+              const newDistance = this.getDistanceText(currentDistance - 1);
+              combatLog.innerHTML += `<p>The ${_currentEnemy.name} advances toward you, closing to ${newDistance} range.</p>`;
+              combatLog.scrollTop = combatLog.scrollHeight;
+            }
+            
+            // Gain momentum if advancing aggressively
+            if (window.GameState.get('enemyStance') === 'aggressive') {
+              window.GameState.set('enemyMomentum', Math.min(5, window.GameState.get('enemyMomentum') + 1));
+            }
+          } else {
+            if (combatLog) {
+              combatLog.innerHTML += `<p>The ${_currentEnemy.name} is already at close range with you.</p>`;
+              combatLog.scrollTop = combatLog.scrollHeight;
+            }
+          }
+          break;
+        case 'retreat':
+          const distanceCurrent = window.GameState.get('combatDistance');
+          if (distanceCurrent < 2) {
+            window.GameState.set('combatDistance', distanceCurrent + 1);
+            
+            if (combatLog) {
+              const newDistance = this.getDistanceText(distanceCurrent + 1);
+              combatLog.innerHTML += `<p>The ${_currentEnemy.name} retreats from you, moving to ${newDistance} range.</p>`;
+              combatLog.scrollTop = combatLog.scrollHeight;
+            }
+          } else {
+            if (combatLog) {
+              combatLog.innerHTML += `<p>The ${_currentEnemy.name} is already at far range from you.</p>`;
+              combatLog.scrollTop = combatLog.scrollHeight;
+            }
+          }
+          break;
+        default:
+          if (combatLog) {
+            combatLog.innerHTML += `<p>The ${_currentEnemy.name} observes you carefully.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
       }
-    }
+      
+      // Update combat UI after enemy action
+      this.updateCombatActions();
+    },
     
-    // Update status bars
-    window.updateStatusBars();
-  } else {
-    // Miss
-    addToCombatLog(`The enemy's ${attackName} misses.`);
-  }
-  
-  // Continue enemy turn after a short delay
-  setTimeout(() => {
-    processEnemyTurn();
-  }, 500);
-}
-
-// Calculate player defense from equipment
-function calculatePlayerDefense() {
-  let defense = 0;
-  
-  // Add armor defense
-  if (window.player.equipment.armor) {
-    defense += window.player.equipment.armor.stats.defense || 0;
-  }
-  
-  // Add helmet defense
-  if (window.player.equipment.helmet) {
-    defense += window.player.equipment.helmet.stats.defense || 0;
-  }
-  
-  // Add shield defense if at appropriate distance
-  if (window.player.equipment.offhand && 
-      window.player.equipment.offhand.category === 'SHIELD' && 
-      window.gameState.combat.combatDistance <= 1) {
-    defense += window.player.equipment.offhand.stats.defense || 0;
-  }
-  
-  return defense;
-}
-
-// Execute opportunity attack
-function executeOpportunityAttack(attacker) {
-  if (attacker === 'player') {
-    // Player opportunity attack (simplified)
-    const weapon = window.player.equipment.weapon;
-    let damage = 3; // Base damage
-    
-    if (weapon && weapon.stats && weapon.stats.damage) {
-      damage = Math.floor(weapon.stats.damage[0] * 0.7); // 70% of minimum weapon damage
-    }
-    
-    // Apply to enemy
-    const enemy = window.gameState.combat.currentEnemy;
-    enemy.health = Math.max(0, enemy.health - damage);
-    
-    // Update enemy health display
-    document.getElementById('enemyHealthDisplay').textContent = `${enemy.health} HP`;
-    document.getElementById('enemyCombatHealth').style.width = `${Math.max(0, (enemy.health / enemy.maxHealth) * 100)}%`;
-    
-    addToCombatLog(`Your opportunity attack deals ${damage} damage.`);
-  } else {
-    // Enemy opportunity attack (simplified)
-    const enemy = window.gameState.combat.currentEnemy;
-    const weapon = enemy.equipment.weapon;
-    let damage = 3; // Base damage
-    
-    if (weapon && weapon.stats && weapon.stats.damage) {
-      damage = Math.floor(weapon.stats.damage[0] * 0.7); // 70% of minimum weapon damage
-    }
-    
-    // Apply to player
-    window.gameState.health = Math.max(1, window.gameState.health - damage);
-    
-    // Update player health display
-    document.getElementById('playerHealthDisplay').textContent = `${Math.round(window.gameState.health)} HP`;
-    document.getElementById('playerCombatHealth').style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
-    
-    addToCombatLog(`The enemy's opportunity attack deals ${damage} damage.`);
-    
-    // Update status bars
-    window.updateStatusBars();
-  }
-  
-  // Check combat end conditions
-  checkCombatEndConditions();
-}
-
-// End enemy turn and start new combat turn
-function endEnemyTurn() {
-  // Reset enemy AP
-  window.gameState.combat.enemyAP = 0;
-  
-  // Increment combat turn counter
-  window.gameState.combat.combatTurn++;
-  
-  // Switch active character
-  window.gameState.combat.activeCharacter = 'player';
-  
-  // Add turn end to combat log
-  addToCombatLog("Enemy ends their turn.");
-  
-  // Begin new combat turn
-  beginCombatTurn();
-}
-
-// Add message to combat log
-function addToCombatLog(message) {
-  const combatLog = document.getElementById('combatLog');
-  
-  // Store combat log message
-  window.gameState.combat.combatLog.push(message);
-  
-  // Trim combat log if too long
-  if (window.gameState.combat.combatLog.length > 50) {
-    window.gameState.combat.combatLog.shift();
-  }
-  
-  // Add message to UI
-  const messageElement = document.createElement('p');
-  messageElement.innerHTML = message;
-  combatLog.appendChild(messageElement);
-  
-  // Scroll to bottom
-  combatLog.scrollTop = combatLog.scrollHeight;
-}
-
-// Attempt to flee from battle
-function attemptToFlee() {
-  // Can only flee from far distance
-  if (window.gameState.combat.combatDistance < 2) {
-    addToCombatLog("You need to be at far distance to attempt to flee.");
-    return;
-  }
-  
-  // Calculate flee chance based on various factors
-  let fleeChance = 50; // Base 50% chance
-  
-  // Skill bonuses
-  fleeChance += (window.player.skills.survival || 0) * 5;
-  
-  // Stamina penalty
-  const staminaPercent = window.gameState.stamina / window.gameState.maxStamina;
-  if (staminaPercent < 0.5) {
-    fleeChance -= Math.floor((0.5 - staminaPercent) * 50);
-  }
-  
-  // Terrain modifiers
-  if (window.gameState.combat.terrain === 'slippery') {
-    fleeChance -= 10;
-  } else if (window.gameState.combat.terrain === 'rocky') {
-    fleeChance += 10; // Easier to escape in rocky terrain
-  }
-  
-  // Weather modifiers
-  if (window.gameState.combat.weather === 'fog') {
-    fleeChance += 15; // Easier to escape in fog
-  }
-  
-  // Roll for success
-  const roll = Math.floor(Math.random() * 100) + 1;
-  
-  if (roll <= fleeChance) {
-    // Successful escape
-    addToCombatLog("You successfully disengage and escape from combat!");
-    
-    // End combat with retreat result
-    endCombatWithResult({
-      victory: false,
-      retreat: true,
-      message: "You successfully retreated from combat."
-    });
-  } else {
-    // Failed escape
-    addToCombatLog("Your attempt to flee fails! The enemy cuts off your escape.");
-    
-    // Use up player's AP
-    window.gameState.combat.playerAP = 0;
-    
-    // Enemy might get an opportunity attack
-    if (Math.random() < 0.5) {
-      addToCombatLog("The enemy lunges at you as you try to escape!");
-      executeOpportunityAttack('enemy');
-    }
-    
-    // End player turn
-    endPlayerTurn();
-  }
-}
-
-// Check for end of combat conditions
-function checkCombatEndConditions() {
-  // Check if player is defeated
-  if (window.gameState.health <= 0) {
-    // Ensure health doesn't go below 1 (no perma-death)
-    window.gameState.health = 1;
-    
-    // End combat with defeat result
-    endCombatWithResult({
-      victory: false,
-      defeat: true,
-      message: "You are defeated and barely escape with your life."
-    });
-    return true;
-  }
-  
-  // Check if enemy is defeated
-  const enemy = window.gameState.combat.currentEnemy;
-  if (enemy && enemy.health <= 0) {
-    // End combat with victory result
-    endCombatWithResult({
-      victory: true,
-      message: `You have defeated the ${enemy.name}!`
-    });
-    return true;
-  }
-  
-  return false;
-}
-
-// End combat with a specific result
-function endCombatWithResult(result) {
-  // Hide combat interface
-  document.getElementById('combatInterface').classList.add('hidden');
-  
-  // Show regular game actions
-  document.getElementById('actions').style.display = 'flex';
-  
-  // Set combat state to inactive
-  window.gameState.combat.inBattle = false;
-  
-  // Apply combat results
-  if (result.victory) {
-    // Victory
-    window.setNarrative(result.message);
-    
-    // Award experience and loot
-    const enemy = window.gameState.combat.currentEnemy;
-    const expGained = calculateExperienceReward(enemy);
-    window.gameState.experience += expGained;
-    
-    // Check for loot
-    const loot = generateLoot(enemy);
-    if (loot && window.player.inventory.length < 20) {
-      window.player.inventory.push(loot);
-      window.addToNarrative(`You found: ${loot.name}.`);
-    }
-    
-    // Add reward info to narrative
-    window.addToNarrative(`You gained ${expGained} experience.`);
-    
-    // Use some stamina from battle
-    window.gameState.stamina = Math.max(0, window.gameState.stamina - 15);
-    
-    // Check for level up
-    if (typeof window.checkLevelUp === 'function') {
-      window.checkLevelUp();
-    }
-    
-    // Improve combat skill slightly
-    const skillGain = 0.1;
-    
-    // Determine which skill to improve based on weapon used
-    const weapon = window.player.equipment.weapon;
-    if (weapon && weapon.category === 'WEAPON') {
-      // Ranged weapons improve marksmanship
-      if (['BOW', 'CROSSBOW', 'MATCHLOCK'].includes(weapon.type)) {
-        if (!window.player.skills.marksmanship) window.player.skills.marksmanship = 0;
-        window.player.skills.marksmanship += skillGain;
-        window.showNotification(`Marksmanship improved to ${window.player.skills.marksmanship.toFixed(1)}`, 'success');
-      } else {
-        // Other weapons improve melee
-        if (!window.player.skills.melee) window.player.skills.melee = 0;
-        window.player.skills.melee += skillGain;
-        window.showNotification(`Melee combat improved to ${window.player.skills.melee.toFixed(1)}`, 'success');
+    processEnemyAttack: function(type = "normal") {
+      // Get combat state
+      const playerStance = window.GameState.get('combatStance');
+      const enemyStance = window.GameState.get('enemyStance');
+      const enemySkill = _currentEnemy.skill || 5;
+      const playerDefense = (window.Player.get('skills.melee') || 0) * 0.5;
+      const playerEvasion = (window.Player.get('phy') || 0) * 0.3;
+      const enemyMomentum = window.GameState.get('enemyMomentum');
+      
+      // Calculate hit chance
+      let hitChance = 60 + enemySkill * 3 - playerDefense * 2 - playerEvasion + enemyMomentum * 5;
+      
+      // Adjust based on stances
+      if (enemyStance === 'aggressive') {
+        hitChance += 15;
+      } else if (enemyStance === 'defensive') {
+        hitChance -= 5;
       }
+      
+      if (playerStance === 'defensive') {
+        hitChance -= 15;
+      } else if (playerStance === 'evasive') {
+        hitChance -= 20;
+      }
+      
+      // Add bonus for opportunity attacks
+      if (type === "opportunity") {
+        hitChance += 10;
+      }
+      
+      // Apply player defense bonus if any
+      if (window.GameState.get('playerDefenseBonus')) {
+        hitChance -= window.GameState.get('playerDefenseBonus');
+        window.GameState.set('playerDefenseBonus', 0); // Reset bonus after use
+      }
+      
+      // Apply player evasion bonus if any
+      if (window.GameState.get('playerEvasionBonus')) {
+        hitChance -= window.GameState.get('playerEvasionBonus');
+        window.GameState.set('playerEvasionBonus', 0); // Reset bonus after use
+      }
+      
+      // Clamp hit chance
+      hitChance = Math.min(95, Math.max(5, hitChance));
+      
+      // Roll for hit
+      const roll = Math.random() * 100;
+      
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        if (type === "opportunity") {
+          combatLog.innerHTML += `<p>The ${_currentEnemy.name} takes advantage of your failed retreat with an attack...</p>`;
+        } else {
+          combatLog.innerHTML += `<p>The ${_currentEnemy.name} attacks you...</p>`;
+        }
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      setTimeout(() => {
+        if (roll <= hitChance) {
+          // Hit success
+          this.resolveEnemySuccessfulAttack();
+        } else {
+          // Miss
+          if (combatLog) {
+            combatLog.innerHTML += `<p>Miss! The ${_currentEnemy.name}'s attack fails to connect.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          
+          // Enemy loses momentum after miss
+          window.GameState.set('enemyMomentum', Math.max(-5, window.GameState.get('enemyMomentum') - 1));
+          
+          // Player gains a small momentum boost from successful dodge/block
+          window.GameState.set('playerMomentum', Math.min(5, window.GameState.get('playerMomentum') + 0.5));
+        }
+      }, 1000);
+    },
+    
+    resolveEnemySuccessfulAttack: function() {
+      // Calculate damage
+      const enemySkill = _currentEnemy.skill || 5;
+      const enemyStrength = _currentEnemy.strength || 5;
+      const baseDamage = 3 + enemySkill * 0.3 + enemyStrength * 0.5;
+      const momentum = window.GameState.get('enemyMomentum');
+      const momentumBonus = momentum > 0 ? momentum : 0;
+      
+      let damage = baseDamage + momentumBonus;
+      
+      // Aggressive stance increases damage
+      if (window.GameState.get('enemyStance') === 'aggressive') {
+        damage *= 1.3;
+      }
+      
+      // Player defensive stance reduces damage
+      if (window.GameState.get('combatStance') === 'defensive') {
+        damage *= 0.7;
+      }
+      
+      // Critical hit chance
+      const critChance = 5 + _currentEnemy.skill * 0.3;
+      const critRoll = Math.random() * 100;
+      
+      let isCritical = false;
+      if (critRoll <= critChance) {
+        isCritical = true;
+        damage *= 1.5;
+      }
+      
+      // Apply final damage
+      damage = Math.round(damage);
+      window.GameState.set('health', Math.max(0, window.GameState.get('health') - damage));
+      
+      // Update player health display
+      const playerHealthDisplay = document.getElementById('playerHealthDisplay');
+      const playerCombatHealth = document.getElementById('playerCombatHealth');
+      
+      if (playerHealthDisplay) {
+        playerHealthDisplay.textContent = `${Math.max(0, window.GameState.get('health'))} HP`;
+      }
+      
+      if (playerCombatHealth) {
+        const healthPercent = Math.max(0, (window.GameState.get('health') / window.GameState.get('maxHealth')) * 100);
+        playerCombatHealth.style.width = `${healthPercent}%`;
+      }
+      
+      // Update combat log
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        if (isCritical) {
+          combatLog.innerHTML += `<p><span class="critical-hit">Critical hit!</span> The ${_currentEnemy.name} lands a powerful blow on you for ${damage} damage!</p>`;
+        } else {
+          combatLog.innerHTML += `<p>Hit! The ${_currentEnemy.name} strikes you for ${damage} damage.</p>`;
+        }
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      // Update momentum
+      window.GameState.set('enemyMomentum', Math.min(5, window.GameState.get('enemyMomentum') + 1));
+      window.GameState.set('playerMomentum', Math.max(-5, window.GameState.get('playerMomentum') - 1));
+      
+      // Check for player defeat
+      if (window.GameState.get('health') <= 0) {
+        setTimeout(() => {
+          if (combatLog) {
+            combatLog.innerHTML += `<p>Defeat! You have been overwhelmed by the ${_currentEnemy.name}!</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          
+          // End combat with defeat
+          setTimeout(() => {
+            this.endCombat('defeat');
+          }, 1500);
+        }, 1000);
+      }
+    },
+    
+    // Helper function to check if player has ranged weapon
+    playerHasRangedWeapon: function() {
+      // In a real implementation, this would check the player's inventory for a ranged weapon
+      // For now, just return true if player has marksmanship skill
+      return (window.Player.get('skills.marksmanship') || 0) > 0;
+    },
+    
+    // Other action implementations for ranged combat, etc.
+    performAim: function() {
+      // Log the action
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        combatLog.innerHTML += `<p>You carefully aim at the ${_currentEnemy.name}, increasing your next shot's accuracy.</p>`;
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      // Add an aim bonus
+      window.GameState.set('aimBonus', (window.GameState.get('aimBonus') || 0) + 20);
+    },
+    
+    performShoot: function() {
+      // Get combat state
+      const playerSkill = window.Player.get('skills.marksmanship') || 0;
+      const enemyStance = window.GameState.get('enemyStance');
+      const distance = window.GameState.get('combatDistance');
+      
+      // Calculate hit chance
+      let hitChance = 50 + playerSkill * 3;
+      
+      // Distance affects accuracy
+      if (distance === 1) { // Medium range
+        hitChance += 10;
+      } else if (distance === 0) { // Close range
+        hitChance -= 10; // Harder to use ranged weapons at close range
+      }
+      
+      // Enemy evasive stance makes them harder to hit
+      if (enemyStance === 'evasive') {
+        hitChance -= 15;
+      }
+      
+      // Apply aim bonus if any
+      if (window.GameState.get('aimBonus')) {
+        hitChance += window.GameState.get('aimBonus');
+        window.GameState.set('aimBonus', 0); // Reset bonus after use
+      }
+      
+      // Clamp hit chance
+      hitChance = Math.min(95, Math.max(5, hitChance));
+      
+      // Roll for hit
+      const roll = Math.random() * 100;
+      
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        combatLog.innerHTML += `<p>You shoot at the ${_currentEnemy.name}...</p>`;
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      setTimeout(() => {
+        if (roll <= hitChance) {
+          // Calculate damage
+          const baseDamage = 5 + playerSkill * 0.8;
+          let damage = baseDamage;
+          
+          // Critical hit chance
+          const critChance = 5 + playerSkill * 0.5;
+          const critRoll = Math.random() * 100;
+          
+          let isCritical = false;
+          if (critRoll <= critChance) {
+            isCritical = true;
+            damage *= 1.5;
+          }
+          
+          // Apply final damage
+          damage = Math.round(damage);
+          _currentEnemy.health -= damage;
+          
+          // Update enemy health display
+          const enemyHealthDisplay = document.getElementById('enemyHealthDisplay');
+          const enemyCombatHealth = document.getElementById('enemyCombatHealth');
+          
+          if (enemyHealthDisplay) {
+            enemyHealthDisplay.textContent = `${Math.max(0, _currentEnemy.health)} HP`;
+          }
+          
+          if (enemyCombatHealth) {
+            const healthPercent = Math.max(0, (_currentEnemy.health / _currentEnemy.maxHealth) * 100);
+            enemyCombatHealth.style.width = `${healthPercent}%`;
+          }
+          
+          // Update combat log
+          if (combatLog) {
+            if (isCritical) {
+              combatLog.innerHTML += `<p><span class="critical-hit">Critical hit!</span> Your shot strikes a vital area for ${damage} damage!</p>`;
+            } else {
+              combatLog.innerHTML += `<p>Hit! Your shot strikes the ${_currentEnemy.name} for ${damage} damage.</p>`;
+            }
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          
+          // Check for enemy defeat
+          if (_currentEnemy.health <= 0) {
+            setTimeout(() => {
+              if (combatLog) {
+                combatLog.innerHTML += `<p>Victory! You have defeated the ${_currentEnemy.name}!</p>`;
+                combatLog.scrollTop = combatLog.scrollHeight;
+              }
+              
+              // End combat with victory
+              setTimeout(() => {
+                this.endCombat('victory');
+              }, 1500);
+            }, 1000);
+          }
+        } else {
+          // Miss
+          if (combatLog) {
+            combatLog.innerHTML += `<p>Miss! Your shot fails to hit the target.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+        }
+      }, 1000);
+    },
+    
+    performGrapple: function() {
+      // Get combat state
+      const playerPhysical = window.Player.get('phy') || 0;
+      const enemyStrength = _currentEnemy.strength || 5;
+      
+      // Calculate success chance
+      let successChance = 50 + playerPhysical * 4 - enemyStrength * 3;
+      
+      // Enemy evasive stance makes them harder to grapple
+      if (window.GameState.get('enemyStance') === 'evasive') {
+        successChance -= 20;
+      }
+      
+      // Clamp success chance
+      successChance = Math.min(90, Math.max(10, successChance));
+      
+      // Roll for success
+      const roll = Math.random() * 100;
+      
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        combatLog.innerHTML += `<p>You attempt to grapple the ${_currentEnemy.name}...</p>`;
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      setTimeout(() => {
+        if (roll <= successChance) {
+          // Success
+          if (combatLog) {
+            combatLog.innerHTML += `<p>Success! You've grappled the ${_currentEnemy.name}, limiting their movement.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          
+          // Apply grapple effects
+          window.GameState.set('enemyGrappled', true);
+          window.GameState.set('playerMomentum', Math.min(5, window.GameState.get('playerMomentum') + 2));
+          window.GameState.set('enemyMomentum', Math.max(-5, window.GameState.get('enemyMomentum') - 2));
+          
+          // Deal some damage
+          const damage = Math.round(2 + playerPhysical * 0.3);
+          _currentEnemy.health -= damage;
+          
+          // Update enemy health display
+          const enemyHealthDisplay = document.getElementById('enemyHealthDisplay');
+          const enemyCombatHealth = document.getElementById('enemyCombatHealth');
+          
+          if (enemyHealthDisplay) {
+            enemyHealthDisplay.textContent = `${Math.max(0, _currentEnemy.health)} HP`;
+          }
+          
+          if (enemyCombatHealth) {
+            const healthPercent = Math.max(0, (_currentEnemy.health / _currentEnemy.maxHealth) * 100);
+            enemyCombatHealth.style.width = `${healthPercent}%`;
+          }
+          
+          if (combatLog) {
+            combatLog.innerHTML += `<p>The grapple inflicts ${damage} damage to the ${_currentEnemy.name}.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+        } else {
+          // Failure
+          if (combatLog) {
+            combatLog.innerHTML += `<p>Failed! The ${_currentEnemy.name} breaks free from your grapple attempt.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          
+          // Lose momentum after failed grapple
+          window.GameState.set('playerMomentum', Math.max(-5, window.GameState.get('playerMomentum') - 1));
+        }
+      }, 1000);
+    },
+    
+    performObserve: function() {
+      // Log the action
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        combatLog.innerHTML += `<p>You observe the ${_currentEnemy.name}, studying their movements and tactics.</p>`;
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      // Generate some insights about the enemy
+      setTimeout(() => {
+        if (combatLog) {
+          combatLog.innerHTML += `<p>You notice that the ${_currentEnemy.name} seems ${
+            _currentEnemy.strength > 7 ? 'exceptionally strong' : 
+            _currentEnemy.strength > 5 ? 'physically strong' : 'relatively weak'
+          } and ${
+            _currentEnemy.skill > 7 ? 'highly skilled' : 
+            _currentEnemy.skill > 5 ? 'competent' : 'somewhat inexperienced'
+          }.</p>`;
+          
+          if (_currentEnemy.preferredRange) {
+            combatLog.innerHTML += `<p>They appear to prefer fighting at ${_currentEnemy.preferredRange} range.</p>`;
+          }
+          
+          if (_currentEnemy.weakness) {
+            combatLog.innerHTML += `<p>You spot a potential weakness: ${_currentEnemy.weakness}</p>`;
+          }
+          
+          combatLog.scrollTop = combatLog.scrollHeight;
+        }
+        
+        // Gain a small tactical advantage
+        window.GameState.set('tacticalAdvantage', true);
+        window.GameState.set('playerMomentum', Math.min(5, window.GameState.get('playerMomentum') + 1));
+      }, 1000);
+    },
+    
+    performFeint: function() {
+      // Log the action
+      const combatLog = document.getElementById('combatLog');
+      if (combatLog) {
+        combatLog.innerHTML += `<p>You perform a feint, attempting to trick the ${_currentEnemy.name}.</p>`;
+        combatLog.scrollTop = combatLog.scrollHeight;
+      }
+      
+      // Calculate success chance based on player skills
+      const tacticsSkill = window.Player.get('skills.tactics') || 0;
+      const enemySkill = _currentEnemy.skill || 5;
+      
+      let successChance = 50 + tacticsSkill * 5 - enemySkill * 2;
+      
+      // Clamp success chance
+      successChance = Math.min(90, Math.max(10, successChance));
+      
+      // Roll for success
+      const roll = Math.random() * 100;
+      
+      setTimeout(() => {
+        if (roll <= successChance) {
+          // Success
+          if (combatLog) {
+            combatLog.innerHTML += `<p>Your feint works! The ${_currentEnemy.name} falls for your ruse, leaving them vulnerable.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          
+          // Apply feint effects
+          window.GameState.set('enemyFeinted', true);
+          window.GameState.set('playerMomentum', Math.min(5, window.GameState.get('playerMomentum') + 2));
+          window.GameState.set('enemyMomentum', Math.max(-5, window.GameState.get('enemyMomentum') - 2));
+          
+          // Setup guaranteed hit for next action
+          window.GameState.set('guaranteedHit', true);
+        } else {
+          // Failure
+          if (combatLog) {
+            combatLog.innerHTML += `<p>Your feint fails! The ${_currentEnemy.name} doesn't fall for your deception.</p>`;
+            combatLog.scrollTop = combatLog.scrollHeight;
+          }
+          
+          // Lose momentum after failed feint
+          window.GameState.set('playerMomentum', Math.max(-5, window.GameState.get('playerMomentum') - 1));
+        }
+      }, 1000);
+    },
+    
+    // Environment and enemy generation
+    generateCombatEnvironment: function() {
+      // Use current weather if available
+      const currentWeather = window.GameState.get('weather') || 'clear';
+      
+      // Generate terrain based on location
+      const terrainOptions = ['flat', 'rocky', 'muddy', 'confined', 'elevated'];
+      const terrain = terrainOptions[Math.floor(Math.random() * terrainOptions.length)];
+      
+      return {
+        terrain: terrain,
+        weather: currentWeather
+      };
+    },
+    
+    getEnemyByType: function(enemyType) {
+      // This should be replaced with a proper enemy database lookup
+      const enemies = {
+        'arrasi_scout': {
+          name: 'Arrasi Scout',
+          description: 'A lightly armored scout of the Arrasi, wielding a curved blade and bow.',
+          type: 'arrasi',
+          health: 35,
+          maxHealth: 35,
+          skill: 7,
+          strength: 5,
+          defense: 5,
+          speed: 8,
+          initiative: 12,
+          hasRanged: true,
+          preferredRange: 'medium',
+          expValue: 35,
+          loot: {
+            taelors: { min: 5, max: 15 },
+            items: [
+              { name: 'Arrasi Curved Blade', chance: 0.2, value: 25 },
+              { name: 'Light Rations', chance: 0.6, value: 5 }
+            ]
+          },
+          weakness: 'Prefers to fight at range, vulnerable in close combat.'
+        },
+        'arrasi_warrior': {
+          name: 'Arrasi Warrior',
+          description: 'A battle-hardened warrior of the Arrasi, wielding a heavy war axe.',
+          type: 'arrasi',
+          health: 50,
+          maxHealth: 50,
+          skill: 8,
+          strength: 8,
+          defense: 7,
+          speed: 6,
+          initiative: 10,
+          hasRanged: false,
+          preferredRange: 'close',
+          expValue: 50,
+          loot: {
+            taelors: { min: 10, max: 25 },
+            items: [
+              { name: 'Arrasi War Axe', chance: 0.15, value: 40 },
+              { name: 'Arrasi Helmet', chance: 0.3, value: 30 }
+            ]
+          },
+          weakness: 'Slow to change tactics, vulnerable to feints.'
+        },
+        'wolf': {
+          name: 'Forest Wolf',
+          description: 'A large, hungry wolf with matted gray fur and sharp teeth.',
+          type: 'beast',
+          health: 30,
+          maxHealth: 30,
+          skill: 6,
+          strength: 7,
+          defense: 4,
+          speed: 9,
+          initiative: 13,
+          hasRanged: false,
+          preferredRange: 'close',
+          expValue: 30,
+          loot: {
+            items: [
+              { name: 'Wolf Pelt', chance: 0.8, value: 15 },
+              { name: 'Sharp Tooth', chance: 0.5, value: 5 }
+            ]
+          },
+          weakness: 'Predictable attack patterns, vulnerable after lunging.'
+        }
+      };
+      
+      // Clone enemy to avoid modifying the template
+      const enemy = enemies[enemyType];
+      if (enemy) {
+        return JSON.parse(JSON.stringify(enemy));
+      }
+      
+      return null;
+    },
+    
+    // Override handler - used for backward compatibility
+    setOriginalEndCombatFunction: function(originalFunction) {
+      _originalEndCombatFunction = originalFunction;
+    },
+    
+    // Integration with missions
+    startMissionCombat: function(enemyType, environment, callbackOnCompletion) {
+      // Set mission combat flag
+      window.GameState.set('inMissionCombat', true);
+      
+      // Save callback for mission continuation
+      if (callbackOnCompletion) {
+        this.on('combatEnd', function handleMissionCombatEnd(data) {
+          // Call the mission callback with the result
+          callbackOnCompletion(data.result);
+          
+          // Remove this event listener since it's no longer needed
+          api.off('combatEnd', handleMissionCombatEnd);
+        });
+      }
+      
+      // Start the combat
+      this.startCombat(enemyType, environment);
     }
-  } else if (result.retreat) {
-    // Retreat
-    window.setNarrative(result.message);
-    window.addToNarrative("You survived, but gained no rewards from combat.");
-    
-    // Use a lot of stamina from fleeing
-    window.gameState.stamina = Math.max(0, window.gameState.stamina - 30);
-    
-    // Improve survival skill slightly
-    if (!window.player.skills.survival) window.player.skills.survival = 0;
-    window.player.skills.survival += 0.1;
-    window.showNotification(`Survival improved to ${window.player.skills.survival.toFixed(1)}`, 'success');
-  } else if (result.defeat) {
-    // Defeat
-    window.setNarrative(result.message);
-    window.addToNarrative("You wake up later, having been dragged back to safety. Your wounds have been treated, but you've lost some items and morale.");
-    
-    // Lose some morale
-    window.gameState.morale = Math.max(20, window.gameState.morale - 15);
-    
-    // Lose a random item
-    if (window.player.inventory.length > 0) {
-      const lostIndex = Math.floor(Math.random() * window.player.inventory.length);
-      const lostItem = window.player.inventory.splice(lostIndex, 1)[0];
-      window.addToNarrative(`You lost your ${lostItem.name} in the struggle.`);
-    }
-    
-    // Very low stamina from defeat
-    window.gameState.stamina = Math.max(0, window.gameState.stamina - 50);
-  }
-  
-  // Update player status
-  window.updateStatusBars();
-  window.updateActionButtons();
-}
-
-// Calculate experience reward based on enemy
-function calculateExperienceReward(enemy) {
-  // Base experience from enemy type
-  const baseExperience = {
-    "arrasi_scout": 20,
-    "arrasi_warrior": 30,
-    "imperial_deserter": 25,
-    "wild_beast": 35
   };
   
-  // Get base value
-  let experience = baseExperience[enemy.id] || 20;
+  return api;
+})();
+
+// Initialize the combat system when document is ready
+document.addEventListener('DOMContentLoaded', function() {
+  window.CombatSystem.init();
+});
+
+// Backward compatibility layer
+window.startCombat = function(enemyType, environment) {
+  window.CombatSystem.startCombat(enemyType, environment);
+};
+
+window.endCombatWithResult = function(result) {
+  window.CombatSystem.endCombat(result);
+};
+
+window.cleanupCombatUI = function() {
+  window.CombatSystem.cleanupCombatUI();
+};
+
+// Override handler for mission system integration (backward compatibility)
+window.setOriginalEndCombatFunction = function(originalFunction) {
+  window.CombatSystem.setOriginalEndCombatFunction(originalFunction);
+};
+
+window.endCombatWithResult = function(result) {
+  console.log("Enhanced endCombatWithResult called with:", result);
   
-  // Adjust based on player level
-  if (window.gameState.level > 1) {
-    experience = Math.floor(experience * (1 - ((window.gameState.level - 1) * 0.1)));
+  // First, clean up the UI
+  if (typeof window.cleanupCombatUI === 'function') {
+    window.cleanupCombatUI();
   }
   
-  // Add bonus for remaining health percentage
-  const playerHealthPercent = window.gameState.health / window.gameState.maxHealth;
-  if (playerHealthPercent > 0.8) {
-    experience = Math.floor(experience * 1.2); // 20% bonus for high health
-  } else if (playerHealthPercent < 0.3) {
-    experience = Math.floor(experience * 1.5); // 50% bonus for winning with low health
+  // Process based on result type
+  if (window.CombatSystem && typeof window.CombatSystem.endCombat === 'function') {
+    window.CombatSystem.endCombat(result);
+  } else {
+    // Legacy fallback handler
+    if (result === 'victory') {
+      // Add victory handling
+      window.setNarrative("You have defeated your opponent!");
+    } else if (result === 'defeat') {
+      // Handle player defeat
+      window.setNarrative("You have been defeated, but managed to escape with your life.");
+      
+      // Reduce health and stamina
+      const healthReduction = Math.floor(window.gameState.maxHealth * 0.5);
+      const staminaReduction = Math.floor(window.gameState.maxStamina * 0.5);
+      window.gameState.health = Math.max(1, window.gameState.health - healthReduction);
+      window.gameState.stamina = Math.max(0, window.gameState.stamina - staminaReduction);
+      
+      // Add time (unconscious for 2 hours)
+      window.updateTimeAndDay(120);
+      
+    } else if (result === 'retreat') {
+      // Handle player retreat
+      window.setNarrative("You've managed to retreat from combat and return to safety, though you're exhausted from running.");
+      
+      // Reduce stamina from running
+      const staminaLoss = Math.floor(window.gameState.maxStamina * 0.3);
+      window.gameState.stamina = Math.max(0, window.gameState.stamina - staminaLoss);
+      
+      // Add some time (30 minutes of running/recovery)
+      window.updateTimeAndDay(30);
+    }
   }
   
-  return Math.max(5, experience);
-}
-
-// Generate loot from defeated enemy
-function generateLoot(enemy) {
-  const lootTables = {
-    "arrasi_scout": [
-      { id: "arrasi_shortbow", name: "Arrasi Short Bow", category: "WEAPON", type: "BOW", stats: { damage: [4, 7], toHit: 5 }, chance: 0.2 },
-      { id: "leather_scraps", name: "Leather Scraps", category: "MATERIAL", value: 5, quantity: 2, chance: 0.5 },
-      { id: "healing_poultice", name: "Healing Poultice", category: "CONSUMABLE", effects: [{ type: "heal", value: 25 }], chance: 0.3 }
-    ],
-    "arrasi_warrior": [
-      { id: "arrasi_axe", name: "Arrasi War Axe", category: "WEAPON", type: "AXE", stats: { damage: [6, 10], toHit: 0 }, chance: 0.15 },
-      { id: "tribal_shield", name: "Tribal Shield", category: "SHIELD", stats: { defense: 15, blockChance: 25 }, chance: 0.2 },
-      { id: "metal_fragments", name: "Metal Fragments", category: "MATERIAL", value: 8, quantity: 2, chance: 0.4 }
-    ],
-    "imperial_deserter": [
-      { id: "imperial_sword", name: "Imperial Sword", category: "WEAPON", type: "SWORD", stats: { damage: [5, 8], toHit: 5 }, chance: 0.1 },
-      { id: "stamina_draught", name: "Stamina Draught", category: "CONSUMABLE", effects: [{ type: "restoreStamina", value: 30 }], chance: 0.3 },
-      { id: "imperial_medallion", name: "Imperial Medallion", category: "MATERIAL", value: 15, chance: 0.2 }
-    ],
-    "wild_beast": [
-      { id: "beast_pelt", name: "Beast Pelt", category: "MATERIAL", value: 12, chance: 0.6 },
-      { id: "beast_claws", name: "Sharp Claws", category: "MATERIAL", value: 8, quantity: 3, chance: 0.4 },
-      { id: "raw_meat", name: "Raw Meat", category: "CONSUMABLE", effects: [{ type: "heal", value: 10 }, { type: "restoreStamina", value: 10 }], chance: 0.5 }
-    ]
-  };
+  // Clear combat state
+  window.gameState.inBattle = false;
+  window.gameState.currentEnemy = null;
   
-  // Get loot table for this enemy
-  const lootTable = lootTables[enemy.id] || [];
+  // Fix mission state if needed
+  if (typeof window.fixMissionStateAfterCombat === 'function') {
+    setTimeout(window.fixMissionStateAfterCombat, 100);
+  }
   
-  // Roll for each item
-  const possibleLoot = lootTable.filter(item => Math.random() < item.chance);
+  // Update UI
+  if (typeof window.updateStatusBars === 'function') {
+    window.updateStatusBars();
+  }
   
-  // Return a random item from possible loot, or null if none
-  if (possibleLoot.length === 0) return null;
-  
-  return possibleLoot[Math.floor(Math.random() * possibleLoot.length)];
-}
-
-// Set up event listeners for our custom combat actions
-window.initializeCombatListeners = function() {
-  // Set up delegation for combat actions
-  document.addEventListener('click', function(e) {
-    if (e.target && e.target.matches('#combatActions .action-btn')) {
-      const action = e.target.getAttribute('data-action');
-      if (action) {
-        handleCombatAction(action);
+  // Force action button update (with a delay to ensure everything else is done)
+  setTimeout(function() {
+    if (typeof window.updateActionButtons === 'function') {
+      window.updateActionButtons();
+    }
+    
+    // Double check that buttons appear
+    setTimeout(function() {
+      const actionsContainer = document.getElementById('actions');
+      if (actionsContainer && actionsContainer.children.length === 0) {
+        console.log("No action buttons found after combat! Running safeguard...");
+        if (typeof window.safeguardCombatCleanup === 'function') {
+          window.safeguardCombatCleanup();
+        }
       }
+    }, 500);
+  }, 200);
+};
+
+// Enhanced cleanup function with double-check
+function cleanupCombatUI() {
+  console.log("Cleaning up combat UI");
+  
+  // First try the new system's cleanup
+  if (window.CombatSystem && typeof window.CombatSystem.cleanupCombatUI === 'function') {
+    window.CombatSystem.cleanupCombatUI();
+  }
+  
+  // Manual cleanup as a fallback/reinforcement
+  const combatContainers = [
+    'distanceContainer', 'stanceContainer', 'environmentContainer',
+    'momentumContainer', 'combatActions', 'combatLog'
+  ];
+  
+  combatContainers.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      console.log(`Removing combat element: ${id}`);
+      element.remove();
     }
   });
   
-  // Override the original combatAction function to use our system
-  window.combatAction = function(action) {
-    handleCombatAction(action);
-  };
-};
-
-// Add combat button helper function
-function addCombatButton(text, action, container) {
-  const button = document.createElement('button');
-  button.className = 'action-btn';
-  button.textContent = text;
-  button.setAttribute('data-action', action);
-  container.appendChild(button);
+  // Hide combat interface if it exists
+  const combatInterface = document.getElementById('combatInterface');
+  if (combatInterface) {
+    combatInterface.classList.add('hidden');
+    combatInterface.classList.remove('combat-fullscreen');
+  }
+  
+  // Restore other UI elements
+  const elementsToRestore = [
+    { id: 'narrative-container', style: 'block' },
+    { selector: '.status-bars', style: 'flex' },
+    { id: 'location', style: 'block' },
+    { id: 'timeDisplay', style: 'block' },
+    { id: 'dayDisplay', style: 'block' },
+    { id: 'dayNightIndicator', style: 'block' },
+    { id: 'actions', style: 'flex' }
+  ];
+  
+  elementsToRestore.forEach(item => {
+    const element = item.id 
+      ? document.getElementById(item.id) 
+      : document.querySelector(item.selector);
+      
+    if (element) {
+      element.style.display = item.style;
+    }
+  });
 }
 
-// Initialize the combat system
-window.initCombatSystem = function() {
-  window.initializeCombatListeners();
-  console.log("Simplified Combat System initialized");
+// Retreat function update to ensure proper cleanup
+window.attemptRetreat = function() {
+  console.log("Player attempting retreat from combat");
+  
+  // Show retreat message
+  const combatLog = document.getElementById('combatLog');
+  if (combatLog) {
+    combatLog.innerHTML += `<p>You disengage from combat and retreat to safety...</p>`;
+  }
+  
+  // Ensure combat ends with a slight delay
+  setTimeout(function() {
+    // First make sure we clear any pending UI updates
+    if (window.pendingUIUpdates) {
+      clearTimeout(window.pendingUIUpdates);
+    }
+    
+    // Force UI cleanup before ending combat
+    cleanupCombatUI();
+    
+    // End combat with retreat result
+    endCombatWithResult('retreat');
+    
+    // Double-check action buttons update
+    window.pendingUIUpdates = setTimeout(function() {
+      if (window.UI && typeof window.UI.updateActionButtons === 'function') {
+        window.UI.updateActionButtons();
+      } else if (typeof window.updateActionButtons === 'function') {
+        window.updateActionButtons(); 
+      }
+    }, 1000);
+  }, 1500);
 };
 
-// Initialize on load
-window.initCombatSystem();
+// Handler for combat end results
+function handleCombatEnd(result) {
+  console.log("Processing combat end result:", result);
+  
+  // Handle based on result type
+  if (result === 'victory') {
+    // Add victory handling
+    setNarrative("You have defeated your opponent!");
+  } else if (result === 'defeat') {
+    // Handle player defeat
+    setNarrative("You have been defeated, but managed to escape with your life.");
+    
+    // Reduce health and stamina
+    const healthReduction = Math.floor(window.gameState.maxHealth * 0.5);
+    const staminaReduction = Math.floor(window.gameState.maxStamina * 0.5);
+    window.gameState.health = Math.max(1, window.gameState.health - healthReduction);
+    window.gameState.stamina = Math.max(0, window.gameState.stamina - staminaReduction);
+    
+    // Add time (unconscious for 2 hours)
+    window.updateTimeAndDay(120);
+    
+  } else if (result === 'retreat') {
+    // Handle player retreat
+    setNarrative("You've managed to retreat from combat and return to safety, though you're exhausted from running.");
+    
+    // Reduce stamina from running
+    const staminaLoss = Math.floor(window.gameState.maxStamina * 0.3);
+    window.gameState.stamina = Math.max(0, window.gameState.stamina - staminaLoss);
+    
+    // Add some time (30 minutes of running/recovery)
+    window.updateTimeAndDay(30);
+  }
+  
+  // Clear combat state
+  window.gameState.inBattle = false;
+  window.gameState.currentEnemy = null;
+  
+  // Update UI
+  if (typeof updateStatusBars === 'function') {
+    updateStatusBars();
+  }
+  
+  // Force action button update
+  if (typeof updateActionButtons === 'function') {
+    setTimeout(updateActionButtons, 500);
+    // Double check after a bit longer
+    setTimeout(updateActionButtons, 1500);
+  }
+}
+
+
+// COMBAT STAMINA ENHANCEMENT
+// Add these functions to your combat.js file
+
+// Constants for stamina mechanics
+const COMBAT_STAMINA_REGEN_PER_TURN = 3; // Stamina gained each turn automatically
+const COMBAT_REST_STAMINA_GAIN = 15;      // Stamina gained when using Rest action
+
+// Add a stamina indicator to combat UI
+function addStaminaIndicator() {
+  // Check if it already exists to avoid duplicates
+  if (document.getElementById('staminaContainer')) {
+    return;
+  }
+  
+  const momentumContainer = document.getElementById('momentumContainer');
+  if (!momentumContainer) {
+    console.warn("Momentum container not found when adding stamina indicator");
+    return;
+  }
+  
+  const staminaContainer = document.createElement('div');
+  staminaContainer.id = 'staminaContainer';
+  staminaContainer.style.width = '100%';
+  staminaContainer.style.display = 'flex';
+  staminaContainer.style.justifyContent = 'space-between';
+  staminaContainer.style.alignItems = 'center';
+  staminaContainer.style.margin = '10px 0';
+  
+  // Player stamina
+  const playerStaminaDiv = document.createElement('div');
+  playerStaminaDiv.style.width = '45%';
+  
+  const playerStaminaLabel = document.createElement('div');
+  playerStaminaLabel.textContent = 'Your Stamina:';
+  
+  const playerStaminaValue = document.createElement('div');
+  playerStaminaValue.id = 'playerCombatStaminaValue';
+  playerStaminaValue.style.fontWeight = 'bold';
+  playerStaminaValue.style.color = '#4bff91'; // Green color
+  playerStaminaValue.textContent = gameState.stamina;
+  
+  playerStaminaDiv.appendChild(playerStaminaLabel);
+  playerStaminaDiv.appendChild(playerStaminaValue);
+  
+  // Stamina cost indicator
+  const staminaCostDiv = document.createElement('div');
+  staminaCostDiv.style.width = '45%';
+  staminaCostDiv.style.textAlign = 'right';
+  
+  const staminaCostLabel = document.createElement('div');
+  staminaCostLabel.textContent = 'Regen Per Turn:';
+  
+  const staminaCostValue = document.createElement('div');
+  staminaCostValue.id = 'staminaRegenValue';
+  staminaCostValue.style.fontWeight = 'bold';
+  staminaCostValue.textContent = '+' + COMBAT_STAMINA_REGEN_PER_TURN;
+  
+  staminaCostDiv.appendChild(staminaCostLabel);
+  staminaCostDiv.appendChild(staminaCostValue);
+  
+  staminaContainer.appendChild(playerStaminaDiv);
+  staminaContainer.appendChild(staminaCostDiv);
+  
+  // Insert after momentum container
+  momentumContainer.parentNode.insertBefore(staminaContainer, momentumContainer.nextSibling);
+  
+  // Update stamina display
+  updateStaminaDisplay();
+}
+
+// Update stamina display in combat
+function updateStaminaDisplay() {
+  const playerStaminaValue = document.getElementById('playerCombatStaminaValue');
+  if (playerStaminaValue) {
+    playerStaminaValue.textContent = Math.round(gameState.stamina);
+    
+    // Change color based on stamina level
+    if (gameState.stamina < 10) {
+      playerStaminaValue.style.color = '#ff4b4b'; // Red when low
+    } else if (gameState.stamina < 20) {
+      playerStaminaValue.style.color = '#ffb74b'; // Orange when medium
+    } else {
+      playerStaminaValue.style.color = '#4bff91'; // Green when high
+    }
+  }
+}
+
+// Add Rest action to combat actions
+function addRestAction(actionsContainer) {
+  // Only add if it doesn't exist and container exists
+  if (!actionsContainer) return;
+  
+  // Check if rest button already exists
+  const existingRestButton = Array.from(actionsContainer.children).find(child => 
+    child.getAttribute('data-action') === 'rest_combat'
+  );
+  
+  if (existingRestButton) return;
+  
+  // Create rest button
+  const restButton = document.createElement('button');
+  restButton.className = 'action-btn';
+  restButton.textContent = '💤 Rest (+' + COMBAT_REST_STAMINA_GAIN + ' Stamina)';
+  restButton.setAttribute('data-action', 'rest_combat');
+  restButton.onclick = function() {
+    handleCombatRest();
+  };
+  
+  // Add to container
+  actionsContainer.appendChild(restButton);
+}
+
+// Handle combat rest action
+function handleCombatRest() {
+  // Gain stamina
+  gameState.stamina = Math.min(gameState.maxStamina, gameState.stamina + COMBAT_REST_STAMINA_GAIN);
+  
+  // Update UI
+  updateStaminaDisplay();
+  
+  // Add to combat log
+  const combatLog = document.getElementById('combatLog');
+  if (combatLog) {
+    combatLog.innerHTML += `<p>You take a moment to catch your breath, regaining ${COMBAT_REST_STAMINA_GAIN} stamina.</p>`;
+    combatLog.scrollTop = combatLog.scrollHeight;
+  }
+  
+  // Process enemy turn
+  setTimeout(function() {
+    processEnemyTurn();
+  }, 1000);
+}
+
+// Per-turn stamina regeneration
+function regenStaminaPerTurn() {
+  const oldStamina = gameState.stamina;
+  gameState.stamina = Math.min(gameState.maxStamina, gameState.stamina + COMBAT_STAMINA_REGEN_PER_TURN);
+  
+  // Update UI
+  updateStaminaDisplay();
+  
+  // Log stamina recovery if significant
+  if (gameState.stamina > oldStamina) {
+    const combatLog = document.getElementById('combatLog');
+    if (combatLog) {
+      combatLog.innerHTML += `<p>You regain ${COMBAT_STAMINA_REGEN_PER_TURN} stamina as the combat continues.</p>`;
+      combatLog.scrollTop = combatLog.scrollHeight;
+    }
+  }
+}
+
+// Enhanced combat setup function
+const originalSetupCombatUI = window.setupCombatUI || function(){};
+window.setupCombatUI = function(enemy, environment) {
+  // Call original function first
+  originalSetupCombatUI(enemy, environment);
+  
+  // Add stamina indicator
+  addStaminaIndicator();
+};
+
+// Enhanced update combat actions
+const originalUpdateCombatActions = window.updateCombatActions || function(){};
+window.updateCombatActions = function() {
+  // Call original function first
+  originalUpdateCombatActions();
+  
+  // Add rest action to combat actions container
+  const actionsContainer = document.getElementById('combatActions');
+  if (actionsContainer) {
+    addRestAction(actionsContainer);
+  }
+};
+
+// Enhanced handle combat action function
+const originalHandleCombatAction = window.handleCombatAction || function(){};
+window.handleCombatAction = function(action) {
+  // Special handling for rest action
+  if (action === 'rest_combat') {
+    handleCombatRest();
+    return;
+  }
+  
+  // Call original function for other actions
+  originalHandleCombatAction(action);
+  
+  // After any action, update stamina display
+  updateStaminaDisplay();
+};
+
+// Modified process enemy turn to handle stamina regen
+const originalProcessEnemyTurn = window.processEnemyTurn || function(){};
+window.processEnemyTurn = function() {
+  // Regenerate stamina before enemy turn
+  regenStaminaPerTurn();
+  
+  // Call original function
+  originalProcessEnemyTurn();
+};
+
+// Enhance combat start to ensure stamina is visible
+const originalStartCombat = window.startCombat || function(){};
+window.startCombat = function(enemyType, environment) {
+  // Call original function
+  originalStartCombat(enemyType, environment);
+  
+  // Ensure stamina UI is added and updated
+  setTimeout(function() {
+    addStaminaIndicator();
+    updateStaminaDisplay();
+  }, 500);
+};
+
+console.log("Combat stamina enhancements loaded");
+
+// This safety function will guarantee buttons are restored even if something goes wrong
+window.safeguardCombatCleanup = function() {
+  console.log("Running combat cleanup safeguard...");
+  
+  // Make sure critical UI elements are visible
+  const narrativeContainer = document.getElementById('narrative-container');
+  const statusBars = document.querySelector('.status-bars');
+  const location = document.getElementById('location');
+  const timeDisplay = document.getElementById('timeDisplay');
+  const dayDisplay = document.getElementById('dayDisplay');
+  const dayNightIndicator = document.getElementById('dayNightIndicator');
+  const actionsContainer = document.getElementById('actions');
+  const combatInterface = document.getElementById('combatInterface');
+  
+  // Restore visibility of normal game elements
+  if (narrativeContainer) narrativeContainer.style.display = 'block';
+  if (statusBars) statusBars.style.display = 'flex';
+  if (location) location.style.display = 'block';
+  if (timeDisplay) timeDisplay.style.display = 'block';
+  if (dayDisplay) dayDisplay.style.display = 'block';
+  if (dayNightIndicator) dayNightIndicator.style.display = 'block';
+  
+  // Hide combat interface
+  if (combatInterface) {
+    combatInterface.classList.add('hidden');
+    combatInterface.classList.remove('combat-fullscreen');
+  }
+  
+  // Make sure action buttons container is visible
+  if (actionsContainer) {
+    actionsContainer.style.display = 'flex';
+    actionsContainer.innerHTML = ''; // Clear any stale buttons
+  }
+  
+  // Force game state to be out of battle
+  window.gameState.inBattle = false;
+  window.gameState.currentEnemy = null;
+  
+  // Force update action buttons
+  if (window.UI && typeof window.UI.updateActionButtons === 'function') {
+    window.UI.updateActionButtons();
+  } else if (typeof window.updateActionButtons === 'function') {
+    window.updateActionButtons();
+  } else {
+    // Manual fallback if all else fails - add some basic buttons
+    if (actionsContainer) {
+      const restBtn = document.createElement('button');
+      restBtn.className = 'action-btn';
+      restBtn.textContent = 'Rest';
+      restBtn.setAttribute('data-action', 'rest');
+      restBtn.onclick = function() {
+        if (window.ActionSystem) {
+          window.ActionSystem.handleAction('rest');
+        } else if (typeof window.handleRest === 'function') {
+          window.handleRest();
+        }
+      };
+      actionsContainer.appendChild(restBtn);
+      
+      // Add profile button
+      const profileBtn = document.createElement('button');
+      profileBtn.className = 'action-btn';
+      profileBtn.textContent = 'Profile';
+      profileBtn.setAttribute('data-action', 'profile');
+      profileBtn.onclick = function() {
+        if (window.UI) {
+          window.UI.openPanel('profile');
+        } else {
+          document.getElementById('profile').classList.remove('hidden');
+        }
+      };
+      actionsContainer.appendChild(profileBtn);
+    }
+  }
+  
+  console.log("Combat cleanup safeguard completed");
+};
+
+// Enhanced function to clean up combat UI with better error handling
+const originalCleanupCombatUI = window.cleanupCombatUI;
+window.cleanupCombatUI = function() {
+  console.log("Improved combat UI cleanup running...");
+  
+  try {
+    // Try original cleanup first
+    if (typeof originalCleanupCombatUI === 'function') {
+      originalCleanupCombatUI();
+    }
+    
+    // Always restore action buttons container visibility
+    const actionsContainer = document.getElementById('actions');
+    if (actionsContainer) {
+      actionsContainer.style.display = 'flex';
+    }
+    
+    // Force update of action buttons
+    setTimeout(function() {
+      if (window.UI && typeof window.UI.updateActionButtons === 'function') {
+        window.UI.updateActionButtons();
+      } else if (typeof window.updateActionButtons === 'function') {
+        window.updateActionButtons();
+      }
+      
+      // Double check after a short delay
+      setTimeout(function() {
+        const actionsContainer = document.getElementById('actions');
+        if (actionsContainer && actionsContainer.children.length === 0) {
+          console.log("No action buttons found after combat! Running safeguard...");
+          window.safeguardCombatCleanup();
+        }
+      }, 500);
+    }, 100);
+  } catch (error) {
+    console.error("Error during combat cleanup:", error);
+    // Run safeguard function if anything goes wrong
+    window.safeguardCombatCleanup();
+  }
+};
+
+// Enhance endCombatWithResult to be more robust
+const originalEndCombatWithResult = window.endCombatWithResult;
+window.endCombatWithResult = function(result) {
+  console.log("Enhanced endCombatWithResult called with:", result);
+  
+  try {
+    // Try original function
+    if (typeof originalEndCombatWithResult === 'function') {
+      originalEndCombatWithResult(result);
+    } else {
+      // Fallback if original not found
+      if (window.CombatSystem && typeof window.CombatSystem.endCombat === 'function') {
+        window.CombatSystem.endCombat(result);
+      }
+    }
+  } catch (error) {
+    console.error("Error ending combat:", error);
+  }
+  
+  // Always run these critical cleanup steps regardless of errors
+  setTimeout(function() {
+    // Force combat state to be false
+    window.gameState.inBattle = false;
+    
+    // Make sure UI is properly restored
+    window.cleanupCombatUI();
+    
+    // Add emergency button to escape the stuck state
+    if (document.getElementById('actions').children.length === 0) {
+      window.safeguardCombatCleanup();
+    }
+  }, 300);
+};
+
+// Emergency recovery button - add this to fix your current stuck state
+(function addEmergencyButton() {
+  // Check if we're in a stuck state
+  const actionsContainer = document.getElementById('actions');
+  if (actionsContainer && actionsContainer.children.length === 0) {
+    console.log("EMERGENCY: Adding recovery button to fix stuck state");
+    
+    // Create emergency button
+    const emergencyBtn = document.createElement('button');
+    emergencyBtn.className = 'action-btn';
+    emergencyBtn.style.backgroundColor = '#ff4b4b';
+    emergencyBtn.style.color = 'white';
+    emergencyBtn.style.fontWeight = 'bold';
+    emergencyBtn.textContent = '🛟 EMERGENCY RECOVERY';
+    emergencyBtn.onclick = function() {
+      window.safeguardCombatCleanup();
+    };
+    
+    // Add to body if actions container is hidden
+    if (actionsContainer.style.display === 'none') {
+      emergencyBtn.style.position = 'fixed';
+      emergencyBtn.style.bottom = '20px';
+      emergencyBtn.style.right = '20px';
+      emergencyBtn.style.zIndex = '9999';
+      document.body.appendChild(emergencyBtn);
+    } else {
+      actionsContainer.appendChild(emergencyBtn);
+    }
+  }
+})();
+
+// CRITICAL FIX: Reset mission state after combat if needed
+window.fixMissionStateAfterCombat = function() {
+  console.log("Checking and fixing mission state after combat...");
+  
+  // Check if combat has ended but mission state is still active
+  if (!window.gameState.inBattle && window.gameState.inMission) {
+    console.log("Detected stuck mission state! Resetting mission flags...");
+    
+    // Check if we were in mission combat (which may have ended improperly)
+    if (window.gameState.inMissionCombat) {
+      console.log("Mission combat flag was still active! Clearing it...");
+      window.gameState.inMissionCombat = false;
+      
+      // If mission system exists and was in the middle of combat, try to continue the mission
+      if (window.MissionSystem && typeof window.MissionSystem.continueMissionAfterCombat === 'function') {
+        // Try to salvage the mission by continuing with a victory result
+        console.log("Attempting to continue mission with victory result...");
+        try {
+          window.MissionSystem.continueMissionAfterCombat('victory');
+        } catch (err) {
+          console.error("Failed to continue mission:", err);
+          // If continuation fails, reset mission state
+          window.gameState.inMission = false;
+          window.gameState.currentMission = null;
+          window.gameState.missionStage = 0;
+        }
+      } else {
+        // If we can't continue the mission, reset mission state
+        window.gameState.inMission = false;
+        window.gameState.currentMission = null;
+        window.gameState.missionStage = 0;
+      }
+    } else {
+      // If not in mission combat, just reset all mission flags
+      window.gameState.inMission = false;
+      window.gameState.currentMission = null;
+      window.gameState.missionStage = 0;
+    }
+    
+    // Update the UI
+    if (window.UI && typeof window.UI.updateActionButtons === 'function') {
+      window.UI.updateActionButtons();
+    } else if (typeof window.updateActionButtons === 'function') {
+      window.updateActionButtons();
+    }
+    
+    console.log("Mission state reset completed");
+  }
+};
+
+// Enhance endCombatWithResult to check mission state
+const originalEndCombatWithMissionCheck = window.endCombatWithResult;
+window.endCombatWithResult = function(result) {
+  console.log("Enhanced endCombatWithResult with mission state check called with:", result);
+  
+  try {
+    // Try original function
+    if (typeof originalEndCombatWithMissionCheck === 'function') {
+      originalEndCombatWithMissionCheck(result);
+    }
+  } catch (error) {
+    console.error("Error ending combat:", error);
+  }
+  
+  // Always run mission state check after combat ends
+  setTimeout(function() {
+    window.fixMissionStateAfterCombat();
+    
+    // Double check that the UI is properly updated
+    setTimeout(function() {
+      // If actions are still empty, try a full recovery
+      const actionsContainer = document.getElementById('actions');
+      if (!actionsContainer || actionsContainer.children.length === 0) {
+        if (window.safeguardCombatCleanup) {
+          window.safeguardCombatCleanup();
+        }
+      }
+    }, 300);
+  }, 200);
+};
+
+// Fix to ActionSystem.handleAction to prevent "attempted to use normal action in mission" errors
+(function enhanceActionSystem() {
+  if (window.ActionSystem && window.ActionSystem.handleAction) {
+    const originalHandleAction = window.ActionSystem.handleAction;
+    
+    window.ActionSystem.handleAction = function(action) {
+      // Check for UI-related actions that should always work
+      const alwaysAllowedActions = ['profile', 'inventory', 'questLog'];
+      
+      // If we're in a mission but trying to use UI actions, allow it anyway
+      if (window.gameState.inMission && alwaysAllowedActions.includes(action)) {
+        console.log(`Allowing UI action '${action}' during mission for better UX`);
+        
+        // Special handling for these actions
+        switch(action) {
+          case 'profile':
+            if (window.UI && window.UI.openPanel) {
+              window.UI.openPanel('profile');
+            } else {
+              document.getElementById('profile').classList.remove('hidden');
+            }
+            return;
+          case 'inventory':
+            if (window.UI && window.UI.openPanel) {
+              window.UI.openPanel('inventory');
+            } else {
+              document.getElementById('inventory').classList.remove('hidden');
+            }
+            return;
+          case 'questLog':
+            if (window.UI && window.UI.openPanel) {
+              window.UI.openPanel('questLog');
+            } else {
+              document.getElementById('questLog').classList.remove('hidden');
+            }
+            return;
+        }
+      }
+      
+      // For everything else, use the original handler
+      originalHandleAction(action);
+    };
+  }
+})();
+
+// Emergency mission state reset - execute immediately to fix current state
+(function emergencyMissionReset() {
+  console.log("Checking for emergency mission state reset...");
+  
+  // Only run if we have no action buttons and we're in mission state
+  const actionsContainer = document.getElementById('actions');
+  if (window.gameState.inMission && (!actionsContainer || actionsContainer.children.length === 0)) {
+    console.log("EMERGENCY: Resetting stuck mission state");
+    
+    // Force reset all mission-related flags
+    window.gameState.inMission = false;
+    window.gameState.currentMission = null;
+    window.gameState.missionStage = 0;
+    window.gameState.inMissionCombat = false;
+    window.gameState.inBattle = false;
+    
+    // Try to update UI
+    if (window.safeguardCombatCleanup) {
+      window.safeguardCombatCleanup();
+    } else if (actionsContainer) {
+      actionsContainer.style.display = 'flex';
+      
+      // Create emergency button
+      const emergencyBtn = document.createElement('button');
+      emergencyBtn.className = 'action-btn';
+      emergencyBtn.style.backgroundColor = '#ff4b4b';
+      emergencyBtn.style.color = 'white';
+      emergencyBtn.style.fontWeight = 'bold';
+      emergencyBtn.textContent = '🛟 RESET GAME STATE';
+      emergencyBtn.onclick = function() {
+        window.gameState.inMission = false;
+        window.gameState.inBattle = false;
+        location.reload(); // Reload the page as a last resort
+      };
+      actionsContainer.appendChild(emergencyBtn);
+      
+      // Try to restore normal buttons
+      if (window.updateActionButtons) {
+        window.updateActionButtons();
+      }
+    }
+  }
+})();
