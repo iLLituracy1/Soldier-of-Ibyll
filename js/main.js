@@ -1,9 +1,38 @@
 // MAIN ENTRY POINT
 // Initializes the game and sets up event listeners with Time Management integration
 
+
+
 // Run initialization when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
   console.log("Game initializing...");
+
+  // Initialize player object with default values
+window.player = {
+  name: "",
+  origin: "",
+  career: {
+    title: "",
+    description: ""
+  },
+  phy: 1,
+  men: 1,
+  skills: {
+    melee: 0,
+    marksmanship: 0,
+    survival: 0,
+    command: 0,
+    discipline: 0,
+    tactics: 0,
+    organization: 0,
+    arcana: 0
+  },
+  relationships: {},
+  inventory: [],
+  taelors: 10, // Starting currency
+  isVeteran: false,
+  veteranTitle: ""
+};
 
   // Set up event listeners for character creation buttons
   document.getElementById('paanic-button').addEventListener('click', function() {
