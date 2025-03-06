@@ -70,6 +70,34 @@ window.updateActionButtons = function() {
   // Update action buttons based on time of day, location, etc.
   const actionsContainer = document.getElementById('actions');
   actionsContainer.innerHTML = '';
+
+  if (window.gameState.awaitingCommanderReport) {
+    // Create special button for campaign introduction
+    const reportButton = document.createElement('button');
+    reportButton.className = 'action-btn';
+    reportButton.id = 'report-to-commander';
+    reportButton.textContent = 'Report to Commander';
+    reportButton.onclick = function() {
+      // Clear the special state
+      window.gameState.awaitingCommanderReport = false;
+      
+      // Show campaign briefing
+      window.setNarrative(`
+        <p>You enter the command tent to find Commander Valarius bent over maps of the western territories. He looks up as you enter, acknowledging you with a curt nod.</p>
+        <p>"We've received orders from high command," he says, gesturing to the map. "The Empire is pushing west, into Arrasi territory. Your unit will be deployed to secure the borderlands."</p>
+        <p>The commander outlines the strategic importance of the peninsula and the resources it would bring to the Empire. You can tell this is a major campaign, not just a border skirmish.</p>
+        <p>"Prepare yourself," Valarius concludes. "Report back here tomorrow for your specific mission assignments. This campaign will test everything you've learned so far."</p>
+      `);
+      
+      // Initialize campaign
+      window.initiateCampaign('arrasi_campaign');
+      
+      // Update action buttons without the special button
+      window.updateActionButtons();
+    };
+    actionsContainer.appendChild(reportButton);
+    return; // Exit early so no other buttons are added
+  }
   
   const timeOfDay = window.getTimeOfDay();
   const hours = Math.floor(window.gameTime / 60);
@@ -261,13 +289,12 @@ window.showCampaignIntroduction = function() {
     <p>This could be the deployment you've been waiting for...</p>
   `);
   
-  // Create special button to respond
-  const actionsContainer = document.getElementById('actions');
-  const originalHTML = actionsContainer.innerHTML;
+   // Add special flag to game state
+   window.gameState.awaitingCommanderReport = true;
   
-  actionsContainer.innerHTML = `
-    <button class="action-btn" id="report-to-commander">Report to Commander</button>
-  `;
+   // Force update of action buttons to show the special button
+   window.updateActionButtons();
+ };
   
   // Add event listener
   document.getElementById('report-to-commander').addEventListener('click', function() {
@@ -286,4 +313,3 @@ window.showCampaignIntroduction = function() {
     actionsContainer.innerHTML = originalHTML;
     window.updateActionButtons();
   });
-};
