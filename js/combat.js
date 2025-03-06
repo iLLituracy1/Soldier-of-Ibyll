@@ -3167,6 +3167,13 @@ function endCombatWithResult(result) {
   
   // Re-enable action buttons
   document.getElementById('actions').style.display = 'flex';
+
+   // Special handling for mission combat
+   if (window.gameState.inMissionCombat) {
+    window.gameState.inMissionCombat = false;
+    window.endMissionCombat(result);
+    return;
+  }
   
   // Add outcome narrative
   if (result.victory) {
@@ -3553,7 +3560,7 @@ window.checkForCombatEncounters = function(action) {
   // Only certain actions have a chance for combat
   if (action === 'patrol' || action === 'scout') {
     // Base chance depends on action
-    let combatChance = action === 'patrol' ? 0.99 : 0.99;
+    let combatChance = action === 'patrol' ? 0.40 : 0.40;
     
     // Adjust for day/night and weather
     const hours = Math.floor(window.gameTime / 60);

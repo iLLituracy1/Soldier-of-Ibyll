@@ -162,7 +162,19 @@ window.initializeGameState = function() {
   window.gameState.sideQuests.push(window.createQuest(randomType));
   
   console.log("Initial quests created:", window.gameState.sideQuests);
+
+// Set up campaign introduction after a few days
+if (!window.gameState.currentCampaign && window.gameState.mainQuest.stage === 0) {
+  // Start with some camp time before first campaign
+  window.gameState.mainQuest.stage = 0.5;
+  
+  // Flag to track if campaign has been introduced
+  window.gameState.campaignIntroduced = false;
+  
+  console.log("Game state initialized, campaign will trigger after day 3");
+}
 };
+
 
 // Function to check for level up
 window.checkLevelUp = function() {

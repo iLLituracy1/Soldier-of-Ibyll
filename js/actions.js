@@ -4,6 +4,18 @@
 // Master function to handle all action button clicks
 window.handleAction = function(action) {
   console.log('Action handled:', action);
+
+  // Handle mission selection screen
+  if (action === 'show_missions') {
+    window.showMissionSelectionScreen();
+    return;
+  }
+
+  // Mission actions need to go to mission handler
+  if (action.startsWith('mission_')) {
+    window.handleMissionAction(action);
+    return;
+  }
   
   // Show panels like inventory, profile, etc.
   if (action === 'profile') {
@@ -141,10 +153,10 @@ window.handleAction = function(action) {
     let staminaRecovery = 15;
     
     if (timeOfDay === 'night') {
-      healthRecovery = 15;
+      healthRecovery = 25;
       staminaRecovery = 40;
     } else if (timeOfDay === 'evening') {
-      healthRecovery = 10;
+      healthRecovery = 15;
       staminaRecovery = 25;
     }
     
@@ -157,7 +169,7 @@ window.handleAction = function(action) {
     window.updateProfileIfVisible();
     
     // Time passed depends on time of day
-    let timePassed = 30; // Default for daytime rest
+    let timePassed = 90; // Default for daytime rest
     if (timeOfDay === 'night') {
       timePassed = 480; // 8 hours for night rest
     } else if (timeOfDay === 'evening') {
@@ -210,7 +222,7 @@ window.handleAction = function(action) {
     }
     
     // Chance to discover brawler pits
-    if (!window.gameState.discoveredBrawlerPits && Math.random() < 0.25) {
+    if (!window.gameState.discoveredBrawlerPits && Math.random() < 0.15) {
       window.gameState.discoveredBrawlerPits = true;
       window.addToNarrative("During your patrol, you overhear whispers about underground fighting pits where soldiers test their mettle and bet on matches. Such activities aren't officially sanctioned, but they seem to be an open secret in the camp.");
       window.showNotification("Discovered: Brawler Pits! New activity unlocked at night.", 'success');
@@ -243,7 +255,7 @@ window.handleAction = function(action) {
     window.gameState.morale = Math.min(100, window.gameState.morale + 5);
     
     // Chance to discover gambling tent during mess
-    if (!window.gameState.discoveredGamblingTent && Math.random() < 0.3) {
+    if (!window.gameState.discoveredGamblingTent && Math.random() < 0.2) {
       window.gameState.discoveredGamblingTent = true;
       window.addToNarrative("As you finish your meal, you notice a group of soldiers huddled in the corner of the mess tent. The clink of coins and hushed exclamations draw your attention. One of them notices your interest and nods toward a larger tent near the edge of camp. \"Games start after dusk,\" he mutters. \"Bring your taelors if you're feeling lucky.\"");
       window.showNotification("Discovered: Gambling Tent! New activity unlocked at night.", 'success');

@@ -25,6 +25,12 @@ window.updateTimeAndDay = function(minutesToAdd) {
   while (window.gameTime >= 1440) { // 24 hours * 60 minutes
     window.gameTime -= 1440;
     window.gameDay++;
+
+    if (window.gameDay >= 3 && !window.gameState.campaignIntroduced && !window.gameState.currentCampaign) {
+      window.gameState.campaignIntroduced = true;
+      console.log("Day 3+ reached, triggering campaign introduction");
+      window.showCampaignIntroduction();
+    }
     
     // Reset daily flags
     window.gameState.dailyTrainingCount = 0;
@@ -90,6 +96,11 @@ window.updateActionButtons = function() {
     
     // Guard duty available all times
     window.addActionButton('Guard Duty', 'guard', actionsContainer);
+
+    // Mission button if in a campaign
+    if (window.gameState.currentCampaign && !window.gameState.inMission) {
+      window.addActionButton('Campaign Missions', 'show_missions', actionsContainer);
+    }
     
     // Gambling and Brawler Pits visibility logic
     if (timeOfDay === 'evening' || timeOfDay === 'night') {
@@ -241,4 +252,38 @@ window.showAchievement = function(achievementId) {
   setTimeout(() => {
     document.body.removeChild(notificationElement);
   }, 5000);
+};
+
+window.showCampaignIntroduction = function() {
+  // Add narrative about being summoned to commander's tent
+  window.addToNarrative(`
+    <p>A messenger arrives at your quarters, bearing the seal of Commander Valarius. "Your presence is requested at the command tent immediately," they state formally before departing.</p>
+    <p>This could be the deployment you've been waiting for...</p>
+  `);
+  
+  // Create special button to respond
+  const actionsContainer = document.getElementById('actions');
+  const originalHTML = actionsContainer.innerHTML;
+  
+  actionsContainer.innerHTML = `
+    <button class="action-btn" id="report-to-commander">Report to Commander</button>
+  `;
+  
+  // Add event listener
+  document.getElementById('report-to-commander').addEventListener('click', function() {
+    // Show campaign briefing
+    window.setNarrative(`
+      <p>You enter the command tent to find Commander Valarius bent over maps of the western territories. He looks up as you enter, acknowledging you with a curt nod.</p>
+      <p>"We've received orders from high command," he says, gesturing to the map. "The Empire is pushing west, into Arrasi territory. Your unit will be deployed to secure the borderlands."</p>
+      <p>The commander outlines the strategic importance of the peninsula and the resources it would bring to the Empire. You can tell this is a major campaign, not just a border skirmish.</p>
+      <p>"Prepare yourself," Valarius concludes. "Report back here tomorrow for your specific mission assignments. This campaign will test everything you've learned so far."</p>
+    `);
+    
+    // Initialize campaign
+    window.initiateCampaign('arrasi_campaign');
+    
+    // Restore action buttons
+    actionsContainer.innerHTML = originalHTML;
+    window.updateActionButtons();
+  });
 };
