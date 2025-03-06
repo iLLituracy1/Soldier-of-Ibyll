@@ -278,3 +278,86 @@ window.initializeMission = function(missionType) {
   function generateMissionId() {
     return 'm' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
   }
+
+  // Show mission summary
+window.showMissionSummary = function(mission) {
+  let summaryHTML = `
+    <h3>Mission Complete: ${mission.name}</h3>
+    <p>You have successfully completed your mission!</p>
+    <p><strong>Rewards:</strong></p>
+    <ul>
+      <li>Experience: ${mission.rewards.experience} XP</li>
+      <li>Payment: ${mission.rewards.taelors} taelors</li>
+  `;
+  
+  // Add item rewards if any
+  if (mission.rewards.itemAwarded) {
+    summaryHTML += `<li>Item: ${mission.rewards.itemAwarded.name}</li>`;
+  }
+  
+  summaryHTML += `</ul>`;
+  
+  // Show objectives completed
+  summaryHTML += `<p><strong>Objectives Completed:</strong></p><ul>`;
+  mission.objectives.forEach(obj => {
+    summaryHTML += `<li>${obj.description}</li>`;
+  });
+  summaryHTML += `</ul>`;
+  
+  // Show summary
+  window.setNarrative(summaryHTML);
+};
+
+// Show mission failure summary
+window.showMissionFailureSummary = function(mission) {
+  let failureHTML = `
+    <h3>Mission Failed: ${mission.name}</h3>
+    <p>You were unable to complete your mission and have been forced to return to camp.</p>
+    <p><strong>Reason:</strong> `;
+  
+  // Different failure reasons
+  if (mission.failureReason === "time_expired") {
+    failureHTML += `You ran out of time before completing all objectives.`;
+  } else if (mission.failureReason === "retreat") {
+    failureHTML += `You had to retreat from a difficult situation.`;
+  } else {
+    failureHTML += `You were unable to overcome the challenges of the mission.`;
+  }
+  
+  failureHTML += `</p>`;
+  
+  // Show incomplete objectives
+  failureHTML += `<p><strong>Incomplete Objectives:</strong></p><ul>`;
+  mission.objectives.filter(obj => !obj.completed).forEach(obj => {
+    failureHTML += `<li>${obj.description} (Progress: ${obj.progress}/${obj.count})</li>`;
+  });
+  failureHTML += `</ul>`;
+  
+  // Show summary
+  window.setNarrative(failureHTML);
+};
+
+// Apply failure consequences
+window.applyMissionFailureConsequences = function(mission) {
+  // Morale loss
+  window.gameState.morale = Math.max(25, window.gameState.morale - 15);
+  
+  // Random injury
+  if (Math.random() < 0.5 && window.gameState.playerInjuries.length < 3) {
+    // Apply a random minor injury
+    const possibleInjuries = ["twisted_ankle", "fractured_arm", "concussion"];
+    const randomInjury = possibleInjuries[Math.floor(Math.random() * possibleInjuries.length)];
+    
+    if (typeof window.applyInjury === 'function') {
+      window.applyInjury("player", randomInjury);
+    }
+  }
+  
+  // Loss of some resources
+  if (window.player.inventory.length > 0 && Math.random() < 0.3) {
+    // Lose a random item
+    const randomIndex = Math.floor(Math.random() * window.player.inventory.length);
+    const lostItem = window.player.inventory.splice(randomIndex, 1)[0];
+    window.addToNarrative(`In your retreat, you lost your ${lostItem.name}.`);
+  }
+};

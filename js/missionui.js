@@ -133,6 +133,13 @@ window.showMissionSelectionScreen = function() {
     window.addActionButton('Scout Ahead', 'mission_scout', actionsContainer);
     window.addActionButton('Make Camp', 'mission_camp', actionsContainer);
     window.addActionButton('Check Objectives', 'mission_objectives', actionsContainer);
+
+    // Check if there are discovered encounters to add a special button
+    const hasDiscoveredEncounters = mission.encounters.some(e => 
+    e.day === mission.currentDay && !e.completed && e.discovered && !e.triggered);
+    if (hasDiscoveredEncounters) {
+    window.addActionButton('Check Known Encounters', 'show_encounters', actionsContainer);
+    }
     
     // Terrain-specific actions
     if (mission.terrain === 'forest') {

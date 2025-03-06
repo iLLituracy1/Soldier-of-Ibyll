@@ -3623,9 +3623,107 @@ window.generateLoot = function(enemy) {
   return lootTable[Math.floor(Math.random() * lootTable.length)];
 };
 
-// Function to end mission combat (placeholder preserved from original)
+// End mission combat function
 window.endMissionCombat = function(result) {
   // Similar to endCombat but with mission-specific outcomes
-  endCombatWithResult(result);
+  console.log("Mission combat ended with result:", result);
+  
+  // Get the current mission encounter
+  const encounter = window.gameState.currentMissionEncounter;
+  if (!encounter) {
+    console.error("No mission encounter found when ending combat");
+    endCombatWithResult(result);
+    return;
+  }
+  
+  // Mark encounter as completed with correct result
+  encounter.completed = true;
+  encounter.result = result.victory ? 'victory' : 'defeat';
+  
+  // Get the current mission from gameState
+  const mission = window.gameState.currentMission;
+  if (!mission) {
+    console.error("No mission found when ending combat");
+    endCombatWithResult(result);
+    return;
+  }
+  
+  // If victory, update mission objectives
+  if (result.victory) {
+    // Add victory event
+    const victoryEvent = {
+      day: mission.currentDay,
+      time: window.gameState.missionTime || 480,
+      type: 'encounter_victory',
+      description: `You have defeated the ${encounter.enemyType.replace('_', ' ')}s!`
+    };
+    mission.events.push(victoryEvent);
+    
+    // Update elimination objectives
+    const eliminationObjective = mission.objectives.find(o => 
+      o.type === 'eliminate' && !o.completed);
+    
+    if (eliminationObjective) {
+      eliminationObjective.progress += encounter.count;
+      
+      const objectiveEvent = {
+        day: mission.currentDay,
+        time: window.gameState.missionTime || 480,
+        type: 'objective_progress',
+        description: `You've eliminated ${encounter.count} enemies. Progress: ${eliminationObjective.progress}/${eliminationObjective.count}`
+      };
+      
+      mission.events.push(objectiveEvent);
+      
+      // Add this narrative AFTER combat ends
+      setTimeout(() => {
+        window.addToNarrative(objectiveEvent.description);
+        
+        // Check for objective completion
+        if (eliminationObjective.progress >= eliminationObjective.count) {
+          eliminationObjective.completed = true;
+          window.addToNarrative(`<strong>Objective completed:</strong> ${eliminationObjective.description}`);
+          
+          // Wait before checking mission completion so it doesn't interrupt combat
+          setTimeout(() => {
+            // Check if all objectives are complete
+            checkMissionCompletionFromCombat(mission);
+          }, 1000);
+        }
+      }, 500); // Slight delay to ensure combat UI is cleared first
+    }
+  } else {
+    // Defeat - Add defeat event
+    const defeatEvent = {
+      day: mission.currentDay,
+      time: window.gameState.missionTime || 480,
+      type: 'encounter_defeat',
+      description: `You were defeated by the ${encounter.enemyType.replace('_', ' ')}s but managed to escape.`
+    };
+    mission.events.push(defeatEvent);
+    
+    // Apply defeat consequences
+    setTimeout(() => {
+      window.addToNarrative(defeatEvent.description);
+    }, 500);
+  }
+  
+  // Clear mission combat flag
   window.gameState.inMissionCombat = false;
+  window.gameState.currentMissionEncounter = null;
+  
+  // Use the regular endCombat function for UI cleanup
+  endCombatWithResult(result);
 };
+
+
+// Helper function to check for mission completion from combat
+function checkMissionCompletionFromCombat(mission) {
+  // Check if all objectives are complete
+  const allObjectivesComplete = mission.objectives.every(obj => obj.completed);
+  
+  if (allObjectivesComplete && typeof window.completeMission === 'function') {
+    // Mission complete!
+    window.completeMission(mission);
+  }
+}
