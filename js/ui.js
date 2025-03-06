@@ -77,6 +77,7 @@ window.updateActionButtons = function() {
     reportButton.className = 'action-btn';
     reportButton.id = 'report-to-commander';
     reportButton.textContent = 'Report to Commander';
+    
     reportButton.onclick = function() {
       // Clear the special state
       window.gameState.awaitingCommanderReport = false;
@@ -89,12 +90,29 @@ window.updateActionButtons = function() {
         <p>"Prepare yourself," Valarius concludes. "Report back here tomorrow for your specific mission assignments. This campaign will test everything you've learned so far."</p>
       `);
       
-      // Initialize campaign
-      window.initiateCampaign('arrasi_campaign');
+      // Check if window.initiateCampaign exists before calling it
+      if (typeof window.initiateCampaign === 'function') {
+        window.initiateCampaign('arrasi_campaign');
+      } else {
+        console.error("Campaign system not loaded: window.initiateCampaign is not a function");
+        // Fallback: create a simple campaign object
+        window.gameState.currentCampaign = {
+          id: 'c' + Date.now().toString(36),
+          type: 'arrasi_campaign',
+          name: "Arrasi Peninsula Campaign",
+          description: "Push west into Arrasi territory to secure the peninsula.",
+          currentStage: 1,
+          completedMissions: [],
+          state: "active"
+        };
+        window.gameState.mainQuest.stage = 1;
+        window.addToNarrative("<p>Campaign initialized. Report back tomorrow for mission assignments.</p>");
+      }
       
       // Update action buttons without the special button
       window.updateActionButtons();
     };
+    
     actionsContainer.appendChild(reportButton);
     return; // Exit early so no other buttons are added
   }
@@ -296,8 +314,6 @@ window.showCampaignIntroduction = function() {
    window.updateActionButtons();
  };
   
-  // Add event listener
-  document.getElementById('report-to-commander').addEventListener('click', function() {
     // Show campaign briefing
     window.setNarrative(`
       <p>You enter the command tent to find Commander Valarius bent over maps of the western territories. He looks up as you enter, acknowledging you with a curt nod.</p>
@@ -312,4 +328,4 @@ window.showCampaignIntroduction = function() {
     // Restore action buttons
     actionsContainer.innerHTML = originalHTML;
     window.updateActionButtons();
-  });
+  
