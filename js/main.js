@@ -1,5 +1,5 @@
 // MAIN ENTRY POINT
-// This is the main entry point that initializes the game and sets up event listeners
+// Initializes the game and sets up event listeners with Time Management integration
 
 // Run initialization when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -46,20 +46,15 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log("Game initialized and ready to play!");
 });
 
-// Add this code to the bottom of js/main.js to ensure campaign and mission systems
-// are properly initialized and available when needed
-
+// Campaign and mission system initialization
 document.addEventListener('DOMContentLoaded', function() {
-  // Original main.js initialization code remains above this
-
-  // Load campaign and mission systems
   console.log("Initializing campaign and mission systems...");
   
   // Ensure the campaign system is initialized and available
   if (typeof window.initiateCampaign !== 'function') {
     console.log("Setting up campaign system");
     
-    // Campaign initialization function (based on js/campaignSystem.js)
+    // Campaign initialization function (based on previous implementation)
     window.initiateCampaign = function(campaignType) {
       // Get campaign template
       const template = window.campaignTemplates[campaignType];
@@ -137,16 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     };
     
-    // Show campaign stage briefing
-    window.showCampaignStageBriefing = function(campaign, stageInfo) {
-      window.addToNarrative(`
-        <h3>Campaign Stage ${stageInfo.stage}: ${stageInfo.name}</h3>
-        <p>You have progressed to a new stage in the campaign.</p>
-        <p>New missions are now available. Visit the command tent to select your next assignment.</p>
-      `);
-    };
-    
-    // Complete campaign function
+    // Campaign completion function
     window.completeCampaign = function(campaign) {
       campaign.state = "completed";
       
@@ -156,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
       window.gameState.experience += rewards.experience;
       window.player.taelors += rewards.taelors;
       
-      // Add special item
+      // Add special item if inventory has space
       if (rewards.specialItem && window.player.inventory.length < 20) {
         window.player.inventory.push(window.items[rewards.specialItem]);
       }
@@ -175,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
       window.showCampaignVictory(campaign);
     };
     
-    // Show campaign victory
+    // Show campaign victory function
     window.showCampaignVictory = function(campaign) {
       window.setNarrative(`
         <h3>Campaign Victory!</h3>
@@ -202,161 +188,6 @@ document.addEventListener('DOMContentLoaded', function() {
       // Save to localStorage
       localStorage.setItem('unlockedFeatures', JSON.stringify(unlockedFeatures));
     };
-  }
-  
-  // Ensure mission system is initialized and available
-  if (typeof window.showMissionSelectionScreen !== 'function') {
-    console.log("Setting up mission selection system");
-    
-    // Mission selection screen function
-    window.showMissionSelectionScreen = function() {
-      const campaign = window.gameState.currentCampaign;
-      if (!campaign) {
-        console.error("No active campaign found");
-        window.addToNarrative("There are no missions available at this time.");
-        return;
-      }
-      
-      // Get current stage
-      const currentStage = window.campaignTemplates[campaign.type]
-        .missionProgression.find(stage => stage.stage === campaign.currentStage);
-      
-      if (!currentStage) {
-        console.error("No stage found for current campaign");
-        window.addToNarrative("There are no missions available at this time.");
-        return;
-      }
-      
-      // Build mission selection UI
-      const actionsContainer = document.getElementById('actions');
-      actionsContainer.innerHTML = '';
-      
-      // Add title
-      const title = document.createElement('h3');
-      title.textContent = `Campaign Stage ${campaign.currentStage}: ${currentStage.name}`;
-      title.style.textAlign = 'center';
-      title.style.marginBottom = '20px';
-      actionsContainer.appendChild(title);
-      
-      // Add description of current stage
-      const stageDescription = document.createElement('p');
-      stageDescription.textContent = `Select a mission to advance the campaign. You need to complete ${currentStage.requiredCompletions} missions at this stage.`;
-      stageDescription.style.marginBottom = '20px';
-      actionsContainer.appendChild(stageDescription);
-      
-      // Available missions
-      currentStage.availableMissions.forEach(missionType => {
-        // Check if already completed
-        const alreadyCompleted = campaign.completedMissions.includes(missionType);
-        
-        // Get mission template
-        const missionTemplate = window.missionTypes[missionType];
-        if (!missionTemplate) return;
-        
-        // Create mission card
-        const missionCard = document.createElement('div');
-        missionCard.className = 'mission-card';
-        missionCard.style.border = '1px solid #444';
-        missionCard.style.borderRadius = '8px';
-        missionCard.style.padding = '15px';
-        missionCard.style.marginBottom = '15px';
-        missionCard.style.background = alreadyCompleted ? '#2a3b2a' : '#1a1a1a';
-        
-        // Mission title
-        const missionTitle = document.createElement('h4');
-        missionTitle.textContent = missionTemplate.name;
-        missionTitle.style.marginTop = '0';
-        missionCard.appendChild(missionTitle);
-        
-        // Mission description
-        const missionDesc = document.createElement('p');
-        missionDesc.textContent = missionTemplate.description;
-        missionCard.appendChild(missionDesc);
-        
-        // Mission details
-        const missionDetails = document.createElement('div');
-        missionDetails.innerHTML = `
-          <strong>Difficulty:</strong> ${'★'.repeat(missionTemplate.difficulty)}<br>
-          <strong>Duration:</strong> ${missionTemplate.duration} days<br>
-          <strong>Reward:</strong> ${missionTemplate.rewards.experience} XP, ${missionTemplate.rewards.taelors} taelors
-        `;
-        missionCard.appendChild(missionDetails);
-        
-        // Mission button
-        const missionButton = document.createElement('button');
-        missionButton.className = 'action-btn';
-        missionButton.textContent = alreadyCompleted ? 'Completed' : 'Start Mission';
-        missionButton.disabled = alreadyCompleted;
-        missionButton.style.marginTop = '10px';
-        
-        if (!alreadyCompleted) {
-          missionButton.onclick = function() {
-            if (typeof window.startMission === 'function') {
-              window.startMission(missionType);
-            } else {
-              window.addToNarrative(`Mission system is not fully loaded. You cannot start the ${missionTemplate.name} mission at this time.`);
-              window.updateActionButtons();
-            }
-          };
-        }
-        
-        missionCard.appendChild(missionButton);
-        
-        // Add to container
-        actionsContainer.appendChild(missionCard);
-      });
-      
-      // Back to camp button
-      const backButton = document.createElement('button');
-      backButton.className = 'action-btn';
-      backButton.textContent = 'Return to Camp';
-      backButton.style.marginTop = '20px';
-      backButton.onclick = function() {
-        window.updateActionButtons();
-      };
-      actionsContainer.appendChild(backButton);
-    };
-    
-    // Basic mission start placeholder if mission system isn't fully loaded
-    if (typeof window.startMission !== 'function') {
-      window.startMission = function(missionType) {
-        const missionTemplate = window.missionTypes[missionType];
-        if (!missionTemplate) {
-          window.addToNarrative("Mission type not found.");
-          return false;
-        }
-        
-        window.addToNarrative(`
-          <h3>${missionTemplate.name}</h3>
-          <p>${missionTemplate.description}</p>
-          <p>You set out on the mission...</p>
-          <p>After several days of hard work, you complete your objectives and return to camp.</p>
-        `);
-        
-        // Add mission to completed missions
-        const campaign = window.gameState.currentCampaign;
-        if (campaign && !campaign.completedMissions.includes(missionType)) {
-          campaign.completedMissions.push(missionType);
-          
-          // Reward player
-          window.gameState.experience += missionTemplate.rewards.experience;
-          window.player.taelors += missionTemplate.rewards.taelors;
-          
-          window.addToNarrative(`
-            <p>Mission completed successfully!</p>
-            <p>Rewards: ${missionTemplate.rewards.experience} XP, ${missionTemplate.rewards.taelors} taelors</p>
-          `);
-          
-          // Update campaign progress
-          window.updateCampaignProgress(missionType);
-        }
-        
-        // Restore regular camp actions
-        window.updateActionButtons();
-        
-        return true;
-      };
-    }
   }
   
   console.log("Campaign and mission systems initialized successfully");

@@ -880,8 +880,11 @@ function calculateInitiative(enemy) {
   window.gameState.currentInitiative = 0;
 }
 
-// Setup the combat UI for the new phased system
+// Setup the combat UI for the new phased system - with cleanup check
 function setupCombatUI(enemy, environment) {
+  // Clean up any existing combat UI elements first
+  cleanupCombatUI();
+  
   document.getElementById('enemyName').textContent = enemy.name;
   document.getElementById('enemyHealthDisplay').textContent = `${enemy.health} HP`;
   document.getElementById('playerHealthDisplay').textContent = `${Math.round(window.gameState.health)} HP`;
@@ -893,7 +896,7 @@ function setupCombatUI(enemy, environment) {
   // Show combat interface
   document.getElementById('combatInterface').classList.remove('hidden');
   
-  // Add the new distance/position indicator
+  // Add the distance indicator
   addDistanceIndicator();
   
   // Add stance indicator
@@ -915,6 +918,39 @@ function setupCombatUI(enemy, environment) {
   
   // Disable regular action buttons during combat
   document.getElementById('actions').style.display = 'none';
+}
+
+// Clean up combat UI elements - new function
+function cleanupCombatUI() {
+  // Remove any existing distance indicator
+  if (document.getElementById('distanceContainer')) {
+    document.getElementById('distanceContainer').remove();
+  }
+  
+  // Remove any existing stance container
+  if (document.getElementById('stanceContainer')) {
+    document.getElementById('stanceContainer').remove();
+  }
+  
+  // Remove any existing environment container
+  if (document.getElementById('environmentContainer')) {
+    document.getElementById('environmentContainer').remove();
+  }
+  
+  // Remove any existing momentum container
+  if (document.getElementById('momentumContainer')) {
+    document.getElementById('momentumContainer').remove();
+  }
+  
+  // Clear combat log
+  if (document.getElementById('combatLog')) {
+    document.getElementById('combatLog').innerHTML = '';
+  }
+  
+  // Clear combat actions
+  if (document.getElementById('combatActions')) {
+    document.getElementById('combatActions').innerHTML = '';
+  }
 }
 
 // Add environment indicator to UI
@@ -3160,16 +3196,19 @@ function advanceCombatTurn() {
   updateCombatActions();
 }
 
-// End combat with result
+// End combat with result - with improved cleanup
 function endCombatWithResult(result) {
   // Hide combat interface
   document.getElementById('combatInterface').classList.add('hidden');
   
+  // Clean up combat UI elements
+  cleanupCombatUI();
+  
   // Re-enable action buttons
   document.getElementById('actions').style.display = 'flex';
 
-   // Special handling for mission combat
-   if (window.gameState.inMissionCombat) {
+  // Special handling for mission combat
+  if (window.gameState.inMissionCombat) {
     window.gameState.inMissionCombat = false;
     window.endMissionCombat(result);
     return;
@@ -3336,29 +3375,29 @@ function endCombatWithResult(result) {
     window.updateTimeAndDay(24 * 60); // 24 hours (1 day) in minutes
   }
   
-  // Reset battle state
-  window.gameState.inBattle = false;
-  window.gameState.currentEnemy = null;
-  window.gameState.combatPhase = "neutral";
-  window.gameState.initiativeOrder = [];
-  window.gameState.currentInitiative = 0;
-  window.gameState.actionQueue = [];
-  window.gameState.playerQueuedAction = null;
-  window.gameState.enemyQueuedAction = null;
-  window.gameState.counterAttackAvailable = false;
-  window.gameState.playerMomentum = 0;
-  window.gameState.enemyMomentum = 0;
-  window.gameState.consecutiveHits = 0;
-  window.gameState.perfectParries = 0;
-  window.gameState.dodgeCount = 0;
-  window.gameState.playerStaggered = false;
-  window.gameState.terrain = "normal";
-  window.gameState.weather = window.gameState.originalWeather || "clear";
-  
-  // Update UI
-  window.updateStatusBars();
-  window.updateProfileIfVisible();
-}
+ // Reset battle state
+ window.gameState.inBattle = false;
+ window.gameState.currentEnemy = null;
+ window.gameState.combatPhase = "neutral";
+ window.gameState.initiativeOrder = [];
+ window.gameState.currentInitiative = 0;
+ window.gameState.actionQueue = [];
+ window.gameState.playerQueuedAction = null;
+ window.gameState.enemyQueuedAction = null;
+ window.gameState.counterAttackAvailable = false;
+ window.gameState.playerMomentum = 0;
+ window.gameState.enemyMomentum = 0;
+ window.gameState.consecutiveHits = 0;
+ window.gameState.perfectParries = 0;
+ window.gameState.dodgeCount = 0;
+ window.gameState.playerStaggered = false;
+ window.gameState.terrain = "normal";
+ window.gameState.weather = window.gameState.originalWeather || "clear";
+ 
+ // Update UI
+ window.updateStatusBars();
+ window.updateProfileIfVisible();
+};
 
 // Get details for a player action
 function getPlayerActionDetails(actionType) {
