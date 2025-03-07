@@ -21,7 +21,7 @@
   display: none !important;
 }
 
-/* Enhanced layout styling - fixed to use grid properly */
+/* Enhanced layout styling */
 #gameContainer {
   display: grid;
   grid-template-columns: 250px 1fr;
@@ -35,6 +35,8 @@
   height: calc(100vh - 40px);
   padding: 20px;
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 header {
@@ -59,6 +61,14 @@ header {
   gap: 15px;
   max-height: calc(100vh - 100px);
   overflow-y: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 250px;
+  transform: translateZ(0);
+  will-change: transform;
+  transition: transform 0.3s ease;
 }
 
 .game-main {
@@ -68,6 +78,8 @@ header {
   gap: 20px;
   max-height: calc(100vh - 100px);
   overflow-y: auto;
+  margin-left: 250px;
+  transition: margin-left 0.3s ease;
 }
 
 /* Cleanup of duplicate elements */
@@ -89,19 +101,21 @@ header {
 @media (max-width: 768px) {
   #gameContainer {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto 1fr;
     grid-template-areas:
       "header"
-      "sidebar"
       "main";
   }
   
   .game-sidebar {
-    max-height: none;
+    transform: translateX(-100%);
+  }
+  
+  .game-sidebar.show {
+    transform: translateX(0);
   }
   
   .game-main {
-    max-height: none;
+    margin-left: 0;
   }
   
   .sidebar-toggle {
@@ -236,6 +250,7 @@ header {
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
   opacity: 1;
   transition: opacity 0.3s ease;
+  transform: translateZ(0);
 }
 
 #profile.hidden, #inventory.hidden, #questLog.hidden {
@@ -253,9 +268,7 @@ header {
 
 /* Panel content */
 #profileText, #inventoryList, #questList {
-  margin-top: 15px;
-  overflow-y: auto;
-  max-height: calc(80vh - 60px);
+  padding: 20px;
 }
 
 /* Panel close button */
@@ -269,6 +282,7 @@ header {
 #actions {
   display: flex;
   flex-wrap: wrap;
+  gap: 10px;
   justify-content: center;
   min-height: 50px;
   margin: 10px 0;
@@ -391,318 +405,4 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-}
-
-/* Profile Panel Styles */
-#profile {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  max-width: 90vw;
-  max-height: 90vh;
-  width: 800px;
-  overflow-y: auto;
-  z-index: 1000;
-  background: #1a1a1a;
-  color: #e0e0e0;
-  border: 2px solid #c9a959;
-  border-radius: 8px;
-  box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
-  opacity: 1;
-  transition: opacity 0.3s ease;
-  transform: translateZ(0);
-  padding: 20px;
-}
-
-#profile.hidden {
-  display: none !important;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.close-button {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 30px;
-  height: 30px;
-  background: #2a2a2a;
-  border: 1px solid #444;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 20px;
-  color: #e0e0e0;
-  transition: all 0.3s;
-  z-index: 1001;
-}
-
-.close-button:hover {
-  background: #3a3a3a;
-  transform: scale(1.1);
-}
-
-.character-header {
-  text-align: center;
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #333;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-}
-
-.character-avatar {
-  position: relative;
-  font-size: 48px;
-  width: 64px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #2a2a2a;
-  border-radius: 50%;
-  border: 2px solid #c9a959;
-}
-
-.character-badge {
-  position: absolute;
-  bottom: -5px;
-  right: -5px;
-  font-size: 24px;
-  background: #1a1a1a;
-  border: 2px solid #c9a959;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.character-info {
-  flex: 1;
-  text-align: left;
-}
-
-.character-info h2 {
-  margin: 0;
-  color: #c9a959;
-  font-size: 1.8em;
-}
-
-.character-title {
-  color: #a0a0a0;
-  font-style: italic;
-  margin-top: 5px;
-}
-
-.character-stats {
-  display: flex;
-  gap: 10px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-
-.stat-pill {
-  background: #2a2a2a;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 0.9em;
-  border: 1px solid #444;
-}
-
-.attributes-section {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.attribute-card {
-  background: #2a2a2a;
-  padding: 15px;
-  border-radius: 8px;
-  text-align: center;
-  border: 1px solid #444;
-}
-
-.attribute-card h3 {
-  margin: 0 0 10px 0;
-  color: #c9a959;
-}
-
-.attribute-value {
-  font-size: 1.5em;
-  font-weight: bold;
-  margin: 10px 0;
-}
-
-.attribute-description {
-  color: #a0a0a0;
-  font-size: 0.9em;
-}
-
-.skills-section {
-  margin-bottom: 30px;
-}
-
-.skills-section h3 {
-  color: #c9a959;
-  margin-bottom: 15px;
-}
-
-.skills-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 15px;
-}
-
-.skill-card {
-  background: #2a2a2a;
-  padding: 10px;
-  border-radius: 6px;
-  text-align: center;
-  border: 1px solid #444;
-}
-
-.skill-name {
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-
-.skill-value {
-  color: #c9a959;
-}
-
-.skill-base {
-  color: #a0a0a0;
-  font-size: 0.8em;
-  margin-top: 5px;
-}
-
-.relationships-section {
-  margin-top: 30px;
-}
-
-.relationships-section h3 {
-  color: #c9a959;
-  margin-bottom: 15px;
-}
-
-.relationship-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 15px;
-}
-
-.relationship-card {
-  background: #2a2a2a;
-  padding: 15px;
-  border-radius: 6px;
-  border: 1px solid #444;
-}
-
-.relationship-name {
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-
-.relationship-status {
-  color: #c9a959;
-  font-style: italic;
-}
-
-.relationship-value {
-  color: #a0a0a0;
-  font-size: 0.9em;
-  margin-top: 5px;
-}
-
-/* Ensure modal overlay works properly */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
-}
-
-/* Force hardware acceleration for smoother animations */
-#profile {
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  perspective: 1000px;
-  will-change: transform, opacity;
-}
-
-/* Profile Panel Error Handling */
-.error-message {
-  background-color: rgba(150, 0, 0, 0.1);
-  border: 1px solid rgba(255, 0, 0, 0.3);
-  border-radius: 4px;
-  padding: 15px;
-  margin: 10px 0;
-  color: #ffcccc;
-  text-align: center;
-}
-
-.error-message h3 {
-  color: #ff6666;
-  margin-top: 0;
-}
-
-/* Status bars styling */
-.status-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.bar-container {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.bar-label {
-  font-size: 14px;
-  color: #e0e0e0;
-  font-weight: bold;
-}
-
-.bar-outer {
-  height: 12px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 6px;
-  overflow: hidden;
-  position: relative;
-}
-
-.bar {
-  height: 100%;
-  width: 100%;
-  transition: width 0.3s ease;
-}
-
-.bar-value {
-  font-size: 12px;
-  color: #aaaaaa;
-  text-align: right;
-}
-
-/* Sidebar navigation styling */
-.sidebar-nav {
-  display: none;
-}
-
-.nav-icon {
-  display: none;
 }

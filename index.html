@@ -85,18 +85,12 @@
       <div id="dayDisplay"></div>
     </header>
     
-    <div class="game-sidebar">
-      <!-- Status bars will be dynamically inserted here -->
+    <div id="narrative">
+      <p>The road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.</p>
     </div>
     
-    <div class="game-main">
-      <div id="narrative">
-        <p>The road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.</p>
-      </div>
-      
-      <div id="actions">
-        <!-- Action buttons will be dynamically populated by updateActionButtons() -->
-      </div>
+    <div id="actions">
+      <!-- Action buttons will be dynamically populated by updateActionButtons() -->
     </div>
     
     <!-- Combat Interface (Hidden by default) -->
@@ -126,23 +120,27 @@
     
     <!-- Profile Panel -->
     <div id="profile" class="hidden">
-      <h3>YOUR PROFILE</h3>
-      <div class="profile-close close-button">×</div>
-      <div id="profileText"></div>
+      <h3>Your Profile</h3>
+      <p id="profileText"></p>
+      <button class="menu-button profile-close">Close</button>
     </div>
     
     <!-- Inventory Panel -->
     <div id="inventory" class="hidden">
-      <h3>INVENTORY</h3>
-      <div class="inventory-close close-button">×</div>
-      <div id="inventoryList"></div>
+      <h3>Inventory</h3>
+      <div id="inventoryList">
+        <!-- Inventory items will be dynamically populated -->
+      </div>
+      <button class="menu-button inventory-close">Close</button>
     </div>
     
     <!-- Quest Log Panel -->
     <div id="questLog" class="hidden">
-      <h3>QUEST LOG</h3>
-      <div class="quest-log-close close-button">×</div>
-      <div id="questList"></div>
+      <h3>Quest Log</h3>
+      <div id="questList">
+        <!-- Quests will be dynamically populated -->
+      </div>
+      <button class="menu-button quest-log-close">Close</button>
     </div>
   </div>
   

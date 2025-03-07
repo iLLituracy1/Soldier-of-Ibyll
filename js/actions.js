@@ -7,58 +7,7 @@ window.handleAction = function(action) {
   
   // Show panels like inventory, profile, etc.
   if (action === 'profile') {
-    console.log("Opening profile panel");
-    
-    // Add modal overlay
-    let overlay = document.querySelector('.modal-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      document.body.appendChild(overlay);
-    }
-    
-    // Show profile with enhanced error handling
-    try {
-      window.handleProfile();
-    } catch (error) {
-      console.error("Error showing profile:", error);
-      
-      // Attempt to display a basic profile in case of errors
-      const profileDiv = document.getElementById('profileText');
-      if (profileDiv) {
-        profileDiv.innerHTML = `
-          <div class="error-message">
-            <h3>Profile Error</h3>
-            <p>There was a problem displaying your profile information.</p>
-          </div>
-        `;
-        document.getElementById('profile').classList.remove('hidden');
-      }
-    }
-    
-    // Add click handler to overlay for closing
-    overlay.addEventListener('click', function(e) {
-      if (e.target === overlay) {
-        document.getElementById('profile').classList.add('hidden');
-        document.body.removeChild(overlay);
-      }
-    });
-    
-    // Set up close button handler
-    const closeBtn = document.querySelector('#profile .profile-close, #profile .close-button');
-    if (closeBtn) {
-      closeBtn.onclick = function() {
-        document.getElementById('profile').classList.add('hidden');
-        const overlay = document.querySelector('.modal-overlay');
-        if (overlay) {
-          document.body.removeChild(overlay);
-        }
-      };
-      console.log("Profile close button handler attached");
-    } else {
-      console.warn("Profile close button not found");
-    }
-    
+    window.handleProfile();
     return;
   } else if (action === 'inventory') {
     // Update inventory before showing
@@ -353,9 +302,6 @@ window.handleAction = function(action) {
   
   // Check for level up after actions
   window.checkLevelUp();
-  
-  // Update profile if visible after any action
-  window.updateProfileIfVisible();
 };
 
 // Function to show training options

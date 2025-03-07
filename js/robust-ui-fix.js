@@ -484,73 +484,52 @@ function waitForElementsAndApplyFixes() {
   }, 10000);
 }
 
-// Function to ensure status bars exist and are properly initialized
+// Ensure status bars exist
 function ensureStatusBars() {
-  console.log("Ensuring status bars are initialized...");
+  // Check if status bars container exists
+  let statusBars = document.querySelector('.status-bars');
   
-  // First, ensure the game container exists
-  const gameContainer = document.getElementById('gameContainer');
-  if (!gameContainer) {
-    console.warn("Game container not found, cannot initialize status bars");
-    return;
-  }
-  
-  // Get the existing sidebar rather than creating a new one
-  const sidebar = gameContainer.querySelector('.game-sidebar');
-  if (!sidebar) {
-    console.warn("Game sidebar not found - structure may be incorrect");
-    return;
-  }
-  
-  // Create or get the status bars container
-  let statusBars = sidebar.querySelector('.status-bars');
   if (!statusBars) {
+    debugLog("Creating missing status bars");
+    
+    // Create status bars container
     statusBars = document.createElement('div');
     statusBars.className = 'status-bars';
-    sidebar.insertBefore(statusBars, sidebar.firstChild);
-  }
-  
-  // Ensure all required bars exist
-  const requiredBars = ['Health', 'Stamina', 'Morale'];
-  requiredBars.forEach(barType => {
-    const barId = `sidebar${barType}Bar`;
-    const valueId = `sidebar${barType}Value`;
     
-    if (!document.getElementById(barId)) {
-      // Create bar container
-      const barContainer = document.createElement('div');
-      barContainer.className = 'bar-container';
-      
-      // Create label
-      const label = document.createElement('div');
-      label.className = 'bar-label';
-      label.textContent = barType;
-      
-      // Create the actual bar
-      const bar = document.createElement('div');
-      bar.className = 'bar';
-      bar.id = barId;
-      if (barType === 'Health') bar.style.backgroundColor = '#e74c3c';
-      if (barType === 'Stamina') bar.style.backgroundColor = '#2ecc71';
-      if (barType === 'Morale') bar.style.backgroundColor = '#3498db';
-      
-      // Create value display
-      const value = document.createElement('div');
-      value.className = 'bar-value';
-      value.id = valueId;
-      
-      // Add all elements to the container
-      barContainer.appendChild(label);
-      barContainer.appendChild(document.createElement('div')).className = 'bar-outer';
-      barContainer.querySelector('.bar-outer').appendChild(bar);
-      barContainer.appendChild(value);
-      
-      // Add the complete bar to the status bars container
-      statusBars.appendChild(barContainer);
+    // Create HTML structure
+    statusBars.innerHTML = `
+      <div class="status-bar">
+        <div class="status-label">Health</div>
+        <div class="bar-container">
+          <div id="healthBar" class="bar health-bar" style="width: 100%;"></div>
+        </div>
+        <div id="healthValue" class="bar-value">100/100</div>
+      </div>
+      <div class="status-bar">
+        <div class="status-label">Stamina</div>
+        <div class="bar-container">
+          <div id="staminaBar" class="bar stamina-bar" style="width: 100%;"></div>
+        </div>
+        <div id="staminaValue" class="bar-value">100/100</div>
+      </div>
+      <div class="status-bar">
+        <div class="status-label">Morale</div>
+        <div class="bar-container">
+          <div id="moraleBar" class="bar morale-bar" style="width: 75%;"></div>
+        </div>
+        <div id="moraleValue" class="bar-value">75/100</div>
+      </div>
+    `;
+    
+    // Add to game container before narrative
+    const gameContainer = document.getElementById('gameContainer');
+    const narrative = document.getElementById('narrative');
+    
+    if (gameContainer && narrative) {
+      gameContainer.insertBefore(statusBars, narrative);
+      debugLog("Status bars created and added");
     }
-  });
-  
-  console.log("Status bars initialization complete");
+  }
 }
 
 // Ensure time display elements exist
