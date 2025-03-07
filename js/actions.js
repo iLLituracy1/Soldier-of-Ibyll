@@ -197,9 +197,6 @@ window.handleAction = function(action) {
     window.player.relationships[randomOfficer].disposition += 3;
     window.player.relationships[randomOfficer].interactions += 1;
     
-    // Check for quest progress
-    window.updateQuestProgress("patrol");
-    
     // Small chance to improve survival skill
     const survivalImprovement = parseFloat((Math.random() * 0.03 + 0.02).toFixed(2));
     const survivalCap = Math.floor((window.player.phy + window.player.men) / 3);
@@ -223,16 +220,12 @@ window.handleAction = function(action) {
     window.updateStatusBars();
     window.updateProfileIfVisible();
     
-    // Check for combat encounter
-    window.checkForCombatEncounters('patrol');
+    // Update UI
+    window.updateTimeAndDay(120); // 2 hours
     
-    // Update UI if not in combat
-    if (!window.gameState.inBattle) {
-      window.updateTimeAndDay(120); // 2 hours
-      
-      // Show notification
-      window.showNotification("Patrol complete! +10 XP", 'success');
-    }
+    // Show notification
+    window.showNotification("Patrol complete! +10 XP", 'success');
+
   } else if (action === 'mess') {
     // Mess hall action
     const messText = window.narrativeElements.mess[Math.floor(Math.random() * window.narrativeElements.mess.length)];
@@ -634,9 +627,6 @@ window.handleTraining = function(trainingType) {
   // Update profile if it's open
   window.updateProfileIfVisible();
   
-  // Check for quest progress
-  window.updateQuestProgress("training");
-  
   // Update UI
   window.updateStatusBars();
   window.updateTimeAndDay(60); // 1 hour for training
@@ -1022,4 +1012,33 @@ window.handleBrawl = function(action) {
   setTimeout(function() {
     window.showBrawlerPitOptions();
   }, 1500);
+};
+
+// Placeholder functions for removed combat and quest systems
+window.updateQuestProgress = function(activityType) {
+  console.log("Quest progress tracking disabled - quest system removed");
+  // This is just a placeholder for now until quest system is reimplemented
+};
+
+window.createQuest = function(questType) {
+  console.log("Quest creation disabled - quest system removed");
+  // Return a minimal quest structure to avoid errors
+  return {
+    title: "Placeholder Quest",
+    description: "Quest system is currently disabled.",
+    type: questType || "general",
+    objectives: [
+      {
+        text: "Wait for quest system",
+        count: 0,
+        target: 1,
+        completed: false
+      }
+    ],
+    rewards: {
+      experience: 0,
+      taelors: 0
+    },
+    completed: false
+  };
 };

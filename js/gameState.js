@@ -37,70 +37,14 @@ window.gameState = {
   dailyPatrolDone: false,
   dailyScoutDone: false,
   
-  // Battle system
+  // Battle system - keeping state variables but removing functionality
   inBattle: false,
   currentEnemy: null,
-  
-  // Enhanced combat system properties
-  combatPhase: "neutral", // neutral, preparation, execution, reaction
-  combatDistance: 2, // 0-close, 1-medium, 2-far
-  combatStance: "neutral", // neutral, aggressive, defensive, evasive
-  enemyStance: "neutral",
-  initiativeOrder: [],
-  currentInitiative: 0,
-  playerQueuedAction: null,
-  enemyQueuedAction: null,
-  counterAttackAvailable: false,
-  playerMomentum: 0, // -5 to 5, affects damage and success chances
-  enemyMomentum: 0,
-  consecutiveHits: 0,
-  perfectParries: 0,
-  dodgeCount: 0,
-  playerStaggered: false,
-  playerInjuries: [],
-  terrain: "normal", // normal, rocky, slippery, confined
-  weather: "clear", // clear, rain, fog, wind, heat
-  originalWeather: null, // store original weather during combat
-  allowInterrupts: true,
-  staminaPerAction: {
-    attack: 5,
-    defend: 3,
-    dodge: 4,
-    advance: 3,
-    retreat: 3,
-    aim: 2,
-    special: 7
-  },
-  actionWindUpTime: {
-    quickAttack: 1,
-    attack: 2,
-    heavyAttack: 4,
-    defend: 1,
-    dodge: 1,
-    advance: 1,
-    retreat: 2,
-    aim: 3,
-    special: 3,
-    feint: 2
-  },
-  actionRecoveryTime: {
-    quickAttack: 1,
-    attack: 2,
-    heavyAttack: 3,
-    defend: 1,
-    dodge: 2,
-    advance: 1,
-    retreat: 1,
-    aim: 2, 
-    special: 3,
-    feint: 1
-  },
   
   // Mission system flags
   inMission: false,
   currentMission: null,
   missionStage: 0,
-  inMissionCombat: false,
   
   // Achievement tracking
   combatVictoryAchieved: false,
@@ -138,9 +82,6 @@ window.initializeGameState = function() {
   // Set additional game state values
   window.gameState.trainingProgress = 0;
   window.gameState.dailyTrainingCount = 0; // Initialize training count
-  window.gameState.combatPhase = "neutral";
-  window.gameState.combatDistance = 2;
-  window.gameState.combatStance = "neutral";
   
   // Set activity discovery flags based on origin
   if (window.player.origin === 'Lunarine') {
@@ -151,17 +92,29 @@ window.initializeGameState = function() {
     window.gameState.discoveredGamblingTent = false;
   }
   
-  // Add initial quests - one training quest and one random quest
+  // Add initial quests - simplified since quest system is removed
   window.gameState.sideQuests = [
-    window.createQuest("training")
+    {
+      title: "Basic Training",
+      description: "Complete your basic training at the camp.",
+      type: "training",
+      objectives: [
+        {
+          text: "Complete training sessions",
+          count: 0,
+          target: 5,
+          completed: false
+        }
+      ],
+      rewards: {
+        experience: 50,
+        taelors: 10
+      },
+      completed: false
+    }
   ];
   
-  // Add a second random quest (different from training)
-  const questTypes = ["patrol", "scout"];
-  const randomType = questTypes[Math.floor(Math.random() * questTypes.length)];
-  window.gameState.sideQuests.push(window.createQuest(randomType));
-  
-  console.log("Initial quests created:", window.gameState.sideQuests);
+  console.log("Game state initialized");
 };
 
 // Function to check for level up
