@@ -134,79 +134,20 @@ window.showEmpireUpdate = function() {
 };
 
 window.startAdventure = function() {
-    console.log("Starting adventure - initializing game systems...");
+    console.log("Starting adventure...");
     
-    // Store complete character data before initialization
-    const characterData = {
-        // Basic info
-        name: window.player.name,
-        origin: window.player.origin,
-        career: { ...window.player.career }, // Deep copy career object
-        
-        // Attributes
-        phy: Number(window.player.phy),
-        men: Number(window.player.men),
-        
-        // Skills (ensure all skills are preserved)
-        skills: { 
-            melee: Number(window.player.skills.melee || 0),
-            marksmanship: Number(window.player.skills.marksmanship || 0),
-            survival: Number(window.player.skills.survival || 0),
-            command: Number(window.player.skills.command || 0),
-            discipline: Number(window.player.skills.discipline || 0),
-            tactics: Number(window.player.skills.tactics || 0),
-            organization: Number(window.player.skills.organization || 0),
-            arcana: Number(window.player.skills.arcana || 0)
-        },
-        
-        // Other character data
-        relationships: { ...window.player.relationships },
-        inventory: [...(window.player.inventory || [])],
-        taelors: Number(window.player.taelors || 10),
-        isVeteran: Boolean(window.player.isVeteran),
-        veteranTitle: window.player.veteranTitle || ""
-    };
-    
-    console.log("Character data being passed to game initialization:", characterData);
-    
-    // Hide character creator
+    // Hide character creator and show game container
     document.getElementById('creator').classList.add('hidden');
+    document.getElementById('gameContainer').classList.remove('hidden');
     
-    // Initialize core game systems with character data
-    if (typeof window.initializeGame === 'function') {
-        window.initializeGame(characterData);
-    }
+    // Initialize all game systems
+    window.initializeAllSystems();
     
-    // Set narrative based on character background
-    const careerDesc = window.player.career.description || "";
-    const originDesc = window.origins[window.player.origin]?.description || "";
+    // Set initial narrative
+    window.setNarrative("You begin your journey as a soldier in the borderlands.");
     
-    window.setNarrative(`
-        ${careerDesc}
-
-        ${originDesc}
-
-        You begin your journey as a soldier in the borderlands, ready to make your mark on the world.
-    `);
-    
-    // Show game container
-    const gameContainer = document.getElementById('gameContainer');
-    if (gameContainer) {
-        gameContainer.classList.remove('hidden');
-        
-        // Update UI elements after container is visible
-        requestAnimationFrame(() => {
-            if (typeof window.updateStatusBars === 'function') {
-                window.updateStatusBars();
-            }
-            if (typeof window.updateTimeAndDay === 'function') {
-                window.updateTimeAndDay(0);
-            }
-            if (typeof window.updateActionButtons === 'function') {
-                window.updateActionButtons();
-            }
-        });
-    }
+    // Show initial notification
+    window.showNotification("Welcome to Kasvaari Camp!", 'info');
 };
 
 window.generateCharacterSummary = function() {

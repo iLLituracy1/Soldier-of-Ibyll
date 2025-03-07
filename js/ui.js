@@ -1,6 +1,21 @@
 // UI FUNCTIONS MODULE
 // Functions related to UI updates and rendering
 
+// UI update registry - allows other systems to register their UI update callbacks
+window.uiRegistry = {
+    actionButtonCallbacks: [],
+    inventoryCallbacks: [],
+    equipmentCallbacks: [],
+    statusCallbacks: []
+};
+
+// Register UI update callbacks
+window.registerUICallback = function(type, callback) {
+    if (window.uiRegistry[type + 'Callbacks']) {
+        window.uiRegistry[type + 'Callbacks'].push(callback);
+    }
+};
+
 // Update status bars function
 window.updateStatusBars = function() {
   // Update health bar
@@ -112,126 +127,51 @@ window.getTimeOfDay = function() {
   return 'night';
 };
 
-// Update action buttons function
+// Update action buttons function - now calls registered callbacks
 window.updateActionButtons = function() {
-  const actionsContainer = document.getElementById('actions');
-  actionsContainer.innerHTML = '';
-
-  // Don't show regular actions during combat
-  if (window.gameState.inBattle) {
-    return;
-  }
-
-  // Add inventory button
-  window.addActionButton('Inventory', 'inventory', actionsContainer);
-
-  // Add equipment button
-  window.addActionButton('Equipment', 'equipment', actionsContainer);
-
-  // Add other action buttons
-  window.addActionButton('Scout Area', 'scout', actionsContainer);
-  window.addActionButton('Make Camp', 'camp', actionsContainer);
-  window.addActionButton('Patrol Area', 'patrol', actionsContainer);
-
-  // Check for special commander report state
-  if (window.gameState.awaitingCommanderReport) {
-    // Create special button for campaign introduction
-    const reportButton = document.createElement('button');
-    reportButton.className = 'action-btn';
-    reportButton.id = 'report-to-commander';
-    reportButton.textContent = 'Report to Commander';
+    const actionsContainer = document.getElementById('actions');
+    if (!actionsContainer) return;
     
-    reportButton.onclick = function() {
-      // Clear the special state
-      window.gameState.awaitingCommanderReport = false;
-      
-      // Show campaign briefing
-      window.setNarrative(`
-        <p>You enter the command tent to find Commander Valarius bent over maps of the western territories. He looks up as you enter, acknowledging you with a curt nod.</p>
-        <p>"We've received orders from high command," he says, gesturing to the map. "The Empire is pushing west, into Arrasi territory. Your unit will be deployed to secure the borderlands."</p>
-        <p>The commander outlines the strategic importance of the peninsula and the resources it would bring to the Empire. You can tell this is a major campaign, not just a border skirmish.</p>
-        <p>"Prepare yourself," Valarius concludes. "Report back here tomorrow for your specific mission assignments. This campaign will test everything you've learned so far."</p>
-      `);
-      
-      // Check if campaign initialization function exists
-      if (typeof window.initiateCampaign === 'function') {
-        window.initiateCampaign('arrasi_campaign');
-      } else {
-        console.error("Campaign system not loaded: window.initiateCampaign is not a function");
-        // Fallback: create a simple campaign object
-        window.gameState.currentCampaign = {
-          id: 'c' + Date.now().toString(36),
-          type: 'arrasi_campaign',
-          name: "Arrasi Peninsula Campaign",
-          description: "Push west into Arrasi territory to secure the peninsula.",
-          currentStage: 1,
-          completedMissions: [],
-          state: "active"
-        };
-        window.gameState.mainQuest.stage = 1;
-        window.addToNarrative("<p>Campaign initialized. Report back tomorrow for mission assignments.</p>");
-      }
-      
-      // Update action buttons without the special button
-      window.updateActionButtons();
-    };
-    
-    actionsContainer.appendChild(reportButton);
-    return; // Exit early so no other buttons are added
-  }
-  
-  const timeOfDay = window.getTimeOfDay();
-  const hours = Math.floor(window.gameTime / 60);
-  
-  // Standard actions available in camp
-  if (!window.gameState.inBattle && !window.gameState.inMission) {
-    // Training available during the day
-    if (timeOfDay === 'day' || timeOfDay === 'dawn') {
-      window.addActionButton('Train', 'train', actionsContainer);
+    // Don't show regular actions during combat
+    if (window.gameState.inBattle) {
+        actionsContainer.innerHTML = '';
+        return;
     }
-    
-    // Rest always available
-    window.addActionButton('Rest', 'rest', actionsContainer);
-    
-    // Patrol available during day and evening
-    if (timeOfDay === 'day' || timeOfDay === 'evening') {
-      window.addActionButton('Patrol', 'patrol', actionsContainer);
-    }
-    
-    // Mess hall available during meal times
-    if ((hours >= 7 && hours <= 9) || (hours >= 12 && hours <= 14) || (hours >= 18 && hours <= 20)) {
-      window.addActionButton('Mess Hall', 'mess', actionsContainer);
-    }
-    
-    // Guard duty available all times
-    window.addActionButton('Guard Duty', 'guard', actionsContainer);
 
-    // Mission button if in a campaign
-    if (window.gameState.currentCampaign && !window.gameState.inMission) {
-      window.addActionButton('Campaign Missions', 'show_missions', actionsContainer);
+    // Clear existing buttons
+    actionsContainer.innerHTML = '';
+
+    // Add standard buttons
+    window.addActionButton('Inventory', 'inventory', actionsContainer);
+    window.addActionButton('Equipment', 'equipment', actionsContainer);
+
+    // Call all registered action button callbacks
+    window.uiRegistry.actionButtonCallbacks.forEach(callback => {
+        try {
+            callback(actionsContainer);
+        } catch (error) {
+            console.error('Error in action button callback:', error);
+        }
+    });
+
+    // Add standard game actions
+    if (!window.gameState.inMission) {
+        const timeOfDay = window.getTimeOfDay();
+        
+        if (timeOfDay === 'day' || timeOfDay === 'dawn') {
+            window.addActionButton('Train', 'train', actionsContainer);
+        }
+        
+        window.addActionButton('Rest', 'rest', actionsContainer);
+        
+        if (timeOfDay === 'day' || timeOfDay === 'evening') {
+            window.addActionButton('Patrol', 'patrol', actionsContainer);
+        }
     }
-    
-    // Gambling and Brawler Pits visibility logic
-    if (timeOfDay === 'evening' || timeOfDay === 'night') {
-      // Only show if player has discovered it or has the right background
-      if (window.gameState.discoveredGamblingTent) {
-        window.addActionButton('Gambling Tent', 'gambling', actionsContainer);
-      }
-      
-      if (window.gameState.discoveredBrawlerPits) {
-        window.addActionButton('Brawler Pits', 'brawler_pits', actionsContainer);
-      }
-    }
-    
-    // Add more actions based on game progression
-    if (window.gameState.mainQuest.stage >= 1) {
-      // Add more mission options as the game progresses
-    }
-  }
-  
-  // Menu buttons - always available
-  window.addActionButton('Profile', 'profile', actionsContainer);
-  window.addActionButton('Quest Log', 'questLog', actionsContainer);
+
+    // Add menu buttons
+    window.addActionButton('Profile', 'profile', actionsContainer);
+    window.addActionButton('Quest Log', 'questLog', actionsContainer);
 };
 
 // Function to add action button
@@ -458,6 +398,47 @@ document.addEventListener('DOMContentLoaded', function() {
     gameContainer.classList.remove('hidden');
   }
 });
+
+// Update inventory display
+window.updateInventoryDisplay = function() {
+    const inventoryList = document.getElementById('inventoryList');
+    if (!inventoryList) return;
+
+    // Clear existing inventory
+    inventoryList.innerHTML = '';
+
+    // Add taelors count
+    inventoryList.innerHTML = `<div class="inventory-coins">${window.player.taelors || 0} Taelors</div>`;
+
+    // Call all registered inventory callbacks
+    window.uiRegistry.inventoryCallbacks.forEach(callback => {
+        try {
+            callback(inventoryList);
+        } catch (error) {
+            console.error('Error in inventory callback:', error);
+        }
+    });
+
+    // Display items
+    if (window.player.inventory && window.player.inventory.length > 0) {
+        window.player.inventory.forEach((item, index) => {
+            if (item) {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'inventory-item';
+                itemElement.innerHTML = `
+                    <div>
+                        <div class="inventory-item-name">${item.name || 'Unknown Item'}</div>
+                        <div>${item.effect || ''}</div>
+                    </div>
+                    <div>${item.value || 0} taelors</div>
+                `;
+                inventoryList.appendChild(itemElement);
+            }
+        });
+    } else {
+        inventoryList.innerHTML += '<p>Your inventory is empty.</p>';
+    }
+};
   
   
   

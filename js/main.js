@@ -132,3 +132,132 @@ window.initializeCampaignAndMissionSystems = function() {
 
     console.log("Campaign and mission systems initialized successfully");
 };
+
+// Main initialization system
+window.initializeAllSystems = function() {
+    console.log("Beginning system initialization...");
+    
+    // Track initialization status
+    window.systemStatus = {
+        gameState: false,
+        inventory: false,
+        equipment: false,
+        combat: false,
+        ui: false
+    };
+
+    try {
+        // 1. Initialize game state first
+        if (typeof window.initializeGameState === 'function') {
+            window.initializeGameState();
+            window.systemStatus.gameState = true;
+            console.log("✓ Game state initialized");
+        } else {
+            console.error("Game state initialization function not found");
+        }
+
+        // 2. Initialize inventory and items system
+        if (typeof window.initializeItems === 'function') {
+            window.initializeItems();
+            console.log("✓ Items system initialized");
+        }
+        
+        if (typeof window.initializeInventory === 'function') {
+            window.initializeInventory();
+            window.systemStatus.inventory = true;
+            console.log("✓ Inventory system initialized");
+        }
+
+        // 3. Initialize equipment system
+        if (typeof window.initializeEquipmentUI === 'function') {
+            window.initializeEquipmentUI();
+            window.systemStatus.equipment = true;
+            console.log("✓ Equipment system initialized");
+        }
+
+        // 4. Initialize combat system
+        if (typeof window.initializeCombatSystem === 'function') {
+            window.initializeCombatSystem();
+            window.systemStatus.combat = true;
+            console.log("✓ Combat system initialized");
+        }
+
+        // 5. Initialize campaign and mission systems
+        if (typeof window.initializeCampaignAndMissionSystems === 'function') {
+            window.initializeCampaignAndMissionSystems();
+            console.log("✓ Campaign and mission systems initialized");
+        }
+
+        // 6. Set up UI event listeners last
+        setupEventListeners();
+        window.systemStatus.ui = true;
+        console.log("✓ UI event listeners initialized");
+
+        // 7. Initial UI updates
+        if (typeof window.updateStatusBars === 'function') {
+            window.updateStatusBars();
+        }
+        if (typeof window.updateActionButtons === 'function') {
+            window.updateActionButtons();
+        }
+
+        console.log("All systems initialized successfully");
+        return true;
+    } catch (error) {
+        console.error("Error during initialization:", error);
+        return false;
+    }
+};
+
+// Set up all event listeners
+function setupEventListeners() {
+    // Close buttons for panels
+    const closeButtons = document.querySelectorAll('.close-btn');
+    if (closeButtons) {
+        closeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const panel = this.closest('.game-panel');
+                if (panel) {
+                    panel.classList.add('hidden');
+                }
+            });
+        });
+    }
+
+    // Equipment slot listeners
+    const equipmentSlots = document.querySelectorAll('.equipment-slot');
+    if (equipmentSlots) {
+        equipmentSlots.forEach(slot => {
+            slot.addEventListener('click', function(e) {
+                if (typeof window.handleEquipmentSlotClick === 'function') {
+                    window.handleEquipmentSlotClick(e);
+                }
+            });
+        });
+    }
+
+    // Inventory item listeners
+    const inventoryList = document.getElementById('inventoryList');
+    if (inventoryList) {
+        inventoryList.addEventListener('click', function(e) {
+            if (e.target.closest('.inventory-item') && typeof window.handleInventoryItemClick === 'function') {
+                window.handleInventoryItemClick(e);
+            }
+        });
+    }
+}
+
+// Wait for DOM to be ready before initializing
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("DOM loaded, initializing game systems...");
+    window.initializeAllSystems();
+});
+
+// Error handling for system dependencies
+window.checkSystemDependency = function(systemName) {
+    if (!window.systemStatus || !window.systemStatus[systemName]) {
+        console.error(`Required system '${systemName}' is not initialized`);
+        return false;
+    }
+    return true;
+};

@@ -65,36 +65,62 @@ window.handleAction = function(action) {
     window.handleProfile();
     return;
   } else if (action === 'inventory') {
-    // Update inventory before showing
-    const inventoryList = document.getElementById('inventoryList');
-    if (!inventoryList) {
-      console.error('Could not find inventory list element');
+    // Check if inventory system is initialized
+    if (!window.checkSystemDependency('inventory')) {
+      window.showNotification("Inventory system not ready", 'error');
       return;
     }
 
-    inventoryList.innerHTML = `<div class="inventory-coins">${window.player.taelors || 0} Taelors</div>`;
-    
-    if (!window.player.inventory || window.player.inventory.length === 0) {
-      inventoryList.innerHTML += `<p>Your inventory is empty.</p>`;
-    } else {
-      window.player.inventory.forEach((item, index) => {
-        if (item) {  // Check if item exists
-          inventoryList.innerHTML += `
-            <div class="inventory-item">
-              <div>
-                <div class="inventory-item-name">${item.name || 'Unknown Item'}</div>
-                <div>${item.effect || ''}</div>
-              </div>
-              <div>${item.value || 0} taelors</div>
-            </div>
-          `;
-        }
-      });
-    }
-    
     const inventoryPanel = document.getElementById('inventory');
-    if (inventoryPanel) {
+    const inventoryList = document.getElementById('inventoryList');
+    
+    if (!inventoryPanel || !inventoryList) {
+      console.error('Required inventory elements not found');
+      return;
+    }
+
+    try {
+      // Clear existing inventory
+      inventoryList.innerHTML = '';
+      
+      // Add taelors display
+      const taelorsDiv = document.createElement('div');
+      taelorsDiv.className = 'inventory-coins';
+      taelorsDiv.textContent = `${window.player.taelors || 0} Taelors`;
+      inventoryList.appendChild(taelorsDiv);
+      
+      // Check if player has inventory
+      if (!window.player.inventory || window.player.inventory.length === 0) {
+        const emptyDiv = document.createElement('p');
+        emptyDiv.textContent = 'Your inventory is empty.';
+        inventoryList.appendChild(emptyDiv);
+      } else {
+        // Add each inventory item
+        window.player.inventory.forEach((item, index) => {
+          if (!item) return; // Skip invalid items
+          
+          const itemDiv = document.createElement('div');
+          itemDiv.className = 'inventory-item';
+          itemDiv.setAttribute('data-item-index', index);
+          
+          itemDiv.innerHTML = `
+            <div class="item-info">
+              <div class="item-name">${item.name || 'Unknown Item'}</div>
+              <div class="item-effect">${item.effect || ''}</div>
+            </div>
+            <div class="item-value">${item.value || 0} taelors</div>
+          `;
+          
+          inventoryList.appendChild(itemDiv);
+        });
+      }
+      
+      // Show the panel
       inventoryPanel.classList.remove('hidden');
+      
+    } catch (error) {
+      console.error('Error displaying inventory:', error);
+      window.showNotification("Error displaying inventory", 'error');
     }
     return;
   } else if (action === 'questLog') {
