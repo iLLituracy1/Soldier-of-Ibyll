@@ -1,0 +1,209 @@
+/* Paanic Empire Theme Enhancements */
+
+:root {
+  /* Core palette */
+  --paanic-primary: #251d2c; /* Deep imperial purple */
+  --paanic-secondary: #3a2e40; /* Lighter purple for contrast */
+  --paanic-accent: #b02e26; /* Empire red for accents */
+  --paanic-gold: #c9a959; /* Imperial gold for highlights */
+  --paanic-copper: #bf7245; /* Nesian copper */
+  --paanic-steel: #7b8591; /* Armor/metallic accent */
+  
+  /* UI element colors */
+  --panel-bg: #1a1621; /* Darker background for panels */
+  --panel-border: #3a2e40; /* Panel borders */
+  --button-primary: #3a2e40; /* Primary button color */
+  --button-hover: #4d3e54; /* Button hover state */
+  --button-active: #5d4b66; /* Button active state */
+  
+  /* Text colors */
+  --text-primary: #e0e0e0; /* Main text */
+  --text-secondary: #a0a0a0; /* Secondary text */
+  --text-accent: #c9a959; /* Gold accent text */
+  --text-highlight: #b02e26; /* Highlight text */
+  
+  /* Status colors - keep similar but themed */
+  --health-color: linear-gradient(to right, #b02e26, #d86a52);
+  --stamina-color: linear-gradient(to right, #516e2d, #8fb44a);
+  --morale-color: linear-gradient(to right, #345492, #6184c4);
+  
+  /* Time of day colors */
+  --dawn-sky: linear-gradient(to bottom, #564067, #af746a);
+  --day-sky: linear-gradient(to bottom, #345492, #6184c4);
+  --evening-sky: linear-gradient(to bottom, #463568, #624a7c);
+  --night-sky: linear-gradient(to bottom, #12101b, #251d2c);
+}
+
+/* Apply the new theme */
+body {
+  background: var(--paanic-primary);
+  color: var(--text-primary);
+  font-family: 'Crimson Text', serif; /* More period-appropriate serif font */
+  line-height: 1.6;
+  transition: background 0.5s;
+  background-image: 
+    repeating-linear-gradient(
+      45deg,
+      rgba(62, 47, 73, 0.1) 0px,
+      rgba(62, 47, 73, 0.1) 2px,
+      transparent 2px,
+      transparent 4px
+    );
+  background-attachment: fixed;
+}
+
+/* Panel styling with decorative borders */
+#profile, #inventory, #questLog, #narrative, .equipment-panel, .items-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Add decorative corners to panels */
+#profile::before, #inventory::before, #questLog::before, #narrative::before,
+.equipment-panel::before, .items-panel::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-top: 2px solid var(--paanic-gold);
+  border-left: 2px solid var(--paanic-gold);
+  top: 5px;
+  left: 5px;
+}
+
+#profile::after, #inventory::after, #questLog::after, #narrative::after,
+.equipment-panel::after, .items-panel::after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-bottom: 2px solid var(--paanic-gold);
+  border-right: 2px solid var(--paanic-gold);
+  bottom: 5px;
+  right: 5px;
+}
+
+/* Buttons with imperial styling */
+.menu-button, .action-btn {
+  background: var(--button-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--paanic-gold);
+  padding: 8px 16px;
+  margin: 5px;
+  cursor: pointer;
+  transition: all 0.3s;
+  border-radius: 0; /* Square buttons for military feel */
+  font-family: 'Crimson Text', serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.9em;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.menu-button:hover, .action-btn:hover {
+  background: var(--button-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.menu-button:active, .action-btn:active {
+  background: var(--button-active);
+  transform: translateY(1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Button after effect - gold line appearing on hover */
+.menu-button::after, .action-btn::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: 0;
+  left: 0;
+  background-color: var(--paanic-gold);
+  transition: width 0.3s;
+}
+
+.menu-button:hover::after, .action-btn:hover::after {
+  width: 100%;
+}
+
+/* Headings with empire styling */
+h1, h2, h3 {
+  color: var(--paanic-gold);
+  text-align: center;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+  padding-bottom: 10px;
+}
+
+h1::after, h2::after, h3::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  height: 3px;
+  width: 60px;
+  background: var(--paanic-accent);
+}
+
+/* Form elements */
+input[type="text"], input[type="number"], select {
+  background: var(--paanic-secondary);
+  border: 1px solid var(--panel-border);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-family: 'Crimson Text', serif;
+}
+
+/* Status bars with themed colors */
+.health-bar { background: var(--health-color); }
+.stamina-bar { background: var(--stamina-color); }
+.morale-bar { background: var(--morale-color); }
+
+/* Time indicators */
+.time-dawn { background: var(--dawn-sky); }
+.time-day { background: var(--day-sky); }
+.time-evening { background: var(--evening-sky); }
+.time-night { background: var(--night-sky); }
+
+/* Narrative styling */
+#narrative {
+  background: var(--panel-bg);
+  padding: 20px;
+  border: 1px solid var(--panel-border);
+  line-height: 1.8;
+  font-size: 1.05em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Make the narrative look like an aged scroll/document */
+#narrative p {
+  position: relative;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+#narrative p:first-letter {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: var(--paanic-gold);
+  float: left;
+  margin-right: 4px;
+  line-height: 1;
+}
+
+/* Import Google Font in HTML */
+/* Add this to your index.html <head> section:
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+*/
