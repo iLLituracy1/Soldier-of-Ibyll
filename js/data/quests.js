@@ -139,46 +139,71 @@ window.completeQuest = function(quest) {
 
 // Update quest progress function
 window.updateQuestProgress = function(actionType) {
+  // Ensure game state exists
+  if (!window.gameState) {
+    console.error('Game state not initialized');
+    return;
+  }
+
+  // Ensure sideQuests array exists
+  if (!window.gameState.sideQuests) {
+    window.gameState.sideQuests = [];
+  }
+
   // If no quests exist, create an initial quest
   if (window.gameState.sideQuests.length === 0) {
     const questTypes = ["training", "patrol", "scout"];
     const randomType = questTypes[Math.floor(Math.random() * questTypes.length)];
-    window.gameState.sideQuests.push(window.createQuest(randomType));
-    console.log("Created initial quest:", window.gameState.sideQuests[0]);
+    const newQuest = window.createQuest(randomType);
+    if (newQuest) {  // Only add if quest creation succeeded
+      window.gameState.sideQuests.push(newQuest);
+      console.log("Created initial quest:", newQuest);
+    }
   }
   
   // Process each quest
   window.gameState.sideQuests.forEach(quest => {
-    if (quest.completed) return;
+    if (!quest || quest.completed) return;  // Skip if quest is undefined or completed
     
     let updated = false;
     
+    if (!quest.objectives) {
+      console.error('Quest has no objectives:', quest);
+      return;
+    }
+
     quest.objectives.forEach(objective => {
-      if (objective.completed) return;
+      if (!objective || objective.completed) return;  // Skip if objective is undefined or completed
       
       // Check if the objective matches the action type
       if (
-        (actionType === "training" && objective.text.toLowerCase().includes("training")) ||
-        (actionType === "patrol" && objective.text.toLowerCase().includes("patrol")) ||
-        (actionType === "scout" && objective.text.toLowerCase().includes("scout"))
+        (actionType === "training" && objective.text && objective.text.toLowerCase().includes("training")) ||
+        (actionType === "patrol" && objective.text && objective.text.toLowerCase().includes("patrol")) ||
+        (actionType === "scout" && objective.text && objective.text.toLowerCase().includes("scout"))
       ) {
-        objective.count++;
+        objective.count = (objective.count || 0) + 1;
         updated = true;
         console.log(`Updated objective: ${objective.text}, count: ${objective.count}/${objective.target}`);
         
         // Check if objective is completed
         if (objective.count >= objective.target) {
           objective.completed = true;
-          window.showNotification(`Objective completed: ${objective.text}!`, 'success');
+          if (typeof window.showNotification === 'function') {
+            window.showNotification(`Objective completed: ${objective.text}!`, 'success');
+          }
         } else {
-          window.showNotification(`Objective progress: ${objective.count}/${objective.target}`, 'info');
+          if (typeof window.showNotification === 'function') {
+            window.showNotification(`Objective progress: ${objective.count}/${objective.target}`, 'info');
+          }
         }
       }
     });
     
     // Check if all objectives are completed
-    if (updated && quest.objectives.every(obj => obj.completed)) {
-      window.completeQuest(quest);
+    if (updated && quest.objectives.every(obj => obj && obj.completed)) {
+      if (typeof window.completeQuest === 'function') {
+        window.completeQuest(quest);
+      }
     }
   });
 };

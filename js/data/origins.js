@@ -8,7 +8,7 @@ window.origins = {
     careers: [
       { title: "Regular", description: "Molded by strict drills and shield formations, you are the unyielding wall of the Empire's armies." },
       { title: "Geister Initiate", description: "Trained in the dark arts of geisting, you confront the restless dead amid ancient rites and urgent demands." },
-      { title: "Paanic Noble Youth", description: "Born to privilege but forged in war, you combine noble heritage with the rigorous demands of battlefield scouting." }
+      { title: "Noble Youth", description: "Born to privilege but forged in war, you combine noble heritage with the rigorous demands of battlefield scouting." }
     ]
   },
   "Nesian": {
@@ -48,8 +48,8 @@ window.origins = {
 
 // Primary attribute ranges based on origin
 window.statRanges = {
-  "Paanic": { phy: [1, 3], men: [1, 3] },
-  "Nesian": { phy: [2, 2], men: [2, 3] },
-  "Lunarine": { phy: [1, 2], men: [2, 3] },
-  "Wyrdman": { phy: [3, 3], men: [1, 1] }
+  "Paanic": { phy: [1, 2], men: [1, 2] },
+  "Nesian": { phy: [1, 2], men: [2, 3] },
+  "Lunarine": { phy: [1, 2], men: [1, 2] },
+  "Wyrdman": { phy: [2, 3], men: [1, 1] }
 };

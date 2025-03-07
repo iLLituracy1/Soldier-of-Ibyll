@@ -134,23 +134,79 @@ window.showEmpireUpdate = function() {
 };
 
 window.startAdventure = function() {
-  // Transition from character creation to the main game
-  document.getElementById('creator').classList.add('hidden');
-  document.getElementById('gameContainer').classList.remove('hidden');
-  
-  // Initialize game state
-  window.initializeGameState();
-  
-  // Update status bars and action buttons
-  window.updateStatusBars();
-  window.updateTimeAndDay(0); // Start at the initial time
-  window.updateActionButtons();
-  
-  // Set initial narrative
-  window.setNarrative(`${window.player.name}, a ${window.player.career.title} of ${window.player.origin} heritage, the road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.<br><br>
-  Now, you stand at the edge of your Kasvaari's Camp, the flickering lanterns and distant clang of the forges marking the heartbeat of an army in preparation. Here, amidst the hardened warriors and the banners of noble Charters, you are no longer a traveler—you are a soldier, bound to duty, drawn by the call of empire.<br><br>
-  The Western Hierarchate is a land of towering fortresses and ancient battlefields, a realm where the scars of past campaigns linger in the earth itself. The Arrasi Peninsula lies beyond the western horizon, its crystalline plains an enigma even to those who have fought there before. Soon, you will march upon those lands, crossing the vast Wall of Nesia, where the empire's dominion falters against the unknown.<br><br>
-  For now, your place is here, among your kin and comrades, within the Kasvaari's Camp, where the scent of oiled steel and the murmur of hushed war councils fill the air. What will you do first?`);
+    console.log("Starting adventure - initializing game systems...");
+    
+    // Store complete character data before initialization
+    const characterData = {
+        // Basic info
+        name: window.player.name,
+        origin: window.player.origin,
+        career: { ...window.player.career }, // Deep copy career object
+        
+        // Attributes
+        phy: Number(window.player.phy),
+        men: Number(window.player.men),
+        
+        // Skills (ensure all skills are preserved)
+        skills: { 
+            melee: Number(window.player.skills.melee || 0),
+            marksmanship: Number(window.player.skills.marksmanship || 0),
+            survival: Number(window.player.skills.survival || 0),
+            command: Number(window.player.skills.command || 0),
+            discipline: Number(window.player.skills.discipline || 0),
+            tactics: Number(window.player.skills.tactics || 0),
+            organization: Number(window.player.skills.organization || 0),
+            arcana: Number(window.player.skills.arcana || 0)
+        },
+        
+        // Other character data
+        relationships: { ...window.player.relationships },
+        inventory: [...(window.player.inventory || [])],
+        taelors: Number(window.player.taelors || 10),
+        isVeteran: Boolean(window.player.isVeteran),
+        veteranTitle: window.player.veteranTitle || ""
+    };
+    
+    console.log("Character data being passed to game initialization:", characterData);
+    
+    // Hide character creator
+    document.getElementById('creator').classList.add('hidden');
+    
+    // Initialize core game systems with character data
+    if (typeof window.initializeGame === 'function') {
+        window.initializeGame(characterData);
+    }
+    
+    // Set narrative based on character background
+    const careerDesc = window.player.career.description || "";
+    const originDesc = window.origins[window.player.origin]?.description || "";
+    
+    window.setNarrative(`
+        ${careerDesc}
+
+        ${originDesc}
+
+        You begin your journey as a soldier in the borderlands, ready to make your mark on the world.
+    `);
+    
+    // Show game container
+    const gameContainer = document.getElementById('gameContainer');
+    if (gameContainer) {
+        gameContainer.classList.remove('hidden');
+        
+        // Update UI elements after container is visible
+        requestAnimationFrame(() => {
+            if (typeof window.updateStatusBars === 'function') {
+                window.updateStatusBars();
+            }
+            if (typeof window.updateTimeAndDay === 'function') {
+                window.updateTimeAndDay(0);
+            }
+            if (typeof window.updateActionButtons === 'function') {
+                window.updateActionButtons();
+            }
+        });
+    }
 };
 
 window.generateCharacterSummary = function() {
