@@ -14,8 +14,15 @@ window.initializeInventoryUI = function() {
     return;
   }
   
-  // Determine if player is cavalry for mount slot
-  const isCavalry = window.player.career && window.player.career.title === "Castellan Cavalry";
+  // Check for mount slot requirement
+  // FIXED: Log detailed info about career for debugging
+  let isCavalry = false;
+  if (window.player && window.player.career) {
+    isCavalry = window.player.career.title === "Castellan Cavalry";
+    console.log("Mount slot check - isCavalry:", isCavalry, "Career:", window.player.career.title);
+  } else {
+    console.log("Cannot check for cavalry - player or career not initialized");
+  }
   
   // Create the structure for the inventory UI
   inventoryContainer.innerHTML = `
@@ -106,22 +113,25 @@ window.initializeInventoryUI = function() {
     </div>
   `;
   
-  // Add additional CSS for mount slot
+  // FIXED: Add styles for the mount slot inside the function
+  // This ensures the styles are added even if stylesheet wasn't loaded
   const mountStyle = document.createElement('style');
   mountStyle.textContent = `
     .paperdoll.has-mount {
+      display: grid;
       grid-template-areas:
         ". head ."
         "mainHand body offHand"
         ". accessory ."
         ". mount .";
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 10px;
     }
     
     .mount-slot {
       grid-area: mount;
       background-color: rgba(139, 69, 19, 0.2) !important;
-      border: 1px dashed #8B4513 !important;
+      border: 1px solid #8B4513 !important;
     }
     
     .mount-slot:hover {
@@ -131,6 +141,14 @@ window.initializeInventoryUI = function() {
     .category-mount {
       background-color: rgba(139, 69, 19, 0.2) !important;
     }
+    
+    /* Fix for equipment slots and interaction */
+    .equipment-slot[data-slot="head"] { grid-area: head; }
+    .equipment-slot[data-slot="body"] { grid-area: body; }
+    .equipment-slot[data-slot="mainHand"] { grid-area: mainHand; }
+    .equipment-slot[data-slot="offHand"] { grid-area: offHand; }
+    .equipment-slot[data-slot="accessory"] { grid-area: accessory; }
+    .equipment-slot[data-slot="mount"] { grid-area: mount; }
   `;
   document.head.appendChild(mountStyle);
   
@@ -155,34 +173,38 @@ window.initializeInventoryUI = function() {
     });
   });
   
-    // Sort selection
-    document.getElementById('sort-select').addEventListener('change', function() {
+  // Sort selection
+  const sortSelect = document.getElementById('sort-select');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', function() {
       const category = document.querySelector('.inventory-tab.active').getAttribute('data-category');
       window.renderInventoryItems(category, this.value);
     });
-
-    // Equipment slot clicks
-    const equipmentSlots = document.querySelectorAll('.equipment-slot');
-    equipmentSlots.forEach(slot => {
-      slot.addEventListener('click', function() {
-        const slotName = this.getAttribute('data-slot');
-        const equippedItem = window.player.equipment[slotName];
-        
-        // Only show details if an item is equipped
-        if (equippedItem && equippedItem !== "occupied") {
-          window.showItemDetails(equippedItem);
-        }
-      });
-    });
+  }
   
-  // Close item details panel when clicking the X
-  document.querySelector('.item-details-close').addEventListener('click', function() {
-    document.getElementById('item-details-panel').classList.add('hidden');
+  // Equipment slot clicks
+  const equipmentSlots = document.querySelectorAll('.equipment-slot');
+  equipmentSlots.forEach(slot => {
+    slot.addEventListener('click', function() {
+      const slotName = this.getAttribute('data-slot');
+      const equippedItem = window.player.equipment[slotName];
+      
+      // Only show details if an item is equipped
+      if (equippedItem && equippedItem !== "occupied") {
+        window.showItemDetails(equippedItem);
+      }
+    });
   });
   
-
+  // Close item details panel when clicking the X
+  const closeBtn = document.querySelector('.item-details-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function() {
+      document.getElementById('item-details-panel').classList.add('hidden');
+    });
+  }
   
-  // Add stylesheet
+  // Add additional style for inventory
   const style = document.createElement('style');
   style.textContent = `
     #inventory {
@@ -248,6 +270,7 @@ window.initializeInventoryUI = function() {
         ". head ."
         "mainHand body offHand"
         ". accessory .";
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 10px;
       margin-bottom: 20px;
     }
@@ -271,12 +294,6 @@ window.initializeInventoryUI = function() {
       background: #3a3a3a;
       transform: translateY(-2px);
     }
-    
-    .equipment-slot[data-slot="head"] { grid-area: head; }
-    .equipment-slot[data-slot="body"] { grid-area: body; }
-    .equipment-slot[data-slot="mainHand"] { grid-area: mainHand; }
-    .equipment-slot[data-slot="offHand"] { grid-area: offHand; }
-    .equipment-slot[data-slot="accessory"] { grid-area: accessory; }
     
     .slot-icon {
       font-size: 24px;
@@ -841,9 +858,10 @@ window.updateEquipmentDisplay = function() {
   const slotIdMap = {
     'head': 'head-slot',
     'body': 'body-slot',
-    'mainHand': 'main-hand-slot',  // Changed from mainHand-slot to main-hand-slot
-    'offHand': 'off-hand-slot',    // Changed from offHand-slot to off-hand-slot
-    'accessory': 'accessory-slot'
+    'mainHand': 'main-hand-slot',
+    'offHand': 'off-hand-slot',
+    'accessory': 'accessory-slot',
+    'mount': 'mount-slot'
   };
   
   // Verify equipment object exists
@@ -856,72 +874,77 @@ window.updateEquipmentDisplay = function() {
       offHand: null,
       accessory: null
     };
-  }
-  
- // Update each equipment slot
- for (const slot in window.player.equipment) {
-  // Use the mapped ID instead of directly constructing it
-  const slotElementId = slotIdMap[slot] || `${slot}-slot`;
-  const slotElement = document.getElementById(slotElementId);
-  
-  if (!slotElement) {
-    console.warn(`Slot element '${slotElementId}' not found in DOM`);
-    continue;
-  }
     
-       // Clear existing content except for the slot name
-       const slotName = slotElement.querySelector('.slot-name') ? 
-       slotElement.querySelector('.slot-name').textContent : 
-       slot.replace(/([A-Z])/g, ' $1').trim(); // Convert camelCase to words
+    // Add mount for cavalry
+    if (window.player.career && window.player.career.title === "Castellan Cavalry") {
+      window.player.equipment.mount = null;
+    }
+  }
+  
+  // Update each equipment slot
+  for (const slot in window.player.equipment) {
+    // Use the mapped ID instead of directly constructing it
+    const slotElementId = slotIdMap[slot];
+    const slotElement = document.getElementById(slotElementId);
+    
+    if (!slotElement) {
+      console.warn(`Slot element '${slotElementId}' not found in DOM for slot ${slot}`);
+      continue;
+    }
+    
+    // Clear existing content except for the slot name
+    const slotName = slotElement.querySelector('.slot-name') ? 
+      slotElement.querySelector('.slot-name').textContent : 
+      slot.replace(/([A-Z])/g, ' $1').trim(); // Convert camelCase to words
 
-const item = window.player.equipment[slot];
+    const item = window.player.equipment[slot];
 
-if (item && item !== "occupied") {
-// Check if item has getTemplate method
-if (typeof item.getTemplate !== 'function') {
-console.error(`Item in slot ${slot} is missing getTemplate function:`, item);
+    if (item && item !== "occupied") {
+      // Check if item has getTemplate method
+      if (typeof item.getTemplate !== 'function') {
+        console.error(`Item in slot ${slot} is missing getTemplate function:`, item);
 
-// Create a minimal placeholder display
-slotElement.innerHTML = `
-<div class="item-icon" style="color: red;">❓</div>
-<div class="slot-name">${slotName}</div>
-`;
-continue;
-}
+        // Create a minimal placeholder display
+        slotElement.innerHTML = `
+          <div class="item-icon" style="color: red;">❓</div>
+          <div class="slot-name">${slotName}</div>
+        `;
+        continue;
+      }
 
-// Get template
-try {
-const template = item.getTemplate();
-if (!template) throw new Error("Template not found");
+      // Get template
+      try {
+        const template = item.getTemplate();
+        if (!template) throw new Error("Template not found");
 
-const rarityClass = `rarity-${template.rarity.name.toLowerCase()}`;
-const categoryClass = `category-${template.category}`;
+        const rarityClass = `rarity-${template.rarity.name.toLowerCase()}`;
+        const categoryClass = `category-${template.category}`;
 
-slotElement.innerHTML = `
-<div class="item-icon ${rarityClass} ${categoryClass}">${template.symbol}</div>
-<div class="slot-name">${slotName}</div>
-`;
-} catch (e) {
-console.error(`Error displaying item in slot ${slot}:`, e);
-slotElement.innerHTML = `
-<div class="item-icon" style="color: red;">❓</div>
-<div class="slot-name">${slotName}</div>
-`;
-}
-} else if (item === "occupied") {
-// This slot is occupied by a two-handed weapon
-slotElement.innerHTML = `
-<div class="item-icon" style="opacity: 0.5;">⛔</div>
-<div class="slot-name">${slotName}</div>
-`;
-} else {
-// Empty slot
-slotElement.innerHTML = `
-<div class="slot-icon">⬚</div>
-<div class="slot-name">${slotName}</div>
-`;
-}
-}
+        slotElement.innerHTML = `
+          <div class="item-icon ${rarityClass} ${categoryClass}">${template.symbol}</div>
+          <div class="slot-name">${slotName}</div>
+        `;
+      } catch (e) {
+        console.error(`Error displaying item in slot ${slot}:`, e);
+        slotElement.innerHTML = `
+          <div class="item-icon" style="color: red;">❓</div>
+          <div class="slot-name">${slotName}</div>
+        `;
+      }
+    } else if (item === "occupied") {
+      // This slot is occupied by a two-handed weapon
+      slotElement.innerHTML = `
+        <div class="item-icon" style="opacity: 0.5;">⛔</div>
+        <div class="slot-name">${slotName}</div>
+      `;
+    } else {
+      // Empty slot
+      slotElement.innerHTML = `
+        <div class="slot-icon">⬚</div>
+        <div class="slot-name">${slotName}</div>
+      `;
+    }
+  }
   
   // Update equipment stats display
   const statsDisplay = document.getElementById('equipment-stats-display');
@@ -969,102 +992,49 @@ slotElement.innerHTML = `
     statsDisplay.innerHTML = statsHTML;
   }
   
-  // Also fix slot interaction with the correct IDs
-  window.fixEquipmentSlotInteraction = function() {
-    // Use the same ID mapping for consistency
-    const slotIdMap = {
-      'head': 'head-slot',
-      'body': 'body-slot',
-      'mainHand': 'main-hand-slot',
-      'offHand': 'off-hand-slot',
-      'accessory': 'accessory-slot'
-    };
-    
-    // Get all equipment slots
-    const equipmentSlots = document.querySelectorAll('.equipment-slot');
-    
-    // Remove any existing click listeners
-    equipmentSlots.forEach(slot => {
-      const newSlot = slot.cloneNode(true);
-      slot.parentNode.replaceChild(newSlot, slot);
-      
-      // Add new click listener
-      newSlot.addEventListener('click', function() {
-        const slotName = this.getAttribute('data-slot');
-        console.log(`Clicked equipment slot: ${slotName}`);
-        
-        // Convert from DOM slot name (dash format) to JS property name (camelCase)
-        // e.g., 'main-hand' → 'mainHand'
-        const propertyName = slotName.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
-        
-        if (!window.player.equipment) {
-          console.error("Equipment object not initialized!");
-          return;
-        }
-        
-        const equippedItem = window.player.equipment[propertyName];
-        
-        console.log(`Equipped item in slot ${propertyName}:`, equippedItem);
-        
-        // Only show details if an item is equipped
-        if (equippedItem && equippedItem !== "occupied") {
-          window.showItemDetails(equippedItem);
-        } else {
-          console.log("No item in this slot or slot is occupied by two-handed weapon");
-        }
-      });
-    });
-  };
-  
-  // Fix the equipment slot interactions
+  // Fix slot interaction with the correct IDs
   window.fixEquipmentSlotInteraction();
 };
 
-// Override the inventory button handler in UI.js
-document.addEventListener('DOMContentLoaded', function() {
-  // Create a new style element for draggable functionality
-  const dragStyle = document.createElement('style');
-  dragStyle.textContent = `
-    .draggable {
-      cursor: grab;
-    }
-    
-    .dragging {
-      opacity: 0.8;
-      cursor: grabbing;
-      z-index: 1000;
-      position: absolute;
-      pointer-events: none;
-    }
-    
-    .drop-target {
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-      transform: scale(1.05);
-    }
-  `;
-  document.head.appendChild(dragStyle);
+// Fix equipment slots interaction
+window.fixEquipmentSlotInteraction = function() {
+  // Get all equipment slots
+  const equipmentSlots = document.querySelectorAll('.equipment-slot');
   
-  // Initialize the inventory UI
-  window.initializeInventoryUI();
-  
-  // Override inventory button
-  const originalHandleAction = window.handleAction;
-  
-  window.handleAction = function(action) {
-    if (action === 'inventory') {
-      // Open inventory and render items
-      document.getElementById('inventory').classList.remove('hidden');
-      window.renderInventoryItems();
-      window.updateEquipmentDisplay();
-      return;
-    }
+  // Remove any existing click listeners
+  equipmentSlots.forEach(slot => {
+    const newSlot = slot.cloneNode(true);
+    slot.parentNode.replaceChild(newSlot, slot);
     
-    // Call the original handler for other actions
-    originalHandleAction(action);
-  };
-});
+    // Add new click listener
+    newSlot.addEventListener('click', function() {
+      const slotName = this.getAttribute('data-slot');
+      console.log(`Clicked equipment slot: ${slotName}`);
+      
+      // Convert from DOM slot name (dash format) to JS property name (camelCase)
+      // e.g., 'main-hand' → 'mainHand'
+      const propertyName = slotName.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+      
+      if (!window.player.equipment) {
+        console.error("Equipment object not initialized!");
+        return;
+      }
+      
+      const equippedItem = window.player.equipment[propertyName];
+      
+      console.log(`Equipped item in slot ${propertyName}:`, equippedItem);
+      
+      // Only show details if an item is equipped
+      if (equippedItem && equippedItem !== "occupied") {
+        window.showItemDetails(equippedItem);
+      } else {
+        console.log("No item in this slot or slot is occupied by two-handed weapon");
+      }
+    });
+  });
+};
 
-// Implement drag and drop functionality
+// Handle drag and drop functionality
 window.implementDragAndDrop = function() {
   // Track dragged item
   let draggedItem = null;
@@ -1181,8 +1151,7 @@ window.implementDragAndDrop = function() {
   });
 };
 
-// Call the drag and drop implementation
+// Override the inventory button handler
 document.addEventListener('DOMContentLoaded', function() {
-  // Initialize drag and drop after a slight delay to ensure DOM is ready
-  setTimeout(window.implementDragAndDrop, 500);
+  console.log("DOM loaded, inventory UI module ready");
 });

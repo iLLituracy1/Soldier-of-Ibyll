@@ -313,3 +313,37 @@ header {
 .career-description p {
   margin-bottom: 15px;
 }
+
+/* Mount slot styling */
+.paperdoll.has-mount {
+  display: grid;
+  grid-template-areas:
+    ". head ."
+    "mainHand body offHand"
+    ". accessory ."
+    ". mount .";
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+.mount-slot {
+  grid-area: mount;
+  background-color: rgba(139, 69, 19, 0.2) !important;
+  border: 1px solid #8B4513 !important;
+}
+
+.mount-slot:hover {
+  background-color: rgba(139, 69, 19, 0.3) !important;
+}
+
+.category-mount {
+  background-color: rgba(139, 69, 19, 0.2) !important;
+}
+
+/* Fix for equipment slots and interaction */
+.equipment-slot[data-slot="head"] { grid-area: head; }
+.equipment-slot[data-slot="body"] { grid-area: body; }
+.equipment-slot[data-slot="mainHand"] { grid-area: mainHand; }
+.equipment-slot[data-slot="offHand"] { grid-area: offHand; }
+.equipment-slot[data-slot="accessory"] { grid-area: accessory; }
+.equipment-slot[data-slot="mount"] { grid-area: mount; }

@@ -21,43 +21,6 @@ window.EQUIPMENT_SLOTS = {
   MOUNT:  'mount'
 };
 
-// Create mount symbols
-window.ITEM_SYMBOLS.MOUNT = '🐎';
-window.ITEM_SYMBOLS.WARHORSE = '🐎';
-window.ITEM_SYMBOLS.CHARGER = '🐎';
-window.ITEM_SYMBOLS.CONSTRUCT = '🤖';
-
-// Add mount type
-window.MOUNT_TYPES = {
-  WARHORSE: { name: 'Warhorse', symbol: window.ITEM_SYMBOLS.WARHORSE, slot: window.EQUIPMENT_SLOTS.MOUNT },
-  CHARGER: { name: 'Charger', symbol: window.ITEM_SYMBOLS.CHARGER, slot: window.EQUIPMENT_SLOTS.MOUNT },
-  CONSTRUCT: { name: 'Construct', symbol: window.ITEM_SYMBOLS.CONSTRUCT, slot: window.EQUIPMENT_SLOTS.MOUNT }
-};
-
-// Create mount factory function
-window.createMount = function(config) {
-  const mountType = config.mountType || window.MOUNT_TYPES.WARHORSE;
-  
-  return window.createItemTemplate({
-    name: config.name || `${mountType.name}`,
-    description: config.description || `A loyal ${mountType.name.toLowerCase()}.`,
-    category: window.ITEM_CATEGORIES.MOUNT,
-    rarity: config.rarity || window.ITEM_RARITIES.UNCOMMON,
-    value: config.value || 300,
-    weight: 0,  // Mounts don't count for inventory weight
-    symbol: mountType.symbol,
-    equipSlot: mountType.slot,
-    stats: {
-      speed: config.speed || 20,
-      mobility: config.mobility || 15,
-      durability: config.durability || 50,
-      ...config.stats
-    },
-    requirements: config.requirements || {},
-    ...config
-  });
-};
-
 // Item Rarities with color codes
 window.ITEM_RARITIES = {
   COMMON: { name: 'Common', color: '#aaaaaa', multiplier: 1.0, symbol: '●' },
@@ -69,6 +32,7 @@ window.ITEM_RARITIES = {
 };
 
 // Item Symbols (instead of custom icons)
+// FIXED: Moved all symbols including mount symbols into original definition
 window.ITEM_SYMBOLS = {
   // Weapons
   SWORD: '⚔️',
@@ -103,7 +67,20 @@ window.ITEM_SYMBOLS = {
   GEM: '💎',
   
   // Quest
-  QUEST: '❗'
+  QUEST: '❗',
+  
+  // Mounts - FIXED: Added inside the original definition
+  MOUNT: '🐎',
+  WARHORSE: '🐎',
+  CHARGER: '🐎',
+  CONSTRUCT: '🤖'
+};
+
+// Add mount type
+window.MOUNT_TYPES = {
+  WARHORSE: { name: 'Warhorse', symbol: window.ITEM_SYMBOLS.WARHORSE, slot: window.EQUIPMENT_SLOTS.MOUNT },
+  CHARGER: { name: 'Charger', symbol: window.ITEM_SYMBOLS.CHARGER, slot: window.EQUIPMENT_SLOTS.MOUNT },
+  CONSTRUCT: { name: 'Construct', symbol: window.ITEM_SYMBOLS.CONSTRUCT, slot: window.EQUIPMENT_SLOTS.MOUNT }
 };
 
 // Weapon Types
@@ -239,6 +216,30 @@ window.createItemInstance = function(template, quantity = 1) {
       return desc;
     }
   };
+};
+
+// Create mount factory function
+window.createMount = function(config) {
+  const mountType = config.mountType || window.MOUNT_TYPES.WARHORSE;
+  
+  return window.createItemTemplate({
+    name: config.name || `${mountType.name}`,
+    description: config.description || `A loyal ${mountType.name.toLowerCase()}.`,
+    category: window.ITEM_CATEGORIES.MOUNT,
+    rarity: config.rarity || window.ITEM_RARITIES.UNCOMMON,
+    value: config.value || 300,
+    weight: 0,  // Mounts don't count for inventory weight
+    symbol: mountType.symbol,
+    equipSlot: mountType.slot,
+    stats: {
+      speed: config.speed || 20,
+      mobility: config.mobility || 15,
+      durability: config.durability || 50,
+      ...config.stats
+    },
+    requirements: config.requirements || {},
+    ...config
+  });
 };
 
 // Item Factory - Create weapons
@@ -438,7 +439,7 @@ window.initializeItemTemplates = function() {
       speed: -20
     },
     requirements: {
-      minPhy: 6
+      minMen: 2
     }
   });
   
@@ -508,7 +509,7 @@ window.initializeItemTemplates = function() {
       intimidation: 10
     },
     requirements: {
-      minPhy: 7
+      minPhy: 1
     }
   });
   
@@ -540,7 +541,7 @@ window.initializeItemTemplates = function() {
     equipSlot: window.EQUIPMENT_SLOTS.ACCESSORY,
     stats: {
       command: 15,
-      charisma: 10
+      charisma: 5
     }
   });
   

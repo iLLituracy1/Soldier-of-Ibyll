@@ -60,6 +60,11 @@ window.initializeInventorySystem = function() {
 
 // Add item to inventory
 window.addItemToInventory = function(itemTemplate, quantity = 1) {
+  if (!itemTemplate) {
+    console.error("Cannot add null item template to inventory");
+    return false;
+  }
+  
   // Create a new item instance from the template
   const newItem = window.createItemInstance(itemTemplate, quantity);
   
@@ -411,98 +416,158 @@ window.getItemTemplateById = function(templateId) {
   return window.itemTemplates[templateId] || null;
 };
 
- // Add career-specific starting equipment
- switch(window.player.career.title) {
-  case "Regular":
-  case "Paanic Regular":
-    window.addItemToInventory(window.itemTemplates.basicSword);
-    window.addItemToInventory(window.itemTemplates.legionShield);
-    window.addItemToInventory(window.itemTemplates.legionHelmet);
-    window.addItemToInventory(window.itemTemplates.legionArmor);
-    // Auto-equip items
-    setTimeout(() => {
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'basic_sword').instanceId);
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'legion_shield').instanceId);
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'legion_helmet').instanceId);
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'legion_armor').instanceId);
-    }, 100);
-    break;
-    
-  case "Castellan Cavalry":
-    window.addItemToInventory(window.itemTemplates.nobleSword);
-    window.addItemToInventory(window.itemTemplates.cavalryArmor);
-    window.addItemToInventory(window.itemTemplates.standardWarhorse); // Add mount
-    // Auto-equip items
-    setTimeout(() => {
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'noble_sword').instanceId);
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'cavalry_armor').instanceId);
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'standard_warhorse').instanceId);
-    }, 100);
-    break;
-    
-  // Keep other cases the same
-  case "Nesian Scout":
-    window.addItemToInventory(window.itemTemplates.matchlockRifle);
-    window.addItemToInventory(window.itemTemplates.scoutArmor);
-    // Auto-equip items
-    setTimeout(() => {
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'matchlock_rifle').instanceId);
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'scout_armor').instanceId);
-    }, 100);
-    break;
-    
-  case "Noble Youth":
-  case "Paanic Noble Youth":
-    window.addItemToInventory(window.itemTemplates.nobleSword);
-    window.addItemToInventory(window.itemTemplates.legionArmor);
-    window.addCurrency(50); // Extra starting money
-    // Auto-equip items
-    setTimeout(() => {
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'noble_sword').instanceId);
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'legion_armor').instanceId);
-    }, 100);
-    break;
-    
-  case "Wyrdman":
-  case "Plains Huntsman":
-  case "Berserker":
-    window.addItemToInventory(window.itemTemplates.hunterBow);
-    window.addItemToInventory(window.itemTemplates.scoutArmor);
-    // Auto-equip items
-    setTimeout(() => {
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'hunter_bow').instanceId);
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'scout_armor').instanceId);
-    }, 100);
-    break;
-    
-  default:
-    // Default equipment
-    window.addItemToInventory(window.itemTemplates.basicSword);
-    window.addItemToInventory(window.itemTemplates.legionArmor);
-    // Auto-equip items
-    setTimeout(() => {
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'basic_sword').instanceId);
-      window.equipItem(window.player.inventory.find(i => i.templateId === 'legion_armor').instanceId);
-    }, 100);
-    break;
-}
-
-// Everyone gets a health potion
-window.addItemToInventory(window.itemTemplates.healthPotion);
-
-console.log("Starting items added");
-
-
-// Attach initialization to window load
-window.addEventListener('load', function() {
-  // This will be called after all scripts are loaded
-  if (window.initializeInventorySystem) {
-    window.initializeInventorySystem();
+// FIXED: Moved career-specific equipment to a proper function
+window.addStartingItems = function() {
+  console.log("Adding starting items function called");
+  
+  // Only run if the player object and career exist
+  if (!window.player || !window.player.career) {
+    console.error("Cannot add starting items - player or career is not initialized!");
+    return;
   }
-});
+  
+  console.log("Adding starting equipment for career:", window.player.career.title);
+  
+  // Add career-specific starting equipment
+  switch(window.player.career.title) {
+    case "Regular":
+    case "Paanic Regular":
+      window.addItemToInventory(window.itemTemplates.basicSword);
+      window.addItemToInventory(window.itemTemplates.legionShield);
+      window.addItemToInventory(window.itemTemplates.legionHelmet);
+      window.addItemToInventory(window.itemTemplates.legionArmor);
+      
+      // Auto-equip items - with slight delay to ensure inventory updates
+      setTimeout(() => {
+        try {
+          const basicSword = window.player.inventory.find(i => i.templateId === 'basic_sword');
+          if (basicSword) window.equipItem(basicSword.instanceId);
+          
+          const legionShield = window.player.inventory.find(i => i.templateId === 'legion_shield');
+          if (legionShield) window.equipItem(legionShield.instanceId);
+          
+          const legionHelmet = window.player.inventory.find(i => i.templateId === 'legion_helmet');
+          if (legionHelmet) window.equipItem(legionHelmet.instanceId);
+          
+          const legionArmor = window.player.inventory.find(i => i.templateId === 'legion_armor');
+          if (legionArmor) window.equipItem(legionArmor.instanceId);
+        } catch (err) {
+          console.error("Error equipping Regular items:", err);
+        }
+      }, 100);
+      break;
+      
+    case "Castellan Cavalry":
+      window.addItemToInventory(window.itemTemplates.nobleSword);
+      window.addItemToInventory(window.itemTemplates.cavalryArmor);
+      window.addItemToInventory(window.itemTemplates.standardWarhorse);
+      
+      // Make sure we have a mount slot
+      if (!window.player.equipment.mount) {
+        window.player.equipment.mount = null;
+        console.log("Added mount equipment slot for Cavalry character");
+      }
+      
+      // Auto-equip items
+      setTimeout(() => {
+        try {
+          const nobleSword = window.player.inventory.find(i => i.templateId === 'noble_sword');
+          if (nobleSword) window.equipItem(nobleSword.instanceId);
+          
+          const cavalryArmor = window.player.inventory.find(i => i.templateId === 'cavalry_armor');
+          if (cavalryArmor) window.equipItem(cavalryArmor.instanceId);
+          
+          const standardWarhorse = window.player.inventory.find(i => i.templateId === 'standard_warhorse');
+          if (standardWarhorse) window.equipItem(standardWarhorse.instanceId);
+        } catch (err) {
+          console.error("Error equipping Cavalry items:", err);
+        }
+      }, 100);
+      break;
+    
+    case "Nesian Scout":
+      window.addItemToInventory(window.itemTemplates.matchlockRifle);
+      window.addItemToInventory(window.itemTemplates.scoutArmor);
+      
+      // Auto-equip items
+      setTimeout(() => {
+        try {
+          const matchlockRifle = window.player.inventory.find(i => i.templateId === 'matchlock_rifle');
+          if (matchlockRifle) window.equipItem(matchlockRifle.instanceId);
+          
+          const scoutArmor = window.player.inventory.find(i => i.templateId === 'scout_armor');
+          if (scoutArmor) window.equipItem(scoutArmor.instanceId);
+        } catch (err) {
+          console.error("Error equipping Scout items:", err);
+        }
+      }, 100);
+      break;
+      
+    case "Noble Youth":
+    case "Paanic Noble Youth":
+      window.addItemToInventory(window.itemTemplates.nobleSword);
+      window.addItemToInventory(window.itemTemplates.legionArmor);
+      window.addCurrency(50); // Extra starting money
+      
+      // Auto-equip items
+      setTimeout(() => {
+        try {
+          const nobleSword = window.player.inventory.find(i => i.templateId === 'noble_sword');
+          if (nobleSword) window.equipItem(nobleSword.instanceId);
+          
+          const legionArmor = window.player.inventory.find(i => i.templateId === 'legion_armor');
+          if (legionArmor) window.equipItem(legionArmor.instanceId);
+        } catch (err) {
+          console.error("Error equipping Noble Youth items:", err);
+        }
+      }, 100);
+      break;
+      
+    case "Wyrdman":
+    case "Plains Huntsman":
+    case "Berserker":
+      window.addItemToInventory(window.itemTemplates.hunterBow);
+      window.addItemToInventory(window.itemTemplates.scoutArmor);
+      
+      // Auto-equip items
+      setTimeout(() => {
+        try {
+          const hunterBow = window.player.inventory.find(i => i.templateId === 'hunter_bow');
+          if (hunterBow) window.equipItem(hunterBow.instanceId);
+          
+          const scoutArmor = window.player.inventory.find(i => i.templateId === 'scout_armor');
+          if (scoutArmor) window.equipItem(scoutArmor.instanceId);
+        } catch (err) {
+          console.error("Error equipping Huntsman items:", err);
+        }
+      }, 100);
+      break;
+      
+    default:
+      // Default equipment
+      window.addItemToInventory(window.itemTemplates.basicSword);
+      window.addItemToInventory(window.itemTemplates.legionArmor);
+      
+      // Auto-equip items
+      setTimeout(() => {
+        try {
+          const basicSword = window.player.inventory.find(i => i.templateId === 'basic_sword');
+          if (basicSword) window.equipItem(basicSword.instanceId);
+          
+          const legionArmor = window.player.inventory.find(i => i.templateId === 'legion_armor');
+          if (legionArmor) window.equipItem(legionArmor.instanceId);
+        } catch (err) {
+          console.error("Error equipping default items:", err);
+        }
+      }, 100);
+      break;
+  }
 
-// INVENTORY SYSTEM INTEGRATION FIX
-// Add this to the end of inventory.js
+  // Everyone gets a health potion
+  window.addItemToInventory(window.itemTemplates.healthPotion);
+
+  console.log("Starting items added. Player inventory:", window.player.inventory);
+};
 
 // Create a global initialization function for the entire inventory system
 window.initializeFullInventorySystem = function() {
@@ -517,135 +582,14 @@ window.initializeFullInventorySystem = function() {
   window.initializeInventorySystem();
   
   // Initialize the UI
-  window.initializeInventoryUI();
+  if (typeof window.initializeInventoryUI === 'function') {
+    window.initializeInventoryUI();
+  }
   
   console.log("Full inventory system initialized!");
 };
 
-// Modify the startAdventure function to add items to the player
-const originalStartAdventure = window.startAdventure;
-window.startAdventure = function() {
-  // Call the original function
-  originalStartAdventure();
-  
-  // Add starting items after the game state is initialized
-  console.log("Adding starting items to player...");
-  window.addStartingItems();
-  
-  // Update the inventory display if already open
-  if (!document.getElementById('inventory').classList.contains('hidden')) {
-    window.renderInventoryItems();
-    window.updateEquipmentDisplay();
-  }
-  
-  console.log("Player starting items added!");
-};
-
-// Ensure the inventory system is initialized when the DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-  setTimeout(function() {
-    // Initialize the full inventory system
-    window.initializeFullInventorySystem();
-    
-    // Override inventory button handler (with better preservation of original)
-    const originalHandleAction = window.handleAction;
-    window.handleAction = function(action) {
-      if (action === 'inventory') {
-        // Open inventory and render items
-        document.getElementById('inventory').classList.remove('hidden');
-        window.renderInventoryItems();
-        window.updateEquipmentDisplay();
-        return;
-      }
-      
-      // Call the original handler for other actions
-      return originalHandleAction.call(window, action);
-    };
-    
-    console.log("Inventory system integrated with game!");
-  }, 500); // Slight delay to ensure all scripts are loaded
-});
-
-// Fix for equipment interaction
-window.fixEquipmentSlotInteraction = function() {
-  // Get all equipment slots
-  const equipmentSlots = document.querySelectorAll('.equipment-slot');
-  
-  // Remove any existing click listeners
-  equipmentSlots.forEach(slot => {
-    const newSlot = slot.cloneNode(true);
-    slot.parentNode.replaceChild(newSlot, slot);
-    
-    // Add new click listener
-    newSlot.addEventListener('click', function() {
-      const slotName = this.getAttribute('data-slot');
-      console.log(`Clicked equipment slot: ${slotName}`);
-      
-      if (!window.player.equipment) {
-        console.error("Equipment object not initialized!");
-        return;
-      }
-      
-      const equippedItem = window.player.equipment[slotName];
-      
-      console.log(`Equipped item in slot ${slotName}:`, equippedItem);
-      
-      // Only show details if an item is equipped
-      if (equippedItem && equippedItem !== "occupied") {
-        window.showItemDetails(equippedItem);
-      } else {
-        console.log("No item in this slot or slot is occupied by two-handed weapon");
-      }
-    });
-  });
-};
-
-// Add an error reporter function
-window.debugInventorySystem = function() {
-  console.log("=== INVENTORY SYSTEM DEBUG ===");
-  console.log("Item Templates:", window.itemTemplates ? Object.keys(window.itemTemplates).length : "Not initialized");
-  console.log("Player inventory:", window.player.inventory);
-  console.log("Player equipment:", window.player.equipment);
-  console.log("Inventory capacity:", window.player.inventoryCapacity);
-  
-  // Check if equipment slots exist in the DOM
-  const headSlot = document.getElementById('head-slot');
-  const mainHandSlot = document.getElementById('main-hand-slot');
-  console.log("Head slot in DOM:", headSlot ? "Yes" : "No");
-  console.log("Main Hand slot in DOM:", mainHandSlot ? "Yes" : "No");
-  
-  // Test adding an item
-  if (window.itemTemplates && window.itemTemplates.basicSword) {
-    console.log("Adding test sword to inventory...");
-    window.addItemToInventory(window.itemTemplates.basicSword);
-  } else {
-    console.log("Cannot add test item - templates not loaded");
-  }
-  
-  console.log("=== END DEBUG ===");
-};
-
-// Override the inventory close button to fix any issues
-document.addEventListener('click', function(e) {
-  if (e.target.classList.contains('inventory-close')) {
-    console.log("Inventory closed - performing cleanup");
-    
-    // Fix any potential issues when inventory is reopened
-    if (window.player.inventory && window.player.inventory.length > 0) {
-      console.log(`Player has ${window.player.inventory.length} items`);
-    } else if (window.player.equipment) {
-      // Check if player has any equipped items that should be visible
-      let hasEquipment = false;
-      for (const slot in window.player.equipment) {
-        if (window.player.equipment[slot] && window.player.equipment[slot] !== "occupied") {
-          hasEquipment = true;
-          break;
-        }
-      }
-      
-      if (hasEquipment) {
-        console.log("Player has equipped items but no inventory items");
-      }
-    }
-  }
+// Attach initialization to window load
+window.addEventListener('DOMContentLoaded', function() {
+  console.log("DOM loaded, inventory system ready");
 });

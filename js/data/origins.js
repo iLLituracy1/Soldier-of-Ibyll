@@ -48,8 +48,8 @@ window.origins = {
 
 // Primary attribute ranges based on origin
 window.statRanges = {
-  "Paanic": { phy: [1, 2], men: [1, 2] },
-  "Nesian": { phy: [1, 2], men: [2, 3] },
-  "Lunarine": { phy: [1, 2], men: [1, 2] },
-  "Wyrdman": { phy: [2, 3], men: [1, 1] }
+  "Paanic": { phy: [1, 3], men: [1, 3] },
+  "Nesian": { phy: [2, 2], men: [2, 3] },
+  "Lunarine": { phy: [1, 3], men: [2, 3] },
+  "Wyrdman": { phy: [3, 3], men: [1, 1] }
 };
