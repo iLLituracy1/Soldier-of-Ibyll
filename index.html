@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Soldier of Ibyll</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,6 +13,7 @@
 <link rel="stylesheet" href="css/character-display-enhancements.css">
 <link rel="stylesheet" href="css/inventory-enhancements.css">
 <link rel="stylesheet" href="css/narrative-enhancements.css">
+<link rel="stylesheet" href="css/inventory.css">
 </head>
 <body>
   <!-- CHARACTER CREATION AND PROLOGUE SECTIONS -->
@@ -83,37 +85,18 @@
       <div id="dayDisplay"></div>
     </header>
     
-    <!-- Status bars -->
-    <div class="status-bars">
-      <div class="status-bar">
-        <div class="status-label">Health</div>
-        <div class="bar-container">
-          <div id="healthBar" class="bar health-bar" style="width: 100%;"></div>
-        </div>
-        <div id="healthValue" class="bar-value">100/100</div>
-      </div>
-      <div class="status-bar">
-        <div class="status-label">Stamina</div>
-        <div class="bar-container">
-          <div id="staminaBar" class="bar stamina-bar" style="width: 100%;"></div>
-        </div>
-        <div id="staminaValue" class="bar-value">100/100</div>
-      </div>
-      <div class="status-bar">
-        <div class="status-label">Morale</div>
-        <div class="bar-container">
-          <div id="moraleBar" class="bar morale-bar" style="width: 75%;"></div>
-        </div>
-        <div id="moraleValue" class="bar-value">75/100</div>
-      </div>
+    <div class="game-sidebar">
+      <!-- Status bars will be dynamically inserted here -->
     </div>
     
-    <div id="narrative">
-      <p>The road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.</p>
-    </div>
-    
-    <div id="actions">
-      <!-- Action buttons will be dynamically populated by updateActionButtons() -->
+    <div class="game-main">
+      <div id="narrative">
+        <p>The road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.</p>
+      </div>
+      
+      <div id="actions">
+        <!-- Action buttons will be dynamically populated by updateActionButtons() -->
+      </div>
     </div>
     
     <!-- Combat Interface (Hidden by default) -->
@@ -143,27 +126,23 @@
     
     <!-- Profile Panel -->
     <div id="profile" class="hidden">
-      <h3>Your Profile</h3>
-      <p id="profileText"></p>
-      <button class="menu-button profile-close">Close</button>
+      <h3>YOUR PROFILE</h3>
+      <div class="profile-close close-button">×</div>
+      <div id="profileText"></div>
     </div>
     
     <!-- Inventory Panel -->
     <div id="inventory" class="hidden">
-      <h3>Inventory</h3>
-      <div id="inventoryList">
-        <!-- Inventory items will be dynamically populated -->
-      </div>
-      <button class="menu-button inventory-close">Close</button>
+      <h3>INVENTORY</h3>
+      <div class="inventory-close close-button">×</div>
+      <div id="inventoryList"></div>
     </div>
     
     <!-- Quest Log Panel -->
     <div id="questLog" class="hidden">
-      <h3>Quest Log</h3>
-      <div id="questList">
-        <!-- Quests will be dynamically populated -->
-      </div>
-      <button class="menu-button quest-log-close">Close</button>
+      <h3>QUEST LOG</h3>
+      <div class="quest-log-close close-button">×</div>
+      <div id="questList"></div>
     </div>
   </div>
   
@@ -184,5 +163,7 @@
   <script src="js/main.js"></script>
   <!-- UI Enhancements -->
 <script src="js/ui-enhancements.js"></script>
+<script src="js/ui-enhancement-fix.js"></script>
+<script src="js/robust-ui-fix.js"></script>
 </body>
 </html>

@@ -5,24 +5,16 @@
 window.initializeInventoryUI = function() {
   console.log("Initializing inventory UI...");
   
-  // Get the inventory container
+  // Ensure we have the inventory container
   const inventoryContainer = document.getElementById('inventory');
-  
-  // Check if it exists
   if (!inventoryContainer) {
     console.error("Inventory container not found!");
     return;
   }
   
-  // Check for mount slot requirement
-  // FIXED: Log detailed info about career for debugging
-  let isCavalry = false;
-  if (window.player && window.player.career) {
-    isCavalry = window.player.career.title === "Castellan Cavalry";
-    console.log("Mount slot check - isCavalry:", isCavalry, "Career:", window.player.career.title);
-  } else {
-    console.log("Cannot check for cavalry - player or career not initialized");
-  }
+  // Check if player is cavalry for mount slot
+  const isCavalry = window.player && window.player.career && 
+                    window.player.career.title === "Castellan Cavalry";
   
   // Create the structure for the inventory UI
   inventoryContainer.innerHTML = `
@@ -49,28 +41,28 @@ window.initializeInventoryUI = function() {
       <div class="equipment-panel">
         <h4>Equipment</h4>
         <div class="paperdoll ${isCavalry ? 'has-mount' : ''}">
-          <div class="equipment-slot" data-slot="${window.EQUIPMENT_SLOTS.HEAD}" id="head-slot">
+          <div class="equipment-slot" data-slot="head" id="head-slot">
             <div class="slot-icon">👒</div>
             <div class="slot-name">Head</div>
           </div>
-          <div class="equipment-slot" data-slot="${window.EQUIPMENT_SLOTS.BODY}" id="body-slot">
+          <div class="equipment-slot" data-slot="body" id="body-slot">
             <div class="slot-icon">👕</div>
             <div class="slot-name">Body</div>
           </div>
-          <div class="equipment-slot" data-slot="${window.EQUIPMENT_SLOTS.MAIN_HAND}" id="main-hand-slot">
+          <div class="equipment-slot" data-slot="mainHand" id="main-hand-slot">
             <div class="slot-icon">🗡️</div>
             <div class="slot-name">Main Hand</div>
           </div>
-          <div class="equipment-slot" data-slot="${window.EQUIPMENT_SLOTS.OFF_HAND}" id="off-hand-slot">
+          <div class="equipment-slot" data-slot="offHand" id="off-hand-slot">
             <div class="slot-icon">🛡️</div>
             <div class="slot-name">Off Hand</div>
           </div>
-          <div class="equipment-slot" data-slot="${window.EQUIPMENT_SLOTS.ACCESSORY}" id="accessory-slot">
+          <div class="equipment-slot" data-slot="accessory" id="accessory-slot">
             <div class="slot-icon">📿</div>
             <div class="slot-name">Accessory</div>
           </div>
           ${isCavalry ? `
-          <div class="equipment-slot mount-slot" data-slot="${window.EQUIPMENT_SLOTS.MOUNT}" id="mount-slot">
+          <div class="equipment-slot mount-slot" data-slot="mount" id="mount-slot">
             <div class="slot-icon">🐎</div>
             <div class="slot-name">Mount</div>
           </div>` : ''}
@@ -113,494 +105,66 @@ window.initializeInventoryUI = function() {
     </div>
   `;
   
-  // FIXED: Add styles for the mount slot inside the function
-  // This ensures the styles are added even if stylesheet wasn't loaded
-  const mountStyle = document.createElement('style');
-  mountStyle.textContent = `
-    .paperdoll.has-mount {
-      display: grid;
-      grid-template-areas:
-        ". head ."
-        "mainHand body offHand"
-        ". accessory ."
-        ". mount .";
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-    }
-    
-    .mount-slot {
-      grid-area: mount;
-      background-color: rgba(139, 69, 19, 0.2) !important;
-      border: 1px solid #8B4513 !important;
-    }
-    
-    .mount-slot:hover {
-      background-color: rgba(139, 69, 19, 0.3) !important;
-    }
-    
-    .category-mount {
-      background-color: rgba(139, 69, 19, 0.2) !important;
-    }
-    
-    /* Fix for equipment slots and interaction */
-    .equipment-slot[data-slot="head"] { grid-area: head; }
-    .equipment-slot[data-slot="body"] { grid-area: body; }
-    .equipment-slot[data-slot="mainHand"] { grid-area: mainHand; }
-    .equipment-slot[data-slot="offHand"] { grid-area: offHand; }
-    .equipment-slot[data-slot="accessory"] { grid-area: accessory; }
-    .equipment-slot[data-slot="mount"] { grid-area: mount; }
-  `;
-  document.head.appendChild(mountStyle);
-  
   // Add event listeners
-  document.querySelector('.inventory-close').addEventListener('click', function() {
-    document.getElementById('inventory').classList.add('hidden');
-  });
+  const closeBtn = inventoryContainer.querySelector('.inventory-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function() {
+      inventoryContainer.classList.add('hidden');
+    });
+  }
   
   // Tab switching
-  const tabs = document.querySelectorAll('.inventory-tab');
+  const tabs = inventoryContainer.querySelectorAll('.inventory-tab');
   tabs.forEach(tab => {
     tab.addEventListener('click', function() {
-      // Remove active class from all tabs
       tabs.forEach(t => t.classList.remove('active'));
-      
-      // Add active class to clicked tab
       this.classList.add('active');
-      
-      // Filter items based on selected category
       const category = this.getAttribute('data-category');
       window.renderInventoryItems(category);
     });
   });
   
   // Sort selection
-  const sortSelect = document.getElementById('sort-select');
+  const sortSelect = inventoryContainer.querySelector('#sort-select');
   if (sortSelect) {
     sortSelect.addEventListener('change', function() {
-      const category = document.querySelector('.inventory-tab.active').getAttribute('data-category');
+      const activeTab = inventoryContainer.querySelector('.inventory-tab.active');
+      const category = activeTab ? activeTab.getAttribute('data-category') : 'all';
       window.renderInventoryItems(category, this.value);
     });
   }
   
   // Equipment slot clicks
-  const equipmentSlots = document.querySelectorAll('.equipment-slot');
+  const equipmentSlots = inventoryContainer.querySelectorAll('.equipment-slot');
   equipmentSlots.forEach(slot => {
     slot.addEventListener('click', function() {
       const slotName = this.getAttribute('data-slot');
       const equippedItem = window.player.equipment[slotName];
-      
-      // Only show details if an item is equipped
       if (equippedItem && equippedItem !== "occupied") {
         window.showItemDetails(equippedItem);
       }
     });
   });
   
-  // Close item details panel when clicking the X
-  const closeBtn = document.querySelector('.item-details-close');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', function() {
-      document.getElementById('item-details-panel').classList.add('hidden');
+  // Close item details panel
+  const detailsCloseBtn = inventoryContainer.querySelector('.item-details-close');
+  if (detailsCloseBtn) {
+    detailsCloseBtn.addEventListener('click', function() {
+      const detailsPanel = document.getElementById('item-details-panel');
+      if (detailsPanel) {
+        detailsPanel.classList.add('hidden');
+      }
     });
   }
   
-  // Add additional style for inventory
-  const style = document.createElement('style');
-  style.textContent = `
-    #inventory {
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    
-    .inventory-header {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 10px;
-      padding: 10px;
-      background: #222;
-      border-radius: 4px;
-    }
-    
-    .inventory-currency {
-      font-weight: bold;
-      color: gold;
-    }
-    
-    .inventory-tabs {
-      display: flex;
-      margin-bottom: 15px;
-      border-bottom: 1px solid #444;
-    }
-    
-    .inventory-tab {
-      background: none;
-      border: none;
-      padding: 8px 15px;
-      color: #aaa;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-    
-    .inventory-tab:hover {
-      color: #fff;
-      background: #333;
-    }
-    
-    .inventory-tab.active {
-      color: #fff;
-      border-bottom: 2px solid #a0a0ff;
-    }
-    
-    .inventory-content {
-      display: flex;
-      gap: 20px;
-      margin-bottom: 20px;
-    }
-    
-    .equipment-panel {
-      flex: 0 0 250px;
-      background: #222;
-      border-radius: 8px;
-      padding: 15px;
-    }
-    
-    .paperdoll {
-      display: grid;
-      grid-template-areas:
-        ". head ."
-        "mainHand body offHand"
-        ". accessory .";
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    
-    .equipment-slot {
-      background: #333;
-      border: 1px solid #444;
-      border-radius: 8px;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.3s;
-      min-height: 60px;
-      position: relative;
-    }
-    
-    .equipment-slot:hover {
-      background: #3a3a3a;
-      transform: translateY(-2px);
-    }
-    
-    .slot-icon {
-      font-size: 24px;
-      margin-bottom: 5px;
-    }
-    
-    .slot-name {
-      font-size: 12px;
-      color: #888;
-    }
-    
-    .equipment-stats {
-      background: #2a2a2a;
-      border-radius: 8px;
-      padding: 10px;
-    }
-    
-    .items-panel {
-      flex: 1;
-      background: #222;
-      border-radius: 8px;
-      padding: 15px;
-      overflow: hidden;
-    }
-    
-    .item-sort {
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-    }
-    
-    .item-sort select {
-      background: #333;
-      color: #e0e0e0;
-      border: 1px solid #444;
-      padding: 5px;
-      margin-left: 10px;
-      border-radius: 4px;
-    }
-    
-    .items-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-      gap: 10px;
-      max-height: 450px;
-      overflow-y: auto;
-      padding-right: 5px;
-    }
-    
-    .item-card {
-      background: #2a2a2a;
-      border: 1px solid #444;
-      border-radius: 8px;
-      padding: 8px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      cursor: pointer;
-      transition: all 0.3s;
-      position: relative;
-    }
-    
-    .item-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
-    }
-    
-    .item-icon {
-      font-size: 28px;
-      margin-bottom: 5px;
-      padding: 5px;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    
-    .item-name {
-      font-size: 12px;
-      text-align: center;
-      word-break: break-word;
-      line-height: 1.2;
-    }
-    
-    .item-quantity {
-      position: absolute;
-      bottom: 5px;
-      right: 5px;
-      background: rgba(0, 0, 0, 0.7);
-      border-radius: 10px;
-      padding: 2px 5px;
-      font-size: 10px;
-      font-weight: bold;
-    }
-    
-    .item-rarity-indicator {
-      position: absolute;
-      top: 5px;
-      right: 5px;
-      font-size: 14px;
-    }
-    
-    .item-details-panel {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #222;
-      border: 2px solid #444;
-      border-radius: 8px;
-      padding: 20px;
-      width: 90%;
-      max-width: 400px;
-      z-index: 1000;
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-    }
-    
-    .item-details-close {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      cursor: pointer;
-      font-size: 18px;
-      width: 24px;
-      height: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      background: #333;
-    }
-    
-    .item-details-close:hover {
-      background: #444;
-    }
-    
-    .item-details-content {
-      margin-bottom: 20px;
-    }
-    
-    .item-details-header {
-      display: flex;
-      align-items: center;
-      margin-bottom: 15px;
-    }
-    
-    .item-details-icon {
-      font-size: 36px;
-      margin-right: 15px;
-      padding: 10px;
-      border-radius: 8px;
-    }
-    
-    .item-details-title {
-      flex: 1;
-    }
-    
-    .item-details-name {
-      font-size: 20px;
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    
-    .item-details-type {
-      font-size: 14px;
-      color: #888;
-    }
-    
-    .item-details-rarity {
-      margin-bottom: 10px;
-      font-style: italic;
-    }
-    
-    .item-details-description {
-      margin-bottom: 15px;
-      line-height: 1.4;
-    }
-    
-    .item-details-stats {
-      background: #2a2a2a;
-      border-radius: 8px;
-      padding: 10px;
-      margin-bottom: 15px;
-    }
-    
-    .item-details-actions {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-    }
-    
-    .item-action-btn {
-      background: #333;
-      color: #e0e0e0;
-      border: none;
-      padding: 8px 15px;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-    
-    .item-action-btn:hover {
-      background: #444;
-      transform: translateY(-2px);
-    }
-    
-    .item-action-btn.use {
-      background: #2a623d;
-    }
-    
-    .item-action-btn.equip {
-      background: #2a3d62;
-    }
-    
-    .item-action-btn.unequip {
-      background: #623d2a;
-    }
-    
-    .item-comparison {
-      background: #2a2a2a;
-      border-radius: 8px;
-      padding: 10px;
-      margin-top: 15px;
-    }
-    
-    .stat-comparison {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 5px;
-    }
-    
-    .stat-label {
-      flex: 1;
-    }
-    
-    .stat-current {
-      color: #888;
-      margin-right: 10px;
-    }
-    
-    .stat-new {
-      text-align: right;
-    }
-    
-    .stat-better {
-      color: #4CAF50;
-    }
-    
-    .stat-worse {
-      color: #F44336;
-    }
-    
-    /* Common rarity colors */
-    .rarity-common { color: #aaaaaa; background-color: rgba(170, 170, 170, 0.1); }
-    .rarity-uncommon { color: #00aa00; background-color: rgba(0, 170, 0, 0.1); }
-    .rarity-rare { color: #0066ff; background-color: rgba(0, 102, 255, 0.1); }
-    .rarity-epic { color: #aa00aa; background-color: rgba(170, 0, 170, 0.1); }
-    .rarity-legendary { color: #ff9900; background-color: rgba(255, 153, 0, 0.1); }
-    .rarity-unique { color: #aa0000; background-color: rgba(170, 0, 0, 0.1); }
-    
-    /* Item border colors by rarity */
-    .border-common { border: 1px solid #aaaaaa; }
-    .border-uncommon { border: 1px solid #00aa00; }
-    .border-rare { border: 1px solid #0066ff; }
-    .border-epic { border: 1px solid #aa00aa; }
-    .border-legendary { border: 1px solid #ff9900; }
-    .border-unique { border: 1px solid #aa0000; }
-    
-    /* Category background colors */
-    .category-weapon { background-color: rgba(255, 0, 0, 0.1); }
-    .category-armor { background-color: rgba(0, 0, 255, 0.1); }
-    .category-accessory { background-color: rgba(255, 0, 255, 0.1); }
-    .category-consumable { background-color: rgba(0, 255, 0, 0.1); }
-    .category-material { background-color: rgba(255, 255, 0, 0.1); }
-    .category-quest { background-color: rgba(0, 255, 255, 0.1); }
-    
-    /* Add a subtle glow to equipped items */
-    .item-equipped {
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-    }
-    
-    /* Animation for when items are used/equipped */
-    @keyframes item-action {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-      100% { transform: scale(1); }
-    }
-    
-    .item-action-animation {
-      animation: item-action 0.5s ease;
-    }
-    
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-      .inventory-content {
-        flex-direction: column;
-      }
-      
-      .equipment-panel {
-        flex: none;
-        width: 100%;
-      }
-    }
-  `;
-  document.head.appendChild(style);
+  // Initialize drag and drop if available
+  if (typeof window.implementDragAndDrop === 'function') {
+    window.implementDragAndDrop();
+  }
+  
+  // Render initial inventory state
+  window.renderInventoryItems();
+  window.updateEquipmentDisplay();
   
   console.log("Inventory UI initialized");
 };
@@ -710,12 +274,58 @@ window.renderInventoryItems = function(categoryFilter = 'all', sortBy = 'categor
 
 // Show item details in the details panel
 window.showItemDetails = function(item) {
-  const detailsPanel = document.getElementById('item-details-panel');
-  const detailsContent = document.getElementById('item-details-content');
-  const actionsContainer = document.getElementById('item-details-actions');
+  console.log("Showing item details for:", item);
+  
+  // Ensure we have the panels
+  let detailsPanel = document.getElementById('item-details-panel');
+  let modalOverlay = document.getElementById('inventory-modal-overlay');
+  let detailsContent = document.getElementById('item-details-content');
+  let actionsContainer = document.getElementById('item-details-actions');
+  
+  // Create overlay if it doesn't exist
+  if (!modalOverlay) {
+    modalOverlay = document.createElement('div');
+    modalOverlay.id = 'inventory-modal-overlay';
+    modalOverlay.className = 'modal-overlay hidden';
+    document.getElementById('inventory').appendChild(modalOverlay);
+  }
+  
+  // Create panels if they don't exist
+  if (!detailsPanel) {
+    console.log("Creating new details panel");
+    detailsPanel = document.createElement('div');
+    detailsPanel.id = 'item-details-panel';
+    detailsPanel.className = 'item-details-panel hidden';
+    
+    // Create content div
+    detailsContent = document.createElement('div');
+    detailsContent.id = 'item-details-content';
+    detailsPanel.appendChild(detailsContent);
+    
+    // Create actions container
+    actionsContainer = document.createElement('div');
+    actionsContainer.id = 'item-details-actions';
+    detailsPanel.appendChild(actionsContainer);
+    
+    // Add to inventory container
+    const inventoryContainer = document.getElementById('inventory');
+    if (!inventoryContainer) {
+      console.error("Inventory container not found!");
+      return;
+    }
+    inventoryContainer.appendChild(detailsPanel);
+  }
+  
+  // Function to hide the panel and overlay
+  const hidePanel = () => {
+    detailsPanel.classList.add('hidden');
+    modalOverlay.classList.add('hidden');
+  };
   
   // Get the template
   const template = item.getTemplate();
+  console.log("Item template:", template);
+  
   const rarityClass = `rarity-${template.rarity.name.toLowerCase()}`;
   const categoryClass = `category-${template.category}`;
   
@@ -727,6 +337,7 @@ window.showItemDetails = function(item) {
         <div class="item-details-name">${template.name}</div>
         <div class="item-details-type">${template.category} ${template.weaponType ? `- ${template.weaponType.name}` : ''} ${template.armorType ? `- ${template.armorType.name}` : ''}</div>
       </div>
+      <div class="item-details-close">✕</div>
     </div>
     
     <div class="item-details-rarity" style="color: ${template.rarity.color}">${template.rarity.name}</div>
@@ -799,11 +410,15 @@ window.showItemDetails = function(item) {
       const useButton = document.createElement('button');
       useButton.className = 'item-action-btn use';
       useButton.textContent = 'Use';
-      useButton.addEventListener('click', function() {
-        window.useItem(item.instanceId);
-        detailsPanel.classList.add('hidden');
-        window.renderInventoryItems(document.querySelector('.inventory-tab.active').getAttribute('data-category'));
-        window.updateEquipmentDisplay();
+      useButton.addEventListener('click', async function() {
+        try {
+          await window.useItem(item.instanceId);
+          hidePanel();
+          window.renderInventoryItems(document.querySelector('.inventory-tab.active').getAttribute('data-category'));
+          window.updateEquipmentDisplay();
+        } catch (error) {
+          console.error("Error using item:", error);
+        }
       });
       actionsContainer.appendChild(useButton);
     }
@@ -813,11 +428,15 @@ window.showItemDetails = function(item) {
       const equipButton = document.createElement('button');
       equipButton.className = 'item-action-btn equip';
       equipButton.textContent = 'Equip';
-      equipButton.addEventListener('click', function() {
-        window.equipItem(item.instanceId);
-        detailsPanel.classList.add('hidden');
-        window.renderInventoryItems(document.querySelector('.inventory-tab.active').getAttribute('data-category'));
-        window.updateEquipmentDisplay();
+      equipButton.addEventListener('click', async function() {
+        try {
+          await window.equipItem(item.instanceId);
+          hidePanel();
+          window.renderInventoryItems(document.querySelector('.inventory-tab.active').getAttribute('data-category'));
+          window.updateEquipmentDisplay();
+        } catch (error) {
+          console.error("Error equipping item:", error);
+        }
       });
       actionsContainer.appendChild(equipButton);
     }
@@ -828,11 +447,15 @@ window.showItemDetails = function(item) {
     const unequipButton = document.createElement('button');
     unequipButton.className = 'item-action-btn unequip';
     unequipButton.textContent = 'Unequip';
-    unequipButton.addEventListener('click', function() {
-      window.unequipItem(template.equipSlot);
-      detailsPanel.classList.add('hidden');
-      window.renderInventoryItems(document.querySelector('.inventory-tab.active').getAttribute('data-category'));
-      window.updateEquipmentDisplay();
+    unequipButton.addEventListener('click', async function() {
+      try {
+        await window.unequipItem(template.equipSlot);
+        hidePanel();
+        window.renderInventoryItems(document.querySelector('.inventory-tab.active').getAttribute('data-category'));
+        window.updateEquipmentDisplay();
+      } catch (error) {
+        console.error("Error unequipping item:", error);
+      }
     });
     actionsContainer.appendChild(unequipButton);
   }
@@ -841,13 +464,28 @@ window.showItemDetails = function(item) {
   const closeButton = document.createElement('button');
   closeButton.className = 'item-action-btn';
   closeButton.textContent = 'Close';
-  closeButton.addEventListener('click', function() {
-    detailsPanel.classList.add('hidden');
-  });
+  closeButton.addEventListener('click', hidePanel);
   actionsContainer.appendChild(closeButton);
   
-  // Show the panel
-  detailsPanel.classList.remove('hidden');
+  // Add close handler to the X button
+  const closeX = detailsPanel.querySelector('.item-details-close');
+  if (closeX) {
+    closeX.addEventListener('click', hidePanel);
+  }
+  
+  // Add click handler to overlay to close panel
+  modalOverlay.addEventListener('click', (event) => {
+    if (event.target === modalOverlay) {
+      hidePanel();
+    }
+  });
+  
+  // Show the overlay and panel
+  requestAnimationFrame(() => {
+    modalOverlay.classList.remove('hidden');
+    detailsPanel.classList.remove('hidden');
+    console.log("Item details panel and overlay shown");
+  });
 };
 
 // Update the equipment display in the paperdoll
@@ -998,6 +636,8 @@ window.updateEquipmentDisplay = function() {
 
 // Fix equipment slots interaction
 window.fixEquipmentSlotInteraction = function() {
+  console.log("Fixing equipment slot interaction");
+  
   // Get all equipment slots
   const equipmentSlots = document.querySelectorAll('.equipment-slot');
   
@@ -1007,7 +647,10 @@ window.fixEquipmentSlotInteraction = function() {
     slot.parentNode.replaceChild(newSlot, slot);
     
     // Add new click listener
-    newSlot.addEventListener('click', function() {
+    newSlot.addEventListener('click', function(event) {
+      // Prevent event bubbling
+      event.stopPropagation();
+      
       const slotName = this.getAttribute('data-slot');
       console.log(`Clicked equipment slot: ${slotName}`);
       
@@ -1026,12 +669,15 @@ window.fixEquipmentSlotInteraction = function() {
       
       // Only show details if an item is equipped
       if (equippedItem && equippedItem !== "occupied") {
+        // Show the item details
         window.showItemDetails(equippedItem);
       } else {
         console.log("No item in this slot or slot is occupied by two-handed weapon");
       }
     });
   });
+  
+  console.log("Equipment slot interaction fixed");
 };
 
 // Handle drag and drop functionality

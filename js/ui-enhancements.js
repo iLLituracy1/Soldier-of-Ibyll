@@ -5,14 +5,28 @@
 document.addEventListener('DOMContentLoaded', function() {
   console.log("UI Enhancements initializing...");
   
-  // Only run if we're not in a bundled environment (prevents duplicate initialization)
-  if (!window.uiEnhancementsInitialized) {
-    initializeUIEnhancements();
-  }
+  // Wait for UI_STATE to be available
+  const checkUIState = setInterval(() => {
+    if (window.UI_STATE) {
+      clearInterval(checkUIState);
+      if (!window.uiEnhancementsInitialized) {
+        initializeUIEnhancements();
+      }
+    }
+  }, 100);
+  
+  // Safety timeout
+  setTimeout(() => clearInterval(checkUIState), 5000);
 });
 
 // Main initialization function
 function initializeUIEnhancements() {
+  // Prevent multiple initializations
+  if (window.uiEnhancementsInitialized) {
+    console.log("UI Enhancements already initialized");
+    return;
+  }
+  
   window.uiEnhancementsInitialized = true;
   
   // Add font link to document head
@@ -21,13 +35,15 @@ function initializeUIEnhancements() {
   // Wait for game to be ready
   const gameReadyCheck = setInterval(() => {
     // Check if game container exists AND player object is fully initialized
+    // AND UI fixes have been applied
     if (document.getElementById('gameContainer') && 
         window.player && 
         window.player.career && 
-        window.player.career.title) {
+        window.player.career.title &&
+        window.UI_STATE.fixesApplied) {
       
       clearInterval(gameReadyCheck);
-      console.log("Game state detected, applying UI enhancements");
+      console.log("Game state detected and UI fixes applied, applying UI enhancements");
       
       // Apply enhancements
       enhanceGameContainer();
@@ -40,9 +56,9 @@ function initializeUIEnhancements() {
       // Override functions
       extendUIFunctions();
     } else {
-      console.log("Waiting for game state to fully initialize...");
+      console.log("Waiting for game state and UI fixes to fully initialize...");
     }
-  }, 1000); // Increased interval to 1 second
+  }, 1000);
   
   // Only run for 30 seconds to avoid infinite checks
   setTimeout(() => clearInterval(gameReadyCheck), 30000);
@@ -70,6 +86,12 @@ function enhanceGameContainer() {
   // Safety check the player object
   if (!window.player || !window.player.name || !window.player.origin || !window.player.career || !window.player.career.title) {
     console.error("Player data not fully initialized. Skipping game container enhancement.");
+    return;
+  }
+  
+  // Check if sidebar already exists
+  if (gameContainer.querySelector('.game-sidebar')) {
+    console.log("Sidebar already exists, skipping enhancement");
     return;
   }
   
@@ -522,13 +544,20 @@ function setupEventListeners() {
 
 // Extend UI functions for better integration
 function extendUIFunctions() {
-  // Only extend functions if they exist
-  if (typeof window.updateStatusBars === 'function') {
-    // Override updateStatusBars to update sidebar status as well
-    const originalUpdateStatusBars = window.updateStatusBars;
+  // Only extend if not already extended
+  if (window.uiFunctionsExtended) return;
+  window.uiFunctionsExtended = true;
+  
+  // Store original functions
+  const originalUpdateStatusBars = window.updateStatusBars;
+  const originalUpdateTimeAndDay = window.updateTimeAndDay;
+  const originalUpdateActionButtons = window.updateActionButtons;
+  
+  // Extend status bar updates
+  if (typeof originalUpdateStatusBars === 'function') {
     window.updateStatusBars = function() {
       // Call original function
-      originalUpdateStatusBars();
+      originalUpdateStatusBars.apply(this, arguments);
       
       // Update sidebar status bars if they exist
       const sidebarHealthBar = document.getElementById('sidebarHealthBar');
@@ -537,24 +566,20 @@ function extendUIFunctions() {
       
       if (sidebarHealthBar && window.gameState) {
         sidebarHealthBar.style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
-        document.getElementById('sidebarHealthValue').textContent = `${Math.round(window.gameState.health)}/${window.gameState.maxHealth}`;
       }
       
       if (sidebarStaminaBar && window.gameState) {
         sidebarStaminaBar.style.width = `${(window.gameState.stamina / window.gameState.maxStamina) * 100}%`;
-        document.getElementById('sidebarStaminaValue').textContent = `${Math.round(window.gameState.stamina)}/${window.gameState.maxStamina}`;
       }
       
       if (sidebarMoraleBar && window.gameState) {
         sidebarMoraleBar.style.width = `${window.gameState.morale}%`;
-        document.getElementById('sidebarMoraleValue').textContent = `${Math.round(window.gameState.morale)}/100`;
       }
     };
   }
   
-  if (typeof window.updateTimeAndDay === 'function') {
+  if (typeof originalUpdateTimeAndDay === 'function') {
     // Override updateTimeAndDay to update narrative time class
-    const originalUpdateTimeAndDay = window.updateTimeAndDay;
     window.updateTimeAndDay = function(minutesToAdd) {
       // Call original function
       originalUpdateTimeAndDay(minutesToAdd);
@@ -596,23 +621,23 @@ function extendUIFunctions() {
     };
   }
   
-  if (typeof window.setNarrative === 'function') {
-    // Enhanced setNarrative for animations
-    const originalSetNarrative = window.setNarrative;
-    window.setNarrative = function(text) {
-      const narrative = document.getElementById('narrative');
-      if (narrative) {
-        // Add fade out effect
-        narrative.classList.add('fade-out');
+  if (typeof originalUpdateActionButtons === 'function') {
+    // Enhanced updateActionButtons for animations
+    window.updateActionButtons = function() {
+      // Call original function
+      originalUpdateActionButtons();
+      
+      // Update action buttons
+      const actionsContainer = document.getElementById('actions');
+      if (actionsContainer) {
+        // Remove existing buttons
+        actionsContainer.innerHTML = '';
         
-        // After animation, update content and fade back in
-        setTimeout(() => {
-          originalSetNarrative(text);
-          narrative.classList.remove('fade-out');
-        }, 300);
-      } else {
-        // Fallback to original if narrative element isn't found
-        originalSetNarrative(text);
+        // Recreate buttons
+        const actions = window.gameState.actions || [];
+        actions.forEach(action => {
+          addActionButton(action.label, action.action, actionsContainer);
+        });
       }
     };
   }

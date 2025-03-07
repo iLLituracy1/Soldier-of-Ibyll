@@ -3,17 +3,48 @@
 
 // Update status bars function
 window.updateStatusBars = function() {
-  // Update health bar
-  document.getElementById('healthBar').style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
-  document.getElementById('healthValue').textContent = `${Math.round(window.gameState.health)}/${window.gameState.maxHealth}`;
-  
-  // Update stamina bar
-  document.getElementById('staminaBar').style.width = `${(window.gameState.stamina / window.gameState.maxStamina) * 100}%`;
-  document.getElementById('staminaValue').textContent = `${Math.round(window.gameState.stamina)}/${window.gameState.maxStamina}`;
-  
-  // Update morale bar
-  document.getElementById('moraleBar').style.width = `${window.gameState.morale}%`;
-  document.getElementById('moraleValue').textContent = `${Math.round(window.gameState.morale)}/100`;
+  try {
+    console.log("Updating status bars...");
+    
+    // Update health bar
+    const healthBar = document.getElementById('sidebarHealthBar');
+    const healthValue = document.getElementById('sidebarHealthValue');
+    
+    if (healthBar && healthValue && window.gameState) {
+      const healthPercent = (window.gameState.health / window.gameState.maxHealth) * 100;
+      healthBar.style.width = `${healthPercent}%`;
+      healthValue.textContent = `${Math.round(window.gameState.health)}/${window.gameState.maxHealth}`;
+    } else {
+      console.warn("Health bar elements or gameState not found");
+    }
+    
+    // Update stamina bar
+    const staminaBar = document.getElementById('sidebarStaminaBar');
+    const staminaValue = document.getElementById('sidebarStaminaValue');
+    
+    if (staminaBar && staminaValue && window.gameState) {
+      const staminaPercent = (window.gameState.stamina / window.gameState.maxStamina) * 100;
+      staminaBar.style.width = `${staminaPercent}%`;
+      staminaValue.textContent = `${Math.round(window.gameState.stamina)}/${window.gameState.maxStamina}`;
+    } else {
+      console.warn("Stamina bar elements or gameState not found");
+    }
+    
+    // Update morale bar
+    const moraleBar = document.getElementById('sidebarMoraleBar');
+    const moraleValue = document.getElementById('sidebarMoraleValue');
+    
+    if (moraleBar && moraleValue && window.gameState) {
+      moraleBar.style.width = `${window.gameState.morale}%`;
+      moraleValue.textContent = `${Math.round(window.gameState.morale)}/100`;
+    } else {
+      console.warn("Morale bar elements or gameState not found");
+    }
+    
+    console.log("Status bars updated successfully");
+  } catch (error) {
+    console.error("Error updating status bars:", error);
+  }
 };
 
 // Function to update time and day display
@@ -108,11 +139,6 @@ window.updateActionButtons = function() {
       // Add more mission options as the game progresses
     }
   }
-  
-  // Menu buttons - always available
-  window.addActionButton('Profile', 'profile', actionsContainer);
-  window.addActionButton('Inventory', 'inventory', actionsContainer);
-  window.addActionButton('Quest Log', 'questLog', actionsContainer);
 };
 
 // Function to add action button
@@ -121,67 +147,164 @@ window.addActionButton = function(label, action, container) {
   btn.className = 'action-btn';
   btn.textContent = label;
   btn.setAttribute('data-action', action);
+  
+  // Add tooltip with hotkey information if applicable
+  let tooltip = label;
+  switch(action) {
+    case 'train': tooltip += ' [T]'; break;
+    case 'rest': tooltip += ' [R]'; break;
+    case 'patrol': tooltip += ' [P]'; break;
+    case 'mess': tooltip += ' [M]'; break;
+    case 'guard': tooltip += ' [G]'; break;
+  }
+  btn.setAttribute('title', tooltip);
+  
   btn.onclick = function() {
     window.handleAction(action);
   };
+  
   container.appendChild(btn);
 };
 
 // Function to handle profile panel display
 window.handleProfile = function() {
-  // Update profile text before showing
-  const profileDiv = document.getElementById('profileText');
-  
-  // Calculate skill caps based on attributes
-  const meleeCap = Math.floor(window.player.phy / 1.5);
-  const marksmanshipCap = Math.floor((window.player.phy + window.player.men) / 3);
-  const survivalCap = Math.floor((window.player.phy + window.player.men) / 3);
-  const commandCap = Math.floor((window.player.men * 0.8 + window.player.phy * 0.2) / 1.5);
-  const mentalSkillCap = Math.floor(window.player.men / 1.5);
-  
-  profileDiv.innerHTML = `
-    <p><strong>Name:</strong> ${window.player.name}</p>
-    <p><strong>Heritage:</strong> ${window.player.origin}</p>
-    <p><strong>Career:</strong> ${window.player.career.title}</p>
-    <p><strong>Level:</strong> ${window.gameState.level}</p>
-    <p><strong>Experience:</strong> ${window.gameState.experience}/${window.gameState.level * 100}</p>
-    <p><strong>Skill Points:</strong> ${window.gameState.skillPoints}</p>
-    <p><strong>Physical (PHY):</strong> ${window.player.phy.toFixed(2)} / 15</p>
-    <p><strong>Mental (MEN):</strong> ${window.player.men.toFixed(2)} / 15</p>
-    <p><strong>Skills:</strong> (Capped by attributes)</p>
-    <ul>
-      <li>Melee Combat: ${window.player.skills.melee.toFixed(2)} / ${meleeCap} (PHY based)</li>
-      <li>Marksmanship: ${window.player.skills.marksmanship.toFixed(2)} / ${marksmanshipCap} (PHY+MEN based)</li>
-      <li>Survival: ${window.player.skills.survival.toFixed(2)} / ${survivalCap} (PHY+MEN based)</li>
-      <li>Command: ${window.player.skills.command.toFixed(2)} / ${commandCap} (MEN+some PHY based)</li>
-      <li>Discipline: ${window.player.skills.discipline.toFixed(2)} / ${mentalSkillCap} (MEN based)</li>
-      <li>Tactics: ${window.player.skills.tactics.toFixed(2)} / ${mentalSkillCap} (MEN based)</li>
-      <li>Organization: ${window.player.skills.organization.toFixed(2)} / ${mentalSkillCap} (MEN based)</li>
-      <li>Arcana: ${window.player.skills.arcana.toFixed(2)} / ${mentalSkillCap} (MEN based)</li>
-    </ul>
-  `;
-  
-  // Add relationships
-  profileDiv.innerHTML += `<p><strong>Relationships:</strong></p><ul>`;
-  for (const id in window.player.relationships) {
-    const relationship = window.player.relationships[id];
-    let dispositionText = "Neutral";
-    if (relationship.disposition >= 30) dispositionText = "Friendly";
-    if (relationship.disposition >= 60) dispositionText = "Trusted Ally";
-    if (relationship.disposition <= -30) dispositionText = "Distrustful";
-    if (relationship.disposition <= -60) dispositionText = "Hostile";
+  try {
+    // Get the profile div and panel
+    const profilePanel = document.getElementById('profile');
+    const profileDiv = document.getElementById('profileText');
+    if (!profileDiv || !profilePanel) {
+      console.error('Profile elements not found');
+      return;
+    }
+
+    // Safety check for required player data
+    if (!window.player || !window.gameState) {
+      console.error('Player or game state not initialized');
+      return;
+    }
+
+    // Calculate skill caps based on attributes
+    const meleeCap = Math.floor((window.player.phy || 0) / 1.5);
+    const marksmanshipCap = Math.floor(((window.player.phy || 0) + (window.player.men || 0)) / 3);
+    const survivalCap = Math.floor(((window.player.phy || 0) + (window.player.men || 0)) / 3);
+    const commandCap = Math.floor(((window.player.men || 0) * 0.8 + (window.player.phy || 0) * 0.2) / 1.5);
+    const mentalSkillCap = Math.floor((window.player.men || 0) / 1.5);
+
+    // Determine character avatar and badge
+    let avatarEmoji = '👤';
+    let badgeEmoji = '⚔️';
     
-    profileDiv.innerHTML += `<li>${relationship.name}: ${dispositionText} (${relationship.disposition})</li>`;
+    // Set badge based on career
+    if (window.player.career) {
+      if (window.player.career.title.includes('Geister')) badgeEmoji = '✨';
+      if (window.player.career.title.includes('Marine')) badgeEmoji = '⚓';
+      if (window.player.career.title.includes('Corsair')) badgeEmoji = '⛵';
+      if (window.player.career.title.includes('Berserker')) badgeEmoji = '🪓';
+    }
+
+    // Build the profile HTML with all character information
+    let profileHtml = `
+      <div class="character-header">
+        <div class="character-avatar">
+          ${avatarEmoji}
+          <div class="character-badge">${badgeEmoji}</div>
+        </div>
+        <div class="character-info">
+          <h2>${window.player.name || 'Unknown'}</h2>
+          <div class="character-title">${window.player.origin || 'Unknown Origin'} ${window.player.career?.title || 'Unknown Career'}</div>
+          <div class="character-stats">
+            <div class="stat-pill">Level ${window.gameState.level || 1}</div>
+            <div class="stat-pill">XP: ${window.gameState.experience || 0}/${(window.gameState.level || 1) * 100}</div>
+            <div class="stat-pill">SP: ${window.gameState.skillPoints || 0}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="attributes-section">
+        <div class="attribute-card">
+          <h3>Physical (PHY)</h3>
+          <div class="attribute-value">${((window.player.phy || 0)).toFixed(1)} / 15</div>
+          <div class="attribute-description">Strength, endurance, and raw physical ability</div>
+        </div>
+
+        <div class="attribute-card">
+          <h3>Mental (MEN)</h3>
+          <div class="attribute-value">${((window.player.men || 0)).toFixed(1)} / 15</div>
+          <div class="attribute-description">Intelligence, willpower, and mental acuity</div>
+        </div>
+      </div>
+
+      <div class="skills-section">
+        <h3>Skills</h3>
+        <div class="skills-grid">`;
+
+    // Add skills with proper error handling
+    const skills = {
+      'Melee Combat': { value: window.player.skills?.melee || 0, cap: meleeCap, base: 'PHY' },
+      'Marksmanship': { value: window.player.skills?.marksmanship || 0, cap: marksmanshipCap, base: 'PHY+MEN' },
+      'Survival': { value: window.player.skills?.survival || 0, cap: survivalCap, base: 'PHY+MEN' },
+      'Command': { value: window.player.skills?.command || 0, cap: commandCap, base: 'MEN+PHY' },
+      'Discipline': { value: window.player.skills?.discipline || 0, cap: mentalSkillCap, base: 'MEN' },
+      'Tactics': { value: window.player.skills?.tactics || 0, cap: mentalSkillCap, base: 'MEN' },
+      'Organization': { value: window.player.skills?.organization || 0, cap: mentalSkillCap, base: 'MEN' },
+      'Arcana': { value: window.player.skills?.arcana || 0, cap: mentalSkillCap, base: 'MEN' }
+    };
+
+    for (const [skillName, skillData] of Object.entries(skills)) {
+      profileHtml += `
+        <div class="skill-card">
+          <div class="skill-name">${skillName}</div>
+          <div class="skill-value">${skillData.value.toFixed(1)} / ${skillData.cap}</div>
+          <div class="skill-base">${skillData.base} based</div>
+        </div>
+      `;
+    }
+
+    profileHtml += `</div>`; // Close skills-grid
+
+    // Add relationships if they exist
+    if (window.player.relationships && Object.keys(window.player.relationships).length > 0) {
+      profileHtml += `
+        <div class="relationships-section">
+          <h3>Relationships</h3>
+          <div class="relationship-cards">
+      `;
+
+      for (const [id, relationship] of Object.entries(window.player.relationships)) {
+        let dispositionText = "Neutral";
+        if (relationship.disposition >= 30) dispositionText = "Friendly";
+        if (relationship.disposition >= 60) dispositionText = "Trusted Ally";
+        if (relationship.disposition <= -30) dispositionText = "Distrustful";
+        if (relationship.disposition <= -60) dispositionText = "Hostile";
+
+        profileHtml += `
+          <div class="relationship-card">
+            <div class="relationship-name">${relationship.name}</div>
+            <div class="relationship-status">${dispositionText}</div>
+            <div class="relationship-value">(${relationship.disposition})</div>
+          </div>
+        `;
+      }
+
+      profileHtml += `</div></div>`;
+    }
+
+    // Update the profile content
+    profileDiv.innerHTML = profileHtml;
+
+    // Show the profile panel
+    profilePanel.classList.remove('hidden');
+    
+    console.log("Profile displayed successfully");
+  } catch (error) {
+    console.error('Error displaying profile:', error);
   }
-  profileDiv.innerHTML += `</ul>`;
-  
-  document.getElementById('profile').classList.remove('hidden');
 };
 
 // Function to update profile if it's currently visible
 window.updateProfileIfVisible = function() {
-  if (!document.getElementById('profile').classList.contains('hidden')) {
-    // Profile is visible, update it
+  const profilePanel = document.getElementById('profile');
+  if (profilePanel && !profilePanel.classList.contains('hidden')) {
     window.handleProfile();
   }
 };
