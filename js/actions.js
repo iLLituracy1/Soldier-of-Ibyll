@@ -157,7 +157,7 @@ window.handleAction = function(action) {
     window.updateProfileIfVisible();
     
     // Time passed depends on time of day
-    let timePassed = 30; // Default for daytime rest
+    let timePassed = 120; // Default for daytime rest
     if (timeOfDay === 'night') {
       timePassed = 480; // 8 hours for night rest
     } else if (timeOfDay === 'evening') {
@@ -210,7 +210,7 @@ window.handleAction = function(action) {
     }
     
     // Chance to discover brawler pits
-    if (!window.gameState.discoveredBrawlerPits && Math.random() < 0.25) {
+    if (!window.gameState.discoveredBrawlerPits && Math.random() < 0.10) {
       window.gameState.discoveredBrawlerPits = true;
       window.addToNarrative("During your patrol, you overhear whispers about underground fighting pits where soldiers test their mettle and bet on matches. Such activities aren't officially sanctioned, but they seem to be an open secret in the camp.");
       window.showNotification("Discovered: Brawler Pits! New activity unlocked at night.", 'success');
