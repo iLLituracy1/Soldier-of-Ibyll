@@ -1,46 +1,19 @@
 // UI FUNCTIONS MODULE
 // Functions related to UI updates and rendering
 
-// UI update registry - allows other systems to register their UI update callbacks
-window.uiRegistry = {
-    actionButtonCallbacks: [],
-    inventoryCallbacks: [],
-    equipmentCallbacks: [],
-    statusCallbacks: []
-};
-
-// Register UI update callbacks
-window.registerUICallback = function(type, callback) {
-    if (window.uiRegistry[type + 'Callbacks']) {
-        window.uiRegistry[type + 'Callbacks'].push(callback);
-    }
-};
-
 // Update status bars function
 window.updateStatusBars = function() {
   // Update health bar
-  const healthBar = document.getElementById('healthBar');
-  const healthText = document.getElementById('healthText');
-  if (healthBar && healthText) {
-    healthBar.style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
-    healthText.textContent = `${Math.round(window.gameState.health)}/${window.gameState.maxHealth}`;
-  }
+  document.getElementById('healthBar').style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
+  document.getElementById('healthValue').textContent = `${Math.round(window.gameState.health)}/${window.gameState.maxHealth}`;
   
   // Update stamina bar
-  const staminaBar = document.getElementById('staminaBar');
-  const staminaText = document.getElementById('staminaText');
-  if (staminaBar && staminaText) {
-    staminaBar.style.width = `${(window.gameState.stamina / window.gameState.maxStamina) * 100}%`;
-    staminaText.textContent = `${Math.round(window.gameState.stamina)}/${window.gameState.maxStamina}`;
-  }
+  document.getElementById('staminaBar').style.width = `${(window.gameState.stamina / window.gameState.maxStamina) * 100}%`;
+  document.getElementById('staminaValue').textContent = `${Math.round(window.gameState.stamina)}/${window.gameState.maxStamina}`;
   
   // Update morale bar
-  const moraleBar = document.getElementById('moraleBar');
-  const moraleText = document.getElementById('moraleText');
-  if (moraleBar && moraleText) {
-    moraleBar.style.width = `${window.gameState.morale}%`;
-    moraleText.textContent = `${Math.round(window.gameState.morale)}/100`;
-  }
+  document.getElementById('moraleBar').style.width = `${window.gameState.morale}%`;
+  document.getElementById('moraleValue').textContent = `${Math.round(window.gameState.morale)}/100`;
 };
 
 // Function to update time and day display
@@ -52,12 +25,6 @@ window.updateTimeAndDay = function(minutesToAdd) {
   while (window.gameTime >= 1440) { // 24 hours * 60 minutes
     window.gameTime -= 1440;
     window.gameDay++;
-
-    if (window.gameDay >= 3 && !window.gameState.campaignIntroduced && !window.gameState.currentCampaign) {
-      window.gameState.campaignIntroduced = true;
-      console.log("Day 3+ reached, triggering campaign introduction");
-      window.showCampaignIntroduction();
-    }
     
     // Reset daily flags
     window.gameState.dailyTrainingCount = 0;
@@ -92,86 +59,60 @@ window.getTimeOfDay = function() {
   return 'night';
 };
 
-// Update time and day display function
-window.updateTimeAndDay = function(minutesToAdd) {
-  // Use TimeManager to advance time
-  const newTime = window.TimeManager.advanceTime(minutesToAdd);
+// Function to update action buttons
+window.updateActionButtons = function() {
+  // Update action buttons based on time of day, location, etc.
+  const actionsContainer = document.getElementById('actions');
+  actionsContainer.innerHTML = '';
   
-  // Update time display
-  document.getElementById('timeDisplay').textContent = `Time: ${newTime.hour12}`;
-  document.getElementById('dayDisplay').textContent = `${newTime.monthName} ${newTime.day}, Year ${newTime.year}`;
+  const timeOfDay = window.getTimeOfDay();
+  const hours = Math.floor(window.gameTime / 60);
   
-  // Update day/night indicator
-  const timeIndicator = document.getElementById('dayNightIndicator');
-  timeIndicator.className = `day-night-indicator time-${window.getTimeOfDay()}`;
-  
-  // Update action buttons and other time-dependent systems
-  window.updateActionButtons();
-  
-  // Check for campaign introduction if needed
-  if (newTime.day >= 3 && !window.gameState.campaignIntroduced && !window.gameState.currentCampaign) {
-    window.gameState.campaignIntroduced = true;
-    window.showCampaignIntroduction();
+  // Standard actions available in camp
+  if (!window.gameState.inBattle && !window.gameState.inMission) {
+    // Training available during the day
+    if (timeOfDay === 'day' || timeOfDay === 'dawn') {
+      window.addActionButton('Train', 'train', actionsContainer);
+    }
+    
+    // Rest always available
+    window.addActionButton('Rest', 'rest', actionsContainer);
+    
+    // Patrol available during day and evening
+    if (timeOfDay === 'day' || timeOfDay === 'evening') {
+      window.addActionButton('Patrol', 'patrol', actionsContainer);
+    }
+    
+    // Mess hall available during meal times
+    if ((hours >= 7 && hours <= 9) || (hours >= 12 && hours <= 14) || (hours >= 18 && hours <= 20)) {
+      window.addActionButton('Mess Hall', 'mess', actionsContainer);
+    }
+    
+    // Guard duty available all times
+    window.addActionButton('Guard Duty', 'guard', actionsContainer);
+    
+    // Gambling and Brawler Pits visibility logic
+    if (timeOfDay === 'evening' || timeOfDay === 'night') {
+      // Only show if player has discovered it or has the right background
+      if (window.gameState.discoveredGamblingTent) {
+        window.addActionButton('Gambling Tent', 'gambling', actionsContainer);
+      }
+      
+      if (window.gameState.discoveredBrawlerPits) {
+        window.addActionButton('Brawler Pits', 'brawler_pits', actionsContainer);
+      }
+    }
+    
+    // Add more actions based on game progression
+    if (window.gameState.mainQuest.stage >= 1) {
+      // Add more mission options as the game progresses
+    }
   }
   
-  return newTime;
-};
-
-// Function to get time of day
-window.getTimeOfDay = function() {
-  const hour = window.TimeManager.getCurrentTime().hourOfDay;
-  
-  if (hour >= 5 && hour < 8) return 'dawn';
-  if (hour >= 8 && hour < 18) return 'day';
-  if (hour >= 18 && hour < 21) return 'evening';
-  return 'night';
-};
-
-// Update action buttons function - now calls registered callbacks
-window.updateActionButtons = function() {
-    const actionsContainer = document.getElementById('actions');
-    if (!actionsContainer) return;
-    
-    // Don't show regular actions during combat
-    if (window.gameState.inBattle) {
-        actionsContainer.innerHTML = '';
-        return;
-    }
-
-    // Clear existing buttons
-    actionsContainer.innerHTML = '';
-
-    // Add standard buttons
-    window.addActionButton('Inventory', 'inventory', actionsContainer);
-    window.addActionButton('Equipment', 'equipment', actionsContainer);
-
-    // Call all registered action button callbacks
-    window.uiRegistry.actionButtonCallbacks.forEach(callback => {
-        try {
-            callback(actionsContainer);
-        } catch (error) {
-            console.error('Error in action button callback:', error);
-        }
-    });
-
-    // Add standard game actions
-    if (!window.gameState.inMission) {
-        const timeOfDay = window.getTimeOfDay();
-        
-        if (timeOfDay === 'day' || timeOfDay === 'dawn') {
-            window.addActionButton('Train', 'train', actionsContainer);
-        }
-        
-        window.addActionButton('Rest', 'rest', actionsContainer);
-        
-        if (timeOfDay === 'day' || timeOfDay === 'evening') {
-            window.addActionButton('Patrol', 'patrol', actionsContainer);
-        }
-    }
-
-    // Add menu buttons
-    window.addActionButton('Profile', 'profile', actionsContainer);
-    window.addActionButton('Quest Log', 'questLog', actionsContainer);
+  // Menu buttons - always available
+  window.addActionButton('Profile', 'profile', actionsContainer);
+  window.addActionButton('Inventory', 'inventory', actionsContainer);
+  window.addActionButton('Quest Log', 'questLog', actionsContainer);
 };
 
 // Function to add action button
@@ -301,144 +242,3 @@ window.showAchievement = function(achievementId) {
     document.body.removeChild(notificationElement);
   }, 5000);
 };
-
-window.showCampaignIntroduction = function() {
-  console.log("Showing campaign introduction");
-  
-  // Add narrative about being summoned to commander's tent
-  window.addToNarrative(`
-    <p>A messenger arrives at your quarters, bearing the seal of Commander Valarius. "Your presence is requested at the command tent immediately," they state formally before departing.</p>
-    <p>This could be the deployment you've been waiting for...</p>
-  `);
-  
-  // Add special flag to game state
-  window.gameState.awaitingCommanderReport = true;
-  
-  // Force update of action buttons to show the special button
-  window.updateActionButtons();
-};
-
-// Handle action button clicks
-window.handleAction = function(action) {
-  if (!action) {
-    console.error('No action specified');
-    return;
-  }
-
-  // Handle special actions first
-  switch(action) {
-    case 'inventory':
-      const inventoryPanel = document.getElementById('inventory');
-      if (inventoryPanel) {
-        inventoryPanel.classList.remove('hidden');
-        if (typeof window.displayInventory === 'function') {
-          window.displayInventory();
-        }
-      }
-      break;
-
-    case 'equipment':
-      const equipmentPanel = document.getElementById('equipment');
-      if (equipmentPanel) {
-        equipmentPanel.classList.remove('hidden');
-        if (typeof window.updateEquipmentDisplay === 'function') {
-          window.updateEquipmentDisplay();
-        }
-      }
-      break;
-
-    case 'scout':
-      if (typeof window.handleScout === 'function') {
-        window.handleScout();
-      }
-      break;
-
-    case 'camp':
-      if (typeof window.handleCamp === 'function') {
-        window.handleCamp();
-      }
-      break;
-
-    case 'patrol':
-      if (typeof window.handlePatrol === 'function') {
-        window.handlePatrol();
-      }
-      break;
-
-    default:
-      // For all other actions, try to find a handler function
-      const handlerName = `handle${action.charAt(0).toUpperCase() + action.slice(1)}`;
-      if (typeof window[handlerName] === 'function') {
-        window[handlerName]();
-      } else {
-        console.warn(`No handler found for action: ${action}`);
-      }
-      break;
-  }
-};
-
-// Add event listeners for panel close buttons
-document.addEventListener('DOMContentLoaded', function() {
-  // Close buttons for panels
-  const closeButtons = document.querySelectorAll('.close-btn');
-  if (closeButtons) {
-    closeButtons.forEach(button => {
-      button.addEventListener('click', function() {
-        const panel = this.closest('.game-panel');
-        if (panel) {
-          panel.classList.add('hidden');
-        }
-      });
-    });
-  }
-
-  // Initialize other UI elements if needed
-  const gameContainer = document.getElementById('gameContainer');
-  if (gameContainer) {
-    gameContainer.classList.remove('hidden');
-  }
-});
-
-// Update inventory display
-window.updateInventoryDisplay = function() {
-    const inventoryList = document.getElementById('inventoryList');
-    if (!inventoryList) return;
-
-    // Clear existing inventory
-    inventoryList.innerHTML = '';
-
-    // Add taelors count
-    inventoryList.innerHTML = `<div class="inventory-coins">${window.player.taelors || 0} Taelors</div>`;
-
-    // Call all registered inventory callbacks
-    window.uiRegistry.inventoryCallbacks.forEach(callback => {
-        try {
-            callback(inventoryList);
-        } catch (error) {
-            console.error('Error in inventory callback:', error);
-        }
-    });
-
-    // Display items
-    if (window.player.inventory && window.player.inventory.length > 0) {
-        window.player.inventory.forEach((item, index) => {
-            if (item) {
-                const itemElement = document.createElement('div');
-                itemElement.className = 'inventory-item';
-                itemElement.innerHTML = `
-                    <div>
-                        <div class="inventory-item-name">${item.name || 'Unknown Item'}</div>
-                        <div>${item.effect || ''}</div>
-                    </div>
-                    <div>${item.value || 0} taelors</div>
-                `;
-                inventoryList.appendChild(itemElement);
-            }
-        });
-    } else {
-        inventoryList.innerHTML += '<p>Your inventory is empty.</p>';
-    }
-};
-  
-  
-  

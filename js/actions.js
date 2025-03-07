@@ -1,127 +1,36 @@
 // PLAYER ACTIONS MODULE
 // Functions related to player actions and activities
 
-// Define combat encounters function if it doesn't exist
-if (typeof window.checkForCombatEncounters !== 'function') {
-  window.checkForCombatEncounters = function(activityType) {
-    // Simple implementation to avoid errors
-    console.log(`Check for combat encounters during ${activityType}`);
-    
-    // Base encounter chance depends on activity
-    let encounterChance = 0;
-    switch(activityType) {
-      case 'patrol':
-        encounterChance = 0.25; // 25% chance during patrol
-        break;
-      case 'scout':
-        encounterChance = 0.35; // 35% chance during scouting
-        break;
-      default:
-        encounterChance = 0.05; // 5% base chance for other activities
-    }
-    
-    // Roll for encounter
-    if (Math.random() < encounterChance) {
-      // Encounter triggered - start a simple combat
-      console.log("Combat encounter triggered!");
-      
-      // Select a random enemy type
-      const enemyTypes = ['arrasi_scout', 'wild_beast', 'imperial_deserter'];
-      const randomEnemy = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
-      
-      // Set encounter narrative
-      window.setNarrative(`You encounter a ${randomEnemy.replace('_', ' ')}! Prepare for combat!`);
-      
-      // Start combat
-      if (typeof window.startCombat === 'function') {
-        window.startCombat(randomEnemy);
-        return true;
-      }
-    }
-    
-    return false;
-  };
-  console.log("Added inline checkForCombatEncounters function");
-}
-
 // Master function to handle all action button clicks
 window.handleAction = function(action) {
   console.log('Action handled:', action);
-
-  // Handle mission selection screen
-  if (action === 'show_missions') {
-    window.showMissionSelectionScreen();
-    return;
-  }
-
-  // Mission actions need to go to mission handler
-  if (action.startsWith('mission_')) {
-    window.handleMissionAction(action);
-    return;
-  }
   
   // Show panels like inventory, profile, etc.
   if (action === 'profile') {
     window.handleProfile();
     return;
   } else if (action === 'inventory') {
-    // Check if inventory system is initialized
-    if (!window.checkSystemDependency('inventory')) {
-      window.showNotification("Inventory system not ready", 'error');
-      return;
-    }
-
-    const inventoryPanel = document.getElementById('inventory');
+    // Update inventory before showing
     const inventoryList = document.getElementById('inventoryList');
+    inventoryList.innerHTML = `<div class="inventory-coins">${window.player.taelors} Taelors</div>`;
     
-    if (!inventoryPanel || !inventoryList) {
-      console.error('Required inventory elements not found');
-      return;
-    }
-
-    try {
-      // Clear existing inventory
-      inventoryList.innerHTML = '';
-      
-      // Add taelors display
-      const taelorsDiv = document.createElement('div');
-      taelorsDiv.className = 'inventory-coins';
-      taelorsDiv.textContent = `${window.player.taelors || 0} Taelors`;
-      inventoryList.appendChild(taelorsDiv);
-      
-      // Check if player has inventory
-      if (!window.player.inventory || window.player.inventory.length === 0) {
-        const emptyDiv = document.createElement('p');
-        emptyDiv.textContent = 'Your inventory is empty.';
-        inventoryList.appendChild(emptyDiv);
-      } else {
-        // Add each inventory item
-        window.player.inventory.forEach((item, index) => {
-          if (!item) return; // Skip invalid items
-          
-          const itemDiv = document.createElement('div');
-          itemDiv.className = 'inventory-item';
-          itemDiv.setAttribute('data-item-index', index);
-          
-          itemDiv.innerHTML = `
-            <div class="item-info">
-              <div class="item-name">${item.name || 'Unknown Item'}</div>
-              <div class="item-effect">${item.effect || ''}</div>
+    if (window.player.inventory.length === 0) {
+      inventoryList.innerHTML += `<p>Your inventory is empty.</p>`;
+    } else {
+      window.player.inventory.forEach((item, index) => {
+        inventoryList.innerHTML += `
+          <div class="inventory-item">
+            <div>
+              <div class="inventory-item-name">${item.name}</div>
+              <div>${item.effect}</div>
             </div>
-            <div class="item-value">${item.value || 0} taelors</div>
-          `;
-          
-          inventoryList.appendChild(itemDiv);
-        });
-      }
-      
-      // Show the panel
-      inventoryPanel.classList.remove('hidden');
-      
-    } catch (error) {
-      console.error('Error displaying inventory:', error);
-      window.showNotification("Error displaying inventory", 'error');
+            <div>${item.value} taelors</div>
+          </div>
+        `;
+      });
     }
+    
+    document.getElementById('inventory').classList.remove('hidden');
     return;
   } else if (action === 'questLog') {
     // Update quest log before showing
@@ -232,10 +141,10 @@ window.handleAction = function(action) {
     let staminaRecovery = 15;
     
     if (timeOfDay === 'night') {
-      healthRecovery = 25;
+      healthRecovery = 15;
       staminaRecovery = 40;
     } else if (timeOfDay === 'evening') {
-      healthRecovery = 15;
+      healthRecovery = 10;
       staminaRecovery = 25;
     }
     
@@ -248,7 +157,7 @@ window.handleAction = function(action) {
     window.updateProfileIfVisible();
     
     // Time passed depends on time of day
-    let timePassed = 90; // Default for daytime rest
+    let timePassed = 30; // Default for daytime rest
     if (timeOfDay === 'night') {
       timePassed = 480; // 8 hours for night rest
     } else if (timeOfDay === 'evening') {
@@ -301,7 +210,7 @@ window.handleAction = function(action) {
     }
     
     // Chance to discover brawler pits
-    if (!window.gameState.discoveredBrawlerPits && Math.random() < 0.15) {
+    if (!window.gameState.discoveredBrawlerPits && Math.random() < 0.25) {
       window.gameState.discoveredBrawlerPits = true;
       window.addToNarrative("During your patrol, you overhear whispers about underground fighting pits where soldiers test their mettle and bet on matches. Such activities aren't officially sanctioned, but they seem to be an open secret in the camp.");
       window.showNotification("Discovered: Brawler Pits! New activity unlocked at night.", 'success');
@@ -334,7 +243,7 @@ window.handleAction = function(action) {
     window.gameState.morale = Math.min(100, window.gameState.morale + 5);
     
     // Chance to discover gambling tent during mess
-    if (!window.gameState.discoveredGamblingTent && Math.random() < 0.2) {
+    if (!window.gameState.discoveredGamblingTent && Math.random() < 0.3) {
       window.gameState.discoveredGamblingTent = true;
       window.addToNarrative("As you finish your meal, you notice a group of soldiers huddled in the corner of the mess tent. The clink of coins and hushed exclamations draw your attention. One of them notices your interest and nods toward a larger tent near the edge of camp. \"Games start after dusk,\" he mutters. \"Bring your taelors if you're feeling lucky.\"");
       window.showNotification("Discovered: Gambling Tent! New activity unlocked at night.", 'success');

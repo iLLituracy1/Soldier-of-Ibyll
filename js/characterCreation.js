@@ -134,20 +134,23 @@ window.showEmpireUpdate = function() {
 };
 
 window.startAdventure = function() {
-    console.log("Starting adventure...");
-    
-    // Hide character creator and show game container
-    document.getElementById('creator').classList.add('hidden');
-    document.getElementById('gameContainer').classList.remove('hidden');
-    
-    // Initialize all game systems
-    window.initializeAllSystems();
-    
-    // Set initial narrative
-    window.setNarrative("You begin your journey as a soldier in the borderlands.");
-    
-    // Show initial notification
-    window.showNotification("Welcome to Kasvaari Camp!", 'info');
+  // Transition from character creation to the main game
+  document.getElementById('creator').classList.add('hidden');
+  document.getElementById('gameContainer').classList.remove('hidden');
+  
+  // Initialize game state
+  window.initializeGameState();
+  
+  // Update status bars and action buttons
+  window.updateStatusBars();
+  window.updateTimeAndDay(0); // Start at the initial time
+  window.updateActionButtons();
+  
+  // Set initial narrative
+  window.setNarrative(`${window.player.name}, a ${window.player.career.title} of ${window.player.origin} heritage. Now, you stand at the edge of your Kasvaari's Camp, the flickering lanterns and distant clang of the forges marking the heartbeat of an army in preparation. Here, amidst the hardened warriors and the banners of noble Charters, you are no longer a traveler—you are a soldier, bound to duty, drawn by the call of empire.<br><br>
+
+The Western Hierarchate is a land of towering fortresses and ancient battlefields, a realm where the scars of past campaigns linger in the earth itself. The Arrasi Peninsula lies beyond the western horizon, its crystalline plains an enigma even to those who have fought there before. Soon, you will march upon those lands, crossing the vast Wall of Nesia, where the empire's dominion falters against the unknown.<br><br>
+For now, your place is here, among your kin and comrades, within the Kasvaari's Camp, where the scent of oiled steel and the murmur of hushed war councils fill the air. What will you do first?`);
 };
 
 window.generateCharacterSummary = function() {
@@ -193,14 +196,13 @@ window.setInitialSkills = function(career) {
     window.player.skills.survival = Number(1.5);
     window.player.skills.tactics = Number(1);
   } else if (career.includes("Geister")) {
-    window.player.skills.melee = Number(1);
     window.player.skills.arcana = Number(2);
     window.player.skills.discipline = Number(1.5);
     window.player.skills.tactics = Number(1);
   } else if (career.includes("Berserker") || career.includes("Primal")) {
     window.player.skills.melee = Number(2.5);
     window.player.skills.survival = Number(1.5);
-  } else if (career.includes("Sellsword") || career.includes("Marine")) {
+  } else if (career.includes("Sellsword") || career.includes("Mercenary")) {
     window.player.skills.melee = Number(1.5);
     window.player.skills.marksmanship = Number(1.5);
     window.player.skills.survival = Number(1);
@@ -208,21 +210,6 @@ window.setInitialSkills = function(career) {
     window.player.skills.melee = Number(2);
     window.player.skills.command = Number(1.5);
     window.player.skills.tactics = Number(1);
-    window.player.skills.survival = Number(1);
-  } else if (career.includes("Marauder")) {
-    window.player.skills.melee = Number(1.5);
-    window.player.skills.command = Number(0.5);
-    window.player.skills.tactics = Number(1);
-  } else if (career.includes("Corsair")) {
-    window.player.skills.melee = Number(1);
-    window.player.skills.survival = Number(1);
-    window.player.skills.tactics = Number(1);
-    window.player.skills.organization = Number(1);
-  } else if (career.includes("Squire")) {
-    window.player.skills.melee = Number(.5);
-    window.player.skills.discipline = Number(.5);
-    window.player.skills.organization = Number(1);
-    window.player.skills.survival = Number(.5);
   }
   
   // Add a bit of randomness to initial skill values - ensure we use numbers

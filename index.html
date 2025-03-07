@@ -76,27 +76,27 @@
     </header>
     
     <!-- Status bars -->
-    <div id="status-bars">
+    <div class="status-bars">
       <div class="status-bar">
-        <label>Health:</label>
+        <div class="status-label">Health</div>
         <div class="bar-container">
-          <div id="healthBar" class="bar"></div>
+          <div id="healthBar" class="bar health-bar" style="width: 100%;"></div>
         </div>
-        <span id="healthText">100/100</span>
+        <div id="healthValue" class="bar-value">100/100</div>
       </div>
       <div class="status-bar">
-        <label>Stamina:</label>
+        <div class="status-label">Stamina</div>
         <div class="bar-container">
-          <div id="staminaBar" class="bar"></div>
+          <div id="staminaBar" class="bar stamina-bar" style="width: 100%;"></div>
         </div>
-        <span id="staminaText">100/100</span>
+        <div id="staminaValue" class="bar-value">100/100</div>
       </div>
       <div class="status-bar">
-        <label>Morale:</label>
+        <div class="status-label">Morale</div>
         <div class="bar-container">
-          <div id="moraleBar" class="bar"></div>
+          <div id="moraleBar" class="bar morale-bar" style="width: 75%;"></div>
         </div>
-        <span id="moraleText">75/100</span>
+        <div id="moraleValue" class="bar-value">75/100</div>
       </div>
     </div>
     
@@ -104,30 +104,8 @@
       <p>The road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.</p>
     </div>
     
-    <!-- Mission Interface -->
-    <div id="missionInterface" class="hidden">
-      <div class="mission-header">
-        <h2 id="missionName"></h2>
-        <div id="missionProgress">
-          <div id="missionDay"></div>
-          <div id="missionObjectives"></div>
-        </div>
-      </div>
-      
-      <div class="mission-content">
-        <div id="missionNarrative"></div>
-        <div id="missionActions"></div>
-      </div>
-      
-      <div class="mission-status">
-        <div id="missionWeather"></div>
-        <div id="missionTerrain"></div>
-        <div id="encounterStatus"></div>
-      </div>
-    </div>
-    
     <div id="actions">
-      <!-- Action buttons will be dynamically populated -->
+      <!-- Action buttons will be dynamically populated by updateActionButtons() -->
     </div>
     
     <!-- Combat Interface (Hidden by default) -->
@@ -163,48 +141,12 @@
     </div>
     
     <!-- Inventory Panel -->
-    <div id="inventory" class="game-panel hidden">
-      <div class="panel-header">
-        <h2>Inventory</h2>
-        <button class="close-btn">×</button>
+    <div id="inventory" class="hidden">
+      <h3>Inventory</h3>
+      <div id="inventoryList">
+        <!-- Inventory items will be dynamically populated -->
       </div>
-      <div id="inventoryList" class="inventory-container">
-        <!-- Inventory items will be dynamically populated here -->
-      </div>
-    </div>
-    
-    <!-- Equipment Panel -->
-    <div id="equipment" class="game-panel hidden">
-      <div class="panel-header">
-        <h2>Equipment</h2>
-        <button class="close-btn">×</button>
-      </div>
-      <div id="equipment-slots">
-        <div class="equipment-slot" data-slot="weapon">
-          <div class="slot-label">Weapon</div>
-          <div class="slot-content">None</div>
-        </div>
-        <div class="equipment-slot" data-slot="offhand">
-          <div class="slot-label">Off Hand</div>
-          <div class="slot-content">None</div>
-        </div>
-        <div class="equipment-slot" data-slot="armor">
-          <div class="slot-label">Armor</div>
-          <div class="slot-content">None</div>
-        </div>
-        <div class="equipment-slot" data-slot="helmet">
-          <div class="slot-label">Helmet</div>
-          <div class="slot-content">None</div>
-        </div>
-        <div class="equipment-slot" data-slot="amulet">
-          <div class="slot-label">Amulet</div>
-          <div class="slot-content">None</div>
-        </div>
-        <div class="equipment-slot" data-slot="ammo">
-          <div class="slot-label">Ammunition</div>
-          <div class="slot-content">None</div>
-        </div>
-      </div>
+      <button class="menu-button inventory-close">Close</button>
     </div>
     
     <!-- Quest Log Panel -->
@@ -225,19 +167,10 @@
   <script src="js/data/narrative.js"></script>
   <script src="js/data/quests.js"></script>
   <script src="js/gameState.js"></script>
-  <script src="js/game.js"></script>
-  <script src="js/inventory-system.js"></script>
-  <script src="js/equipment-system.js"></script>
   <script src="js/characterCreation.js"></script>
   <script src="js/combat.js"></script>
-  <script src="js/combatEncounters.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/actions.js"></script>
-  <script src="js/data/missions.js"></script>
-  <script src="js/data/campaigns.js"></script>
-  <script src="js/missionUI.js"></script>
-  <script src="js/missionEvents.js"></script>
-  <script src="js/missionSystem.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
