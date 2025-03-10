@@ -92,7 +92,17 @@ window.startGameAdventure = function() {
     console.error("Inventory system not found - falling back to basic initialization");
     if (window.initializeInventorySystem) window.initializeInventorySystem();
     if (window.initializeInventoryUI) window.initializeInventoryUI();
-    if (window.addStartingItems) window.addStartingItems();
+  }
+
+  // Phase 3.5: Explicitly add and equip starting items
+  if (window.addStartingItems) {
+    console.log("Adding starting items based on career");
+    window.addStartingItems();
+  }
+  
+  if (window.autoEquipStartingItems) {
+    console.log("Auto-equipping starting items");
+    window.autoEquipStartingItems();
   }
   
   // Phase 4: Update UI
@@ -110,6 +120,31 @@ window.startGameAdventure = function() {
 };
 
 // ================= ACTION HANDLING =================
+
+// Add missing handleInventoryClick function
+window.handleInventoryClick = function() {
+  console.log("Opening inventory");
+  
+  // Make sure inventory system is initialized
+  if (!window.player.equipment) {
+    console.log("Initializing inventory system on first open");
+    window.initializeInventorySystem();
+  }
+  
+  // Display the inventory panel
+  const inventoryPanel = document.getElementById('inventory');
+  inventoryPanel.classList.remove('hidden');
+  
+  // Ensure inventory UI is initialized
+  if (!document.querySelector('.paperdoll')) {
+    console.log("Initializing inventory UI on first open");
+    window.initializeInventoryUI();
+  }
+  
+  // Render inventory items
+  window.renderInventoryItems();
+  window.updateEquipmentDisplay();
+};
 
 // Improved action handler with inventory support
 window.handleAction = function(action) {
