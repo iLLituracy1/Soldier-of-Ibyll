@@ -1,144 +1,416 @@
-// MAIN ENTRY POINT
-// This is the main entry point that initializes the game and sets up event listeners
+// IMPROVED MAIN GAME MODULE
+// Provides a structured initialization sequence and handles core game flow
 
-// Game initialization sequence
+/**
+ * This file consolidates the game initialization flow and eliminates timing issues
+ * by providing a clear sequence of operations. It replaces the original main.js and
+ * incorporates parts of inventory-fix.js for a unified, reliable startup process.
+ */
+
+// ================= GAME INITIALIZATION SEQUENCE =================
+
+// Master initialization function - the single entry point for game setup
 window.initializeGame = function() {
   console.log("Game initializing...");
   
-  // Phase 1: Initialize item system first
+  // Phase 1: Set up event handlers for UI elements
+  setupEventHandlers();
+  
+  // Phase 2: Initialize item templates if needed
   if (!window.itemTemplates || Object.keys(window.itemTemplates).length === 0) {
     console.log("Initializing item templates");
     window.initializeItemTemplates();
   }
-  
-  // Phase 2: Set up event handlers
-  setupEventHandlers();
   
   console.log("Game initialized and ready to play!");
 };
 
 // Function to set up all event listeners
 function setupEventHandlers() {
-  // Set up event listeners for character creation buttons
-  document.getElementById('paanic-button').addEventListener('click', function() {
+  console.log("Setting up event handlers...");
+  
+  // Character creation buttons
+  document.getElementById('paanic-button')?.addEventListener('click', function() {
     window.selectOrigin('Paanic');
   });
   
-  document.getElementById('nesian-button').addEventListener('click', function() {
+  document.getElementById('nesian-button')?.addEventListener('click', function() {
     window.selectOrigin('Nesian');
   });
   
-  document.getElementById('lunarine-button').addEventListener('click', function() {
+  document.getElementById('lunarine-button')?.addEventListener('click', function() {
     window.selectOrigin('Lunarine');
   });
   
-  document.getElementById('wyrdman-button').addEventListener('click', function() {
+  document.getElementById('wyrdman-button')?.addEventListener('click', function() {
     window.selectOrigin('Wyrdman');
   });
   
-  document.getElementById('back-to-intro-button').addEventListener('click', window.backToIntro);
-  document.getElementById('back-to-origin-button').addEventListener('click', window.backToOrigin);
-  document.getElementById('confirm-name-button').addEventListener('click', window.setName);
-  document.getElementById('back-to-name-button').addEventListener('click', window.backToName);
-  document.getElementById('confirm-character-button').addEventListener('click', window.confirmCharacter);
-  document.getElementById('continue-to-empire-button').addEventListener('click', window.showEmpireUpdate);
+  // Character creation navigation
+  document.getElementById('back-to-intro-button')?.addEventListener('click', window.backToIntro);
+  document.getElementById('back-to-origin-button')?.addEventListener('click', window.backToOrigin);
+  document.getElementById('confirm-name-button')?.addEventListener('click', window.setName);
+  document.getElementById('back-to-name-button')?.addEventListener('click', window.backToName);
+  document.getElementById('confirm-character-button')?.addEventListener('click', window.confirmCharacter);
+  document.getElementById('continue-to-empire-button')?.addEventListener('click', window.showEmpireUpdate);
   
-  // MODIFIED: Properly handle the startAdventure button to ensure inventory items
-  document.getElementById('start-adventure-button').addEventListener('click', function() {
+  // Start adventure button - properly handles game start
+  document.getElementById('start-adventure-button')?.addEventListener('click', function() {
     window.startGameAdventure();
   });
   
-  // Add event listeners for panel close buttons
-  document.querySelector('.profile-close').addEventListener('click', function() {
+  // Panel close buttons
+  document.querySelector('.profile-close')?.addEventListener('click', function() {
     document.getElementById('profile').classList.add('hidden');
   });
   
-  document.querySelector('.inventory-close').addEventListener('click', function() {
+  document.querySelector('.inventory-close')?.addEventListener('click', function() {
     document.getElementById('inventory').classList.add('hidden');
   });
   
-  document.querySelector('.quest-log-close').addEventListener('click', function() {
+  document.querySelector('.quest-log-close')?.addEventListener('click', function() {
     document.getElementById('questLog').classList.add('hidden');
   });
   
   console.log("Event handlers set up");
 }
 
-// ADDED: Improved startAdventure function with proper inventory integration
+// ================= GAME START & ADVENTURE SEQUENCE =================
+
+// Improved startAdventure function with proper inventory integration
 window.startGameAdventure = function() {
   console.log("Starting game adventure");
   
-  // Phase 1: Original startAdventure functionality
-  // Hide character creation, show game container
+  // Phase 1: Hide character creation, show game container
   document.getElementById('creator').classList.add('hidden');
   document.getElementById('gameContainer').classList.remove('hidden');
   
   // Phase 2: Initialize game state
   window.initializeGameState();
   
-  // Phase 3: Set up inventory system
-  console.log("Initializing inventory system");
-  window.initializeInventorySystem();
-  window.initializeInventoryUI();
+  // Phase 3: Initialize inventory system (this handles UI, equipment, etc.)
+  if (window.initializeFullInventorySystem) {
+    console.log("Initializing inventory system");
+    window.initializeFullInventorySystem();
+  } else {
+    console.error("Inventory system not found - falling back to basic initialization");
+    if (window.initializeInventorySystem) window.initializeInventorySystem();
+    if (window.initializeInventoryUI) window.initializeInventoryUI();
+    if (window.addStartingItems) window.addStartingItems();
+  }
   
-  // Phase 4: Add starting items based on career
-  console.log(`Adding starting items for ${window.player.career.title}`);
-  window.addStartingItems();
-  
-  // Verify inventory has items
-  console.log(`Player inventory now has ${window.player.inventory.length} items`);
-  
-  // Phase 5: Update UI
+  // Phase 4: Update UI
   window.updateStatusBars();
   window.updateTimeAndDay(0); // Start at the initial time
   window.updateActionButtons();
   
-  // Phase 6: Set initial narrative
+  // Phase 5: Set initial narrative
   window.setNarrative(`${window.player.name}, a ${window.player.career.title} of ${window.player.origin} heritage, the road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.<br><br>
   Now, you stand at the edge of your Kasvaari's Camp, the flickering lanterns and distant clang of the forges marking the heartbeat of an army in preparation. Here, amidst the hardened warriors and the banners of noble Charters, you are no longer a traveler—you are a soldier, bound to duty, drawn by the call of empire.<br><br>
   The Western Hierarchate is a land of towering fortresses and ancient battlefields, a realm where the scars of past campaigns linger in the earth itself. The Arrasi Peninsula lies beyond the western horizon, its crystalline plains an enigma even to those who have fought there before. Soon, you will march upon those lands, crossing the vast Wall of Nesia, where the empire's dominion falters against the unknown.<br><br>
   For now, your place is here, among your kin and comrades, within the Kasvaari's Camp, where the scent of oiled steel and the murmur of hushed war councils fill the air. What will you do first?`);
 
-  // Phase 7: Update inventory panel if needed
-  if (!document.getElementById('inventory').classList.contains('hidden')) {
-    console.log("Updating inventory display");
-    window.renderInventoryItems();
-    window.updateEquipmentDisplay();
-  }
-  
   console.log("Game adventure started successfully");
 };
 
-// Handle inventory button click - fixed version
-window.handleInventoryClick = function() {
-  console.log("Opening inventory");
-  const inventoryPanel = document.getElementById('inventory');
-  inventoryPanel.classList.remove('hidden');
-  
-  // Ensure inventory UI is initialized
-  if (!document.querySelector('.paperdoll')) {
-    console.log("Initializing inventory UI on first open");
-    window.initializeInventoryUI();
-  }
-  
-  // Render inventory items
-  window.renderInventoryItems();
-  window.updateEquipmentDisplay();
-};
+// ================= ACTION HANDLING =================
 
-// Override the inventory action handler
-window.originalHandleAction = window.handleAction;
+// Improved action handler with inventory support
 window.handleAction = function(action) {
-  if (action === 'inventory') {
+  console.log('Action handled:', action);
+  
+  // Special panel actions
+  if (action === 'profile') {
+    window.handleProfile();
+    return;
+  } else if (action === 'inventory') {
     window.handleInventoryClick();
+    return;
+  } else if (action === 'questLog') {
+    // Update quest log before showing
+    const questList = document.getElementById('questList');
+    questList.innerHTML = '';
+    
+    // Add main quest
+    questList.innerHTML += `
+      <div class="quest-item">
+        <div class="quest-title">Main Quest: The Campaign</div>
+        <div>Progress: Stage ${window.gameState.mainQuest.stage}/5</div>
+      </div>
+    `;
+    
+    // Add side quests
+    if (window.gameState.sideQuests.length === 0) {
+      questList.innerHTML += `<p>No active side quests.</p>`;
+    } else {
+      window.gameState.sideQuests.forEach(quest => {
+        questList.innerHTML += `
+          <div class="quest-item">
+            <div class="quest-title">${quest.title}</div>
+            <div>${quest.description}</div>
+            <div>Objectives:</div>
+            <ul>
+        `;
+        
+        quest.objectives.forEach(objective => {
+          const className = objective.completed ? 'quest-objective-complete' : '';
+          questList.innerHTML += `
+            <li class="quest-objective ${className}">
+              ${objective.text}: ${objective.count}/${objective.target}
+            </li>
+          `;
+        });
+        
+        questList.innerHTML += `</ul></div>`;
+      });
+    }
+    
+    document.getElementById('questLog').classList.remove('hidden');
     return;
   }
   
-  // Call the original handler for other actions
-  return window.originalHandleAction(action);
+  // Show submenu actions
+  if (action === 'train') {
+    window.showTrainingOptions();
+    return;
+  } else if (action === 'gambling') {
+    window.showGamblingOptions();
+    return;
+  } else if (action === 'brawler_pits') {
+    window.showBrawlerPitOptions();
+    return;
+  }
+  
+  // Handle specific training types
+  if (action === 'physical_training' || action === 'mental_training' || 
+      action === 'melee_drill' || action === 'ranged_drill' || action === 'squad_exercises') {
+    window.handleTraining(action);
+    return;
+  }
+  
+  // Handle specific gambling activities
+  if (action === 'play_cards' || action === 'play_dice') {
+    window.handleGambling(action);
+    return;
+  }
+  
+  // Handle specific brawler pit activities
+  if (action === 'novice_match' || action === 'standard_match' || action === 'veteran_match') {
+    window.handleBrawl(action);
+    return;
+  }
+  
+  // Handle going back from submenus
+  if (action === 'back_from_training' || action === 'back_from_gambling' || action === 'back_from_brawler') {
+    // Show main action buttons again
+    window.updateActionButtons();
+    return;
+  }
+  
+  // Handle core camp actions
+  if (action === 'rest') {
+    handleRestAction();
+  } else if (action === 'patrol') {
+    handlePatrolAction();
+  } else if (action === 'mess') {
+    handleMessAction();
+  } else if (action === 'guard') {
+    handleGuardAction();
+  }
+  
+  // Check for level up after actions
+  window.checkLevelUp();
 };
+
+// Action handler for rest
+function handleRestAction() {
+  // Rest action
+  const timeOfDay = window.getTimeOfDay();
+  let restIndex = 0;
+  
+  if (timeOfDay === 'day') {
+    restIndex = Math.floor(Math.random() * 2); // First two rest narratives
+  } else if (timeOfDay === 'evening') {
+    restIndex = 2 + Math.floor(Math.random() * 2); // Middle two rest narratives
+  } else {
+    restIndex = 4 + Math.floor(Math.random() * 2); // Last two rest narratives
+  }
+  
+  const restText = window.narrativeElements.rest[restIndex];
+  window.setNarrative(restText);
+  
+  // Recovery depends on time of day
+  let healthRecovery = 5;
+  let staminaRecovery = 15;
+  
+  if (timeOfDay === 'night') {
+    healthRecovery = 15;
+    staminaRecovery = 40;
+  } else if (timeOfDay === 'evening') {
+    healthRecovery = 10;
+    staminaRecovery = 25;
+  }
+  
+  // Update game state
+  window.gameState.health = Math.min(window.gameState.maxHealth, window.gameState.health + healthRecovery);
+  window.gameState.stamina = Math.min(window.gameState.maxStamina, window.gameState.stamina + staminaRecovery);
+  
+  // Update UI
+  window.updateStatusBars();
+  window.updateProfileIfVisible();
+  
+  // Time passed depends on time of day
+  let timePassed = 120; // Default for daytime rest
+  if (timeOfDay === 'night') {
+    timePassed = 480; // 8 hours for night rest
+  } else if (timeOfDay === 'evening') {
+    timePassed = 120; // 2 hours for evening rest
+  }
+  
+  window.updateTimeAndDay(timePassed);
+  
+  // Show notification
+  window.showNotification(`Rested and recovered ${healthRecovery} health and ${staminaRecovery} stamina`, 'success');
+}
+
+// Action handler for patrol
+function handlePatrolAction() {
+  // Check if already patrolled today
+  if (window.gameState.dailyPatrolDone) {
+    window.showNotification("You've already completed your patrol duty for today.", 'warning');
+    return;
+  }
+  
+  // Check if player has enough stamina
+  if (window.gameState.stamina < 25) {
+    window.showNotification("You're too exhausted to patrol effectively. Rest first.", 'warning');
+    return;
+  }
+  
+  // Patrol action
+  const patrolText = window.narrativeElements.patrol[Math.floor(Math.random() * window.narrativeElements.patrol.length)];
+  window.setNarrative(patrolText);
+  
+  // Update game state
+  window.gameState.stamina = Math.max(0, window.gameState.stamina - 25);
+  window.gameState.dailyPatrolDone = true;
+  window.gameState.experience += 10;
+  
+  // Improve relationship with a random officer
+  const officers = ["commander", "sergeant"];
+  const randomOfficer = officers[Math.floor(Math.random() * officers.length)];
+  window.player.relationships[randomOfficer].disposition += 3;
+  window.player.relationships[randomOfficer].interactions += 1;
+  
+  // Small chance to improve survival skill
+  const survivalImprovement = parseFloat((Math.random() * 0.03 + 0.02).toFixed(2));
+  const survivalCap = Math.floor((window.player.phy + window.player.men) / 3);
+  
+  if (Math.random() < 0.3 && window.player.skills.survival < survivalCap) {
+    window.player.skills.survival = Math.min(survivalCap, window.player.skills.survival + survivalImprovement);
+    window.showNotification(`Your survival skills improved by ${survivalImprovement}`, 'success');
+  }
+  
+  // Chance to discover brawler pits
+  if (!window.gameState.discoveredBrawlerPits && Math.random() < 0.10) {
+    window.gameState.discoveredBrawlerPits = true;
+    window.addToNarrative("During your patrol, you overhear whispers about underground fighting pits where soldiers test their mettle and bet on matches. Such activities aren't officially sanctioned, but they seem to be an open secret in the camp.");
+    window.showNotification("Discovered: Brawler Pits! New activity unlocked at night.", 'success');
+    
+    // Update achievement progress for discovering new locations
+    window.updateAchievementProgress('scout_master', 1);
+  }
+  
+  // Update UI
+  window.updateStatusBars();
+  window.updateProfileIfVisible();
+  window.updateTimeAndDay(120); // 2 hours
+  
+  // Show notification
+  window.showNotification("Patrol complete! +10 XP", 'success');
+}
+
+// Action handler for mess hall
+function handleMessAction() {
+  // Mess hall action
+  const messText = window.narrativeElements.mess[Math.floor(Math.random() * window.narrativeElements.mess.length)];
+  window.setNarrative(messText);
+  
+  // Update game state
+  window.gameState.stamina = Math.min(window.gameState.maxStamina, window.gameState.stamina + 15);
+  window.gameState.morale = Math.min(100, window.gameState.morale + 5);
+  
+  // Chance to discover gambling tent during mess
+  if (!window.gameState.discoveredGamblingTent && Math.random() < 0.3) {
+    window.gameState.discoveredGamblingTent = true;
+    window.addToNarrative("As you finish your meal, you notice a group of soldiers huddled in the corner of the mess tent. The clink of coins and hushed exclamations draw your attention. One of them notices your interest and nods toward a larger tent near the edge of camp. \"Games start after dusk,\" he mutters. \"Bring your taelors if you're feeling lucky.\"");
+    window.showNotification("Discovered: Gambling Tent! New activity unlocked at night.", 'success');
+    
+    // Update achievement progress for discovering new locations
+    window.updateAchievementProgress('scout_master', 1);
+  }
+  
+  // Small chance to improve organization skill
+  const organizationImprovement = parseFloat((Math.random() * 0.02 + 0.01).toFixed(2));
+  const mentalSkillCap = Math.floor(window.player.men / 1.5);
+  
+  if (Math.random() < 0.15 && window.player.skills.organization < mentalSkillCap) {
+    window.player.skills.organization = Math.min(mentalSkillCap, window.player.skills.organization + organizationImprovement);
+    window.showNotification(`Your organization skills improved by ${organizationImprovement}`, 'success');
+  }
+  
+  // Update UI
+  window.updateStatusBars();
+  window.updateProfileIfVisible();
+  window.updateTimeAndDay(45); // 45 minutes
+  
+  // Show notification
+  window.showNotification("Meal complete! Recovered stamina and morale", 'success');
+}
+
+// Action handler for guard duty
+function handleGuardAction() {
+  // Check if player has enough stamina
+  if (window.gameState.stamina < 20) {
+    window.showNotification("You're too exhausted for guard duty. Rest first.", 'warning');
+    return;
+  }
+  
+  // Guard duty action
+  const guardText = window.narrativeElements.guard[Math.floor(Math.random() * window.narrativeElements.guard.length)];
+  window.setNarrative(guardText);
+  
+  // Update game state
+  window.gameState.stamina = Math.max(0, window.gameState.stamina - 20);
+  window.gameState.experience += 8;
+  
+  // Chance to improve discipline or tactics skill
+  const skillImprovement = parseFloat((Math.random() * 0.04 + 0.06).toFixed(2));
+  const mentalSkillCap = Math.floor(window.player.men / 1.5);
+  
+  if (Math.random() < 0.3) {
+    if (Math.random() < 0.5 && window.player.skills.discipline < mentalSkillCap) {
+      window.player.skills.discipline = Math.min(mentalSkillCap, window.player.skills.discipline + skillImprovement);
+      window.showNotification(`Your discipline improved by ${skillImprovement}.`, 'success');
+    } else if (window.player.skills.tactics < mentalSkillCap) {
+      window.player.skills.tactics = Math.min(mentalSkillCap, window.player.skills.tactics + skillImprovement);
+      window.showNotification(`Your tactical thinking improved by ${skillImprovement}.`, 'success');
+    }
+  }
+  
+  // Update UI
+  window.updateStatusBars();
+  window.updateProfileIfVisible();
+  window.updateTimeAndDay(180); // 3 hours
+  
+  // Show notification
+  window.showNotification("Guard duty complete! +8 XP", 'success');
+}
+
+// ================= GAME INITIALIZATION BOOTSTRAP =================
 
 // Run initialization when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
+  console.log("DOM loaded, initializing game");
   window.initializeGame();
 });

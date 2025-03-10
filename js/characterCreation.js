@@ -1,5 +1,12 @@
-// CHARACTER CREATION MODULE
-// Functions related to character creation
+// IMPROVED CHARACTER CREATION MODULE
+// Functions related to character creation with type safety and validation
+
+/**
+ * This file improves the character creation process by:
+ * - Ensuring numeric types for attributes and skills
+ * - Adding validation to prevent type conversion issues
+ * - Properly handling skill caps and calculations
+ */
 
 // Function to select origin (heritage)
 window.selectOrigin = function(origin) {
@@ -62,10 +69,12 @@ window.selectCareer = function(career) {
       phy: window.player.phy,
       men: window.player.men,
       phyRange: statRange.phy,
-      menRange: statRange.men,
-      physValue: physValue,
-      menValue: menValue
+      menRange: statRange.men
     });
+  } else {
+    console.error("No stat range found for origin:", window.player.origin);
+    window.player.phy = 2;
+    window.player.men = 2;
   }
   
   // Set initial skills based on career
@@ -89,7 +98,7 @@ window.setName = function() {
   
   // Validate name (not empty)
   if (name === '') {
-    alert('Please enter a name for your character.');
+    window.showNotification('Please enter a name for your character.', 'warning');
     return;
   }
   
@@ -133,32 +142,42 @@ window.showEmpireUpdate = function() {
   document.getElementById('empireText').innerHTML = window.empireUpdateText;
 };
 
+// This function is replaced by startGameAdventure in main.js
 window.startAdventure = function() {
-  // Transition from character creation to the main game
-  document.getElementById('creator').classList.add('hidden');
-  document.getElementById('gameContainer').classList.remove('hidden');
-  
-  // Initialize game state
-  window.initializeGameState();
-  
-  // Update status bars and action buttons
-  window.updateStatusBars();
-  window.updateTimeAndDay(0); // Start at the initial time
-  window.updateActionButtons();
-  
-  // Set initial narrative
-  window.setNarrative(`${window.player.name}, a ${window.player.career.title} of ${window.player.origin} heritage, the road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.<br><br>
-  Now, you stand at the edge of your Kasvaari's Camp, the flickering lanterns and distant clang of the forges marking the heartbeat of an army in preparation. Here, amidst the hardened warriors and the banners of noble Charters, you are no longer a traveler—you are a soldier, bound to duty, drawn by the call of empire.<br><br>
-  The Western Hierarchate is a land of towering fortresses and ancient battlefields, a realm where the scars of past campaigns linger in the earth itself. The Arrasi Peninsula lies beyond the western horizon, its crystalline plains an enigma even to those who have fought there before. Soon, you will march upon those lands, crossing the vast Wall of Nesia, where the empire's dominion falters against the unknown.<br><br>
-  For now, your place is here, among your kin and comrades, within the Kasvaari's Camp, where the scent of oiled steel and the murmur of hushed war councils fill the air. What will you do first?`);
+  console.log("Legacy startAdventure called - rerouting to startGameAdventure");
+  if (typeof window.startGameAdventure === 'function') {
+    window.startGameAdventure();
+  } else {
+    // Fallback to original implementation
+    document.getElementById('creator').classList.add('hidden');
+    document.getElementById('gameContainer').classList.remove('hidden');
+    
+    // Initialize game state
+    window.initializeGameState();
+    
+    // Update status bars and action buttons
+    window.updateStatusBars();
+    window.updateTimeAndDay(0); // Start at the initial time
+    window.updateActionButtons();
+    
+    // Set initial narrative
+    window.setNarrative(`${window.player.name}, a ${window.player.career.title} of ${window.player.origin} heritage, the road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.`);
+  }
 };
 
 window.generateCharacterSummary = function() {
+  // Calculate skill caps for display
+  const meleeCap = Math.floor(window.player.phy / 1.5);
+  const marksmanshipCap = Math.floor((window.player.phy + window.player.men) / 3);
+  const survivalCap = Math.floor((window.player.phy + window.player.men) / 3);
+  const commandCap = Math.floor((window.player.men * 0.8 + window.player.phy * 0.2) / 1.5);
+  const mentalSkillCap = Math.floor(window.player.men / 1.5);
+  
   let summary = `<p><strong>Name:</strong> ${window.player.name}</p>`;
   summary += `<p><strong>Heritage:</strong> ${window.player.origin}</p>`;
   summary += `<p><strong>Career:</strong> ${window.player.career.title}</p>`;
-  summary += `<p><strong>Physical:</strong> ${window.player.phy}</p>`;
-  summary += `<p><strong>Mental:</strong> ${window.player.men}</p>`;
+  summary += `<p><strong>Physical (PHY):</strong> ${window.player.phy.toFixed(2)} (Max: ${window.player.men > 0 ? Math.min(15, Math.ceil(window.player.men / 0.6)) : 15})</p>`;
+  summary += `<p><strong>Mental (MEN):</strong> ${window.player.men.toFixed(2)} (Max: ${window.player.phy > 0 ? Math.min(15, Math.ceil(window.player.phy / 0.6)) : 15})</p>`;
   
   // Add career description if available
   const careerInfo = window.origins[window.player.origin].careers.find(c => c.title === window.player.career.title);
@@ -166,14 +185,18 @@ window.generateCharacterSummary = function() {
     summary += `<p>${careerInfo.description}</p>`;
   }
   
-  // Add skills
+  // Add skills with caps
   summary += `<p><strong>Skills:</strong></p><ul>`;
   
-  for (const [skill, value] of Object.entries(window.player.skills)) {
-    if (value > 0) {
-      summary += `<li>${skill.charAt(0).toUpperCase() + skill.slice(1)}: ${value.toFixed(1)}</li>`;
-    }
-  }
+  // Display skills with their caps
+  summary += `<li>Melee Combat: ${window.player.skills.melee.toFixed(1)} / ${meleeCap} (PHY based)</li>`;
+  summary += `<li>Marksmanship: ${window.player.skills.marksmanship.toFixed(1)} / ${marksmanshipCap} (PHY+MEN based)</li>`;
+  summary += `<li>Survival: ${window.player.skills.survival.toFixed(1)} / ${survivalCap} (PHY+MEN based)</li>`;
+  summary += `<li>Command: ${window.player.skills.command.toFixed(1)} / ${commandCap} (MEN+some PHY based)</li>`;
+  summary += `<li>Discipline: ${window.player.skills.discipline.toFixed(1)} / ${mentalSkillCap} (MEN based)</li>`;
+  summary += `<li>Tactics: ${window.player.skills.tactics.toFixed(1)} / ${mentalSkillCap} (MEN based)</li>`;
+  summary += `<li>Organization: ${window.player.skills.organization.toFixed(1)} / ${mentalSkillCap} (MEN based)</li>`;
+  summary += `<li>Arcana: ${window.player.skills.arcana.toFixed(1)} / ${mentalSkillCap} (MEN based)</li>`;
   
   summary += `</ul>`;
   
@@ -222,18 +245,57 @@ window.setInitialSkills = function(career) {
     window.player.skills.tactics = Number(1);
     window.player.skills.organization = Number(1);
   } else if (career.includes("Squire")) {
-    window.player.skills.melee = Number(.5);
-    window.player.skills.discipline = Number(.5);
+    window.player.skills.melee = Number(0.5);
+    window.player.skills.discipline = Number(0.5);
     window.player.skills.organization = Number(1);
-    window.player.skills.survival = Number(.5);
+    window.player.skills.survival = Number(0.5);
+  } else {
+    // Default skills for unknown careers
+    window.player.skills.melee = Number(1);
+    window.player.skills.survival = Number(1);
   }
   
   // Add a bit of randomness to initial skill values - ensure we use numbers
   for (const skill in window.player.skills) {
     if (window.player.skills[skill] > 0) {
-      const randomBonus = Number(parseFloat((Math.random() * 0.5).toFixed(1)));
+      const randomBonus = Number((Math.random() * 0.5).toFixed(1));
       window.player.skills[skill] = Number(window.player.skills[skill]) + Number(randomBonus);
+      
+      // Ensure each skill is explicitly a number
+      window.player.skills[skill] = Number(window.player.skills[skill].toFixed(1));
     }
+  }
+  
+  // Apply skill caps by attribute
+  window.applyCapsToSkills();
+  
+  console.log("Skills initialized:", window.player.skills);
+};
+
+// New function to enforce skill caps based on attributes
+window.applyCapsToSkills = function() {
+  if (!window.player || !window.player.skills) return;
+  
+  // Calculate caps
+  const meleeCap = Math.floor(window.player.phy / 1.5);
+  const marksmanshipCap = Math.floor((window.player.phy + window.player.men) / 3);
+  const survivalCap = Math.floor((window.player.phy + window.player.men) / 3);
+  const commandCap = Math.floor((window.player.men * 0.8 + window.player.phy * 0.2) / 1.5);
+  const mentalSkillCap = Math.floor(window.player.men / 1.5);
+  
+  // Apply caps
+  window.player.skills.melee = Math.min(window.player.skills.melee, meleeCap);
+  window.player.skills.marksmanship = Math.min(window.player.skills.marksmanship, marksmanshipCap);
+  window.player.skills.survival = Math.min(window.player.skills.survival, survivalCap);
+  window.player.skills.command = Math.min(window.player.skills.command, commandCap);
+  window.player.skills.discipline = Math.min(window.player.skills.discipline, mentalSkillCap);
+  window.player.skills.tactics = Math.min(window.player.skills.tactics, mentalSkillCap);
+  window.player.skills.organization = Math.min(window.player.skills.organization, mentalSkillCap);
+  window.player.skills.arcana = Math.min(window.player.skills.arcana, mentalSkillCap);
+  
+  // Round all skills to 1 decimal place
+  for (const skill in window.player.skills) {
+    window.player.skills[skill] = Number(window.player.skills[skill].toFixed(1));
   }
 };
 
@@ -241,11 +303,45 @@ window.initializeRelationships = function() {
   // Initialize relationships with camp characters
   window.player.relationships = {};
   
-  window.campCharacters.forEach(character => {
-    window.player.relationships[character.id] = {
-      name: character.name,
-      disposition: character.disposition,
-      interactions: 0
+  // Check if camp characters exist
+  if (!window.campCharacters || !Array.isArray(window.campCharacters)) {
+    console.error("Camp characters not defined - creating default relationships");
+    window.player.relationships = {
+      "commander": { name: "Commander", disposition: 0, interactions: 0 },
+      "sergeant": { name: "Sergeant", disposition: 0, interactions: 0 }
     };
+    return;
+  }
+  
+  // Create relationship entries for each character
+  window.campCharacters.forEach(character => {
+    if (character && character.id) {
+      window.player.relationships[character.id] = {
+        name: character.name || character.id,
+        disposition: character.disposition || 0,
+        interactions: 0
+      };
+    }
   });
+  
+  console.log("Relationships initialized:", window.player.relationships);
+};
+
+// Provide a helper to validate numeric attributes - useful during development
+window.validatePlayerAttributes = function() {
+  if (!window.player) return false;
+  
+  // Force numeric types for core attributes
+  window.player.phy = Number(window.player.phy);
+  window.player.men = Number(window.player.men);
+  
+  // Force numeric types for all skills
+  for (const skill in window.player.skills) {
+    window.player.skills[skill] = Number(window.player.skills[skill]);
+  }
+  
+  // Reapply skill caps
+  window.applyCapsToSkills();
+  
+  return true;
 };
