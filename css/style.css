@@ -6,18 +6,23 @@ body {
   line-height: 1.6;
   transition: background 0.5s;
 }
+
 #creator, #gameContainer {
   max-width: 800px;
   margin: 0 auto;
+  position: relative;
 }
+
 .section {
   margin-bottom: 20px;
   opacity: 1;
   transition: opacity 0.4s ease-in-out;
 }
+
 .section.fade-out {
   opacity: 0;
 }
+
 .menu-button, .action-btn {
   background: #333;
   border: none;
@@ -28,20 +33,25 @@ body {
   transition: all 0.3s;
   border-radius: 4px;
 }
+
 .menu-button:hover, .action-btn:hover {
   background: #555;
   transform: translateY(-2px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
+
 .menu-button:active, .action-btn:active {
   transform: translateY(1px);
 }
+
 .hidden {
   display: none;
 }
+
 h1, h2, h3 {
   text-align: center;
 }
+
 input[type="text"], input[type="number"] {
   padding: 8px;
   width: 80%;
@@ -53,51 +63,218 @@ input[type="text"], input[type="number"] {
   color: #e0e0e0;
   border-radius: 4px;
 }
-/* Styles for the main game section */
-header {
-  text-align: center;
-  margin-bottom: 20px;
-  position: relative;
+
+/* Game layout */
+.game-layout {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas:
+    "header header"
+    "narrative side-panel"
+    "actions side-panel";
+  gap: 15px;
 }
+
+/* ---- HEADER STYLES ---- */
+.game-header {
+  grid-area: header;
+  text-align: center;
+  position: relative;
+  margin-bottom: 10px;
+  background: #1e1e1e;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+}
+
 #location {
   font-size: 1.2em;
-  margin-bottom: 10px;
   font-weight: bold;
   color: #a0a0ff;
+  margin-bottom: 5px;
 }
+
+.time-display-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+}
+
 #timeDisplay, #dayDisplay {
-  text-align: center;
-  margin-bottom: 10px;
+  margin: 0;
   transition: color 0.5s;
 }
+
+.day-night-indicator {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(to bottom, #87CEEB, #1a1a1a);
+  transition: background 0.5s;
+  vertical-align: middle;
+  margin-right: 5px;
+}
+
+.time-dawn { background: linear-gradient(to bottom, #ff7e5f, #feb47b); }
+.time-day { background: linear-gradient(to bottom, #87CEEB, #4ca1af); }
+.time-evening { background: linear-gradient(to bottom, #614385, #516395); }
+.time-night { background: linear-gradient(to bottom, #141e30, #243b55); }
+
+/* ---- NARRATIVE SECTION ---- */
 #narrative {
+  grid-area: narrative;
   border: 1px solid #333;
   background: #1e293b;
   padding: 15px;
   min-height: 150px;
   max-height: 300px;
   overflow-y: auto;
-  margin-bottom: 20px;
   border-radius: 8px;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
   transition: background 0.5s;
 }
+
+/* ---- SIDE PANEL ---- */
+.side-panel {
+  grid-area: side-panel;
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* Game controls */
+.game-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-btn {
+  background: #2a2a2a;
+  color: #e0e0e0;
+  border: none;
+  border-radius: 4px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.control-btn:hover {
+  background: #3a3a3a;
+  transform: translateY(-2px);
+}
+
+.control-btn:active {
+  transform: translateY(1px);
+}
+
+.control-btn i {
+  font-size: 1.2em;
+}
+
+/* Status bars */
+.status-bars {
+  margin-top: 15px;
+}
+
+.status-bar {
+  margin-bottom: 8px;
+}
+
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8em;
+  margin-bottom: 2px;
+}
+
+.status-label {
+  font-weight: bold;
+}
+
+.bar-container {
+  height: 8px;
+  background: #333;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.health-bar { background: linear-gradient(to right, #ff5f6d, #ffc371); }
+.stamina-bar { background: linear-gradient(to right, #56ab2f, #a8e063); }
+.morale-bar { background: linear-gradient(to right, #4776E6, #8E54E9); }
+
+/* ---- ACTIONS SECTION ---- */
 #actions {
+  grid-area: actions;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
-}
-#profile, #inventory, #questLog {
-  border: 1px solid #444;
   background: #1a1a1a;
   padding: 15px;
-  margin-top: 20px;
   border-radius: 8px;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
-  max-height: 70vh;
+}
+
+/* ---- PANELS ---- */
+#profile, #inventory, #questLog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  border: 1px solid #444;
+  background: #1a1a1a;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  max-height: 80vh;
+  width: 80%;
+  max-width: 700px;
   overflow-y: auto;
 }
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #333;
+}
+
+.panel-header h3 {
+  margin: 0;
+  text-align: left;
+}
+
+.panel-close {
+  background: none;
+  border: none;
+  color: #e0e0e0;
+  font-size: 1.5em;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+/* ---- NOTIFICATIONS ---- */
 .notification {
   position: fixed;
   top: 20px;
@@ -112,59 +289,10 @@ header {
   transition: all 0.3s ease;
   z-index: 1000;
 }
+
 .notification.show {
   opacity: 1;
   transform: translateY(0);
-}
-.day-night-indicator {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: linear-gradient(to bottom, #87CEEB, #1a1a1a);
-  transition: background 0.5s;
-}
-.time-dawn { background: linear-gradient(to bottom, #ff7e5f, #feb47b); }
-.time-day { background: linear-gradient(to bottom, #87CEEB, #4ca1af); }
-.time-evening { background: linear-gradient(to bottom, #614385, #516395); }
-.time-night { background: linear-gradient(to bottom, #141e30, #243b55); }
-
-.status-bars {
-  margin: 15px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.status-bar {
-  display: flex;
-  align-items: center;
-  margin-bottom: 5px;
-}
-.status-label {
-  width: 80px;
-  font-weight: bold;
-}
-.bar-container {
-  flex-grow: 1;
-  height: 15px;
-  background: #333;
-  border-radius: 10px;
-  overflow: hidden;
-  margin: 0 10px;
-}
-.bar {
-  height: 100%;
-  border-radius: 10px;
-  transition: width 0.3s ease;
-}
-.health-bar { background: linear-gradient(to right, #ff5f6d, #ffc371); }
-.stamina-bar { background: linear-gradient(to right, #56ab2f, #a8e063); }
-.morale-bar { background: linear-gradient(to right, #4776E6, #8E54E9); }
-.bar-value {
-  width: 80px;
-  text-align: right;
 }
 
 .achievement-notification {
@@ -182,22 +310,27 @@ header {
   z-index: 1001;
   animation: achievement-slide-in 0.5s ease-out, achievement-fade-out 0.5s ease-in 4.5s forwards;
 }
+
 .achievement-icon {
   font-size: 2em;
 }
+
 .achievement-content {
   flex-grow: 1;
 }
+
 .achievement-title {
   font-size: 0.8em;
   text-transform: uppercase;
   color: #a0a0ff;
 }
+
 .achievement-name {
   font-size: 1.2em;
   font-weight: bold;
   margin: 3px 0;
 }
+
 .achievement-description {
   font-size: 0.9em;
   color: #aaa;
@@ -207,6 +340,7 @@ header {
   from { transform: translateX(-100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
+
 @keyframes achievement-fade-out {
   from { opacity: 1; }
   to { opacity: 0; }
@@ -220,16 +354,19 @@ header {
   padding: 20px;
   margin-top: 20px;
 }
+
 #combatHeader {
   display: flex;
   justify-content: space-between;
   margin-bottom: 15px;
 }
+
 .combat-health-container {
   width: 45%;
   display: flex;
   flex-direction: column;
 }
+
 .combat-health-bar {
   height: 20px;
   background: #333;
@@ -237,18 +374,21 @@ header {
   overflow: hidden;
   margin-top: 5px;
 }
+
 #playerCombatHealth {
   background: linear-gradient(to right, #ff5f6d, #ffc371);
   height: 100%;
   width: 100%;
   transition: width 0.5s;
 }
+
 #enemyCombatHealth {
   background: linear-gradient(to right, #8E0E00, #1F1C18);
   height: 100%;
   width: 100%;
   transition: width 0.5s;
 }
+
 #combatLog {
   background: #1a1a1a;
   border: 1px solid #333;
@@ -258,6 +398,7 @@ header {
   margin: 15px 0;
   border-radius: 4px;
 }
+
 #combatActions {
   display: flex;
   flex-wrap: wrap;
@@ -272,29 +413,35 @@ header {
   padding: 10px;
   margin-bottom: 10px;
 }
+
 .quest-title, .inventory-item-name {
   font-weight: bold;
   margin-bottom: 5px;
   color: #a0a0ff;
 }
+
 .quest-objective {
   font-size: 0.9em;
   color: #aaa;
   margin: 3px 0;
 }
+
 .quest-objective-complete {
   color: #56ab2f;
 }
+
 .inventory-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+
 .inventory-coins {
   padding: 10px;
   margin-bottom: 20px;
   border-bottom: 1px solid #444;
 }
+
 .career-description {
   background: #1a1a1a;
   border: 1px solid #444;
@@ -347,3 +494,259 @@ header {
 .equipment-slot[data-slot="offHand"] { grid-area: offHand; }
 .equipment-slot[data-slot="accessory"] { grid-area: accessory; }
 .equipment-slot[data-slot="mount"] { grid-area: mount; }
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .game-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "side-panel"
+      "narrative"
+      "actions";
+  }
+  
+  .side-panel {
+    order: 2;
+  }
+}
+
+/* Enhanced Profile Styling */
+#profile {
+  background-color: #1e2636;
+  max-width: 800px;
+  width: 90%;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border: 1px solid #2a3448;
+  overflow: hidden;
+  max-height: 90vh; /* Limit height to 90% of viewport */
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  background-color: #232c3f;
+  padding: 10px 15px;
+  border-bottom: 1px solid #2a3448;
+  flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+.panel-header h3 {
+  margin: 0;
+  color: #c9aa71;
+  text-align: left;
+}
+
+#profileText {
+  overflow-y: auto; /* Add scrollbar only when needed */
+  flex-grow: 1; /* Allow content to take remaining space */
+}
+
+.profile-container {
+  padding: 0;
+  color: #e0e0e0;
+}
+
+.profile-header {
+  display: flex;
+  padding: 20px;
+  border-bottom: 1px solid #2a3448;
+}
+
+.profile-avatar {
+  width: 70px;
+  height: 70px; /* Slightly smaller avatar */
+  border-radius: 50%;
+  background-color: rgba(160, 160, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-right: 20px;
+  border: 2px solid #2a3448;
+  flex-shrink: 0; /* Prevent avatar from shrinking */
+}
+
+.avatar-icon {
+  font-size: 2.2em; /* Slightly smaller icon */
+}
+
+.secondary-icon {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: #a0a0ff;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.8em;
+  border: 2px solid #1e2636;
+}
+
+.profile-title {
+  flex: 1;
+}
+
+.profile-title h2 {
+  margin: 0 0 5px 0;
+  color: #c9aa71;
+  text-align: left;
+  font-size: 1.6em; /* Slightly smaller heading */
+}
+
+.profile-subtitle {
+  color: #a0a0a0;
+  margin-bottom: 10px;
+}
+
+.profile-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stat-pill {
+  background-color: #232c3f;
+  padding: 3px 8px;
+  border-radius: 15px;
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+
+.profile-attributes {
+  display: flex;
+  padding: 15px;
+  gap: 15px;
+  border-bottom: 1px solid #2a3448;
+}
+
+.attribute-box {
+  flex: 1;
+  background-color: #232c3f;
+  border-radius: 8px;
+  padding: 12px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.attribute-title {
+  color: #c9aa71;
+  font-weight: bold;
+  margin-bottom: 3px;
+  text-align: center;
+}
+
+.attribute-max {
+  font-size: 0.75em;
+  color: #888;
+  margin-bottom: 5px;
+}
+
+.attribute-value {
+  font-size: 2.5em; /* Slightly smaller values */
+  font-weight: bold;
+  color: #e0e0e0;
+  margin-bottom: 5px;
+}
+
+.attribute-desc {
+  font-size: 0.75em;
+  color: #a0a0a0;
+  text-align: center;
+}
+
+.skills-header {
+  padding: 8px 15px;
+  margin: 0;
+  color: #c9aa71;
+  text-align: left;
+}
+
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* More columns on wider screens */
+  gap: 10px;
+  padding: 0 15px 15px 15px;
+}
+
+.skill-card {
+  background-color: #232c3f;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.skill-name {
+  margin-bottom: 8px;
+  text-align: center;
+  font-size: 0.85em;
+}
+
+.skill-meter {
+  position: relative;
+  width: 60px; /* Smaller skill circles */
+  height: 60px;
+  margin-bottom: 5px;
+}
+
+.skill-circle {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #2a3448;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skill-circle::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: conic-gradient(
+    #c9aa71 0% var(--skill-value),
+    transparent var(--skill-value) 100%
+  );
+}
+
+.skill-circle::after {
+  content: '';
+  position: absolute;
+  width: 80%;
+  height: 80%;
+  border-radius: 50%;
+  background: #232c3f;
+}
+
+.skill-value {
+  position: relative;
+  z-index: 1;
+  font-weight: bold;
+}
+
+.skill-cap {
+  font-size: 0.75em;
+  color: #888;
+}
+
+@media (max-width: 600px) {
+  .profile-attributes {
+    flex-direction: column;
+  }
+  
+  .skills-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+}

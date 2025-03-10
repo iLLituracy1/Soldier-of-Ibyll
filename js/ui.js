@@ -103,10 +103,6 @@ window.updateActionButtons = function() {
       }
     }
   }
-  
-  // Menu buttons - always available
-  window.addActionButton('Profile', 'profile', actionsContainer);
-  window.addActionButton('Inventory', 'inventory', actionsContainer);
 };
 
 // Function to add action button
@@ -124,7 +120,12 @@ window.addActionButton = function(label, action, container) {
 // Function to handle profile panel display
 window.handleProfile = function() {
   // Update profile text before showing
-  const profileDiv = document.getElementById('profileText');
+  const profileDiv = document.getElementById('profile');
+  const profileText = document.getElementById('profileText');
+  
+  // Get career and origin info for styling
+  const career = window.player.career.title;
+  const origin = window.player.origin;
   
   // Calculate skill caps based on attributes
   const meleeCap = Math.floor(window.player.phy / 1.5);
@@ -133,37 +134,229 @@ window.handleProfile = function() {
   const commandCap = Math.floor((window.player.men * 0.8 + window.player.phy * 0.2) / 1.5);
   const mentalSkillCap = Math.floor(window.player.men / 1.5);
   
-  profileDiv.innerHTML = `
-    <p><strong>Name:</strong> ${window.player.name}</p>
-    <p><strong>Heritage:</strong> ${window.player.origin}</p>
-    <p><strong>Career:</strong> ${window.player.career.title}</p>
-    <p><strong>Level:</strong> ${window.gameState.level}</p>
-    <p><strong>Experience:</strong> ${window.gameState.experience}/${window.gameState.level * 100}</p>
-    <p><strong>Skill Points:</strong> ${window.gameState.skillPoints}</p>
-    <p><strong>Physical (PHY):</strong> ${window.player.phy.toFixed(2)} / 15</p>
-    <p><strong>Mental (MEN):</strong> ${window.player.men.toFixed(2)} / 15</p>
-    <p><strong>Skills:</strong> (Capped by attributes)</p>
-    <ul>
-      <li>Melee Combat: ${window.player.skills.melee.toFixed(2)} / ${meleeCap} (PHY based)</li>
-      <li>Marksmanship: ${window.player.skills.marksmanship.toFixed(2)} / ${marksmanshipCap} (PHY+MEN based)</li>
-      <li>Survival: ${window.player.skills.survival.toFixed(2)} / ${survivalCap} (PHY+MEN based)</li>
-      <li>Command: ${window.player.skills.command.toFixed(2)} / ${commandCap} (MEN+some PHY based)</li>
-      <li>Discipline: ${window.player.skills.discipline.toFixed(2)} / ${mentalSkillCap} (MEN based)</li>
-      <li>Tactics: ${window.player.skills.tactics.toFixed(2)} / ${mentalSkillCap} (MEN based)</li>
-      <li>Organization: ${window.player.skills.organization.toFixed(2)} / ${mentalSkillCap} (MEN based)</li>
-      <li>Arcana: ${window.player.skills.arcana.toFixed(2)} / ${mentalSkillCap} (MEN based)</li>
-    </ul>
+  // Generate career-specific icon
+  let careerIcon = "⚔️"; // Default icon
+  
+  if (career.includes("Marine") || career.includes("Corsair")) {
+    careerIcon = "⚓";
+  } else if (career.includes("Scout")) {
+    careerIcon = "🏹";
+  } else if (career.includes("Cavalry")) {
+    careerIcon = "🐎";
+  } else if (career.includes("Geister")) {
+    careerIcon = "✨";
+  } else if (career.includes("Berserker")) {
+    careerIcon = "🪓";
+  }
+  
+  // Generate color based on origin
+  let originColor = "#a0a0ff"; // Default blue
+  
+  if (origin === "Paanic") {
+    originColor = "#ff9966"; // Orange
+  } else if (origin === "Nesian") {
+    originColor = "#66ccff"; // Light blue
+  } else if (origin === "Lunarine") {
+    originColor = "#ffcc66"; // Gold
+  } else if (origin === "Wyrdman") {
+    originColor = "#99cc66"; // Green
+  }
+  
+  // Create the modern profile UI
+  profileText.innerHTML = `
+    <div class="profile-container">
+      <div class="profile-header">
+        <div class="profile-avatar" style="background-color: rgba(${parseInt(originColor.slice(1, 3), 16)}, ${parseInt(originColor.slice(3, 5), 16)}, ${parseInt(originColor.slice(5, 7), 16)}, 0.2)">
+          <div class="avatar-icon">${careerIcon}</div>
+          <div class="secondary-icon" style="background-color: ${originColor}">
+            <span>${origin.charAt(0)}</span>
+          </div>
+        </div>
+        
+        <div class="profile-title">
+          <h2>${window.player.name}</h2>
+          <div class="profile-subtitle">${origin} ${career}</div>
+          
+          <div class="profile-stats">
+            <div class="stat-pill">Level ${window.gameState.level}</div>
+            <div class="stat-pill">XP: ${window.gameState.experience}/${window.gameState.level * 100}</div>
+            <div class="stat-pill">Skill Points: ${window.gameState.skillPoints}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="profile-attributes">
+        <div class="attribute-box">
+          <div class="attribute-title">Physical (PHY)</div>
+          <div class="attribute-max">Max: 15</div>
+          <div class="attribute-value">${window.player.phy.toFixed(1)}</div>
+          <div class="attribute-desc">Strength, endurance, agility, and raw physical ability.</div>
+        </div>
+        
+        <div class="attribute-box">
+          <div class="attribute-title">Mental (MEN)</div>
+          <div class="attribute-max">Max: 15</div>
+          <div class="attribute-value">${window.player.men.toFixed(1)}</div>
+          <div class="attribute-desc">Intelligence, willpower, leadership, perception, and adaptability.</div>
+        </div>
+      </div>
+      
+      <h3 class="skills-header">Skills</h3>
+      
+      <div class="skills-grid">
+        <div class="skill-card">
+          <div class="skill-name">Melee Combat</div>
+          <div class="skill-meter">
+            <div class="skill-circle" style="--skill-value: ${Math.min(100, window.player.skills.melee / meleeCap * 100)}%;">
+              <span class="skill-value">${window.player.skills.melee.toFixed(1)}</span>
+            </div>
+          </div>
+          <div class="skill-cap">Cap: ${meleeCap}</div>
+        </div>
+        
+        <div class="skill-card">
+          <div class="skill-name">Marksmanship</div>
+          <div class="skill-meter">
+            <div class="skill-circle" style="--skill-value: ${Math.min(100, window.player.skills.marksmanship / marksmanshipCap * 100)}%;">
+              <span class="skill-value">${window.player.skills.marksmanship.toFixed(1)}</span>
+            </div>
+          </div>
+          <div class="skill-cap">Cap: ${marksmanshipCap}</div>
+        </div>
+        
+        <div class="skill-card">
+          <div class="skill-name">Survival</div>
+          <div class="skill-meter">
+            <div class="skill-circle" style="--skill-value: ${Math.min(100, window.player.skills.survival / survivalCap * 100)}%;">
+              <span class="skill-value">${window.player.skills.survival.toFixed(1)}</span>
+            </div>
+          </div>
+          <div class="skill-cap">Cap: ${survivalCap}</div>
+        </div>
+        
+        <div class="skill-card">
+          <div class="skill-name">Command</div>
+          <div class="skill-meter">
+            <div class="skill-circle" style="--skill-value: ${Math.min(100, window.player.skills.command / commandCap * 100)}%;">
+              <span class="skill-value">${window.player.skills.command.toFixed(1)}</span>
+            </div>
+          </div>
+          <div class="skill-cap">Cap: ${commandCap}</div>
+        </div>
+        
+        <div class="skill-card">
+          <div class="skill-name">Discipline</div>
+          <div class="skill-meter">
+            <div class="skill-circle" style="--skill-value: ${Math.min(100, window.player.skills.discipline / mentalSkillCap * 100)}%;">
+              <span class="skill-value">${window.player.skills.discipline.toFixed(1)}</span>
+            </div>
+          </div>
+          <div class="skill-cap">Cap: ${mentalSkillCap}</div>
+        </div>
+        
+        <div class="skill-card">
+          <div class="skill-name">Tactics</div>
+          <div class="skill-meter">
+            <div class="skill-circle" style="--skill-value: ${Math.min(100, window.player.skills.tactics / mentalSkillCap * 100)}%;">
+              <span class="skill-value">${window.player.skills.tactics.toFixed(1)}</span>
+            </div>
+          </div>
+          <div class="skill-cap">Cap: ${mentalSkillCap}</div>
+        </div>
+        
+        <div class="skill-card">
+          <div class="skill-name">Organization</div>
+          <div class="skill-meter">
+            <div class="skill-circle" style="--skill-value: ${Math.min(100, window.player.skills.organization / mentalSkillCap * 100)}%;">
+              <span class="skill-value">${window.player.skills.organization.toFixed(1)}</span>
+            </div>
+          </div>
+          <div class="skill-cap">Cap: ${mentalSkillCap}</div>
+        </div>
+        
+        <div class="skill-card">
+          <div class="skill-name">Arcana</div>
+          <div class="skill-meter">
+            <div class="skill-circle" style="--skill-value: ${Math.min(100, window.player.skills.arcana / mentalSkillCap * 100)}%;">
+              <span class="skill-value">${window.player.skills.arcana.toFixed(1)}</span>
+            </div>
+          </div>
+          <div class="skill-cap">Cap: ${mentalSkillCap}</div>
+        </div>
+      </div>
+    </div>
   `;
   
-  document.getElementById('profile').classList.remove('hidden');
+  // Show the profile panel
+  profileDiv.classList.remove('hidden');
+  
+  // Prevent immediate closure when opening panel
+  setTimeout(() => {
+    profileDiv.addEventListener('click', function(event) {
+      event.stopPropagation();
+    }, { once: true });
+  }, 0);
 };
 
 // Function to update profile if it's currently visible
 window.updateProfileIfVisible = function() {
   if (!document.getElementById('profile').classList.contains('hidden')) {
-    // Profile is visible, update it
     window.handleProfile();
   }
+};
+
+// Function to handle inventory panel display
+window.handleInventoryClick = function() {
+  console.log("Opening inventory");
+  
+  // Make sure inventory system is initialized
+  if (!window.player.equipment) {
+    console.log("Initializing inventory system on first open");
+    window.initializeInventorySystem();
+  }
+  
+  // Display the inventory panel
+  const inventoryPanel = document.getElementById('inventory');
+  inventoryPanel.classList.remove('hidden');
+  
+  // Ensure inventory UI is initialized
+  if (!document.querySelector('.paperdoll')) {
+    console.log("Initializing inventory UI on first open");
+    window.initializeInventoryUI();
+  }
+  
+  // Render inventory items
+  window.renderInventoryItems();
+  window.updateEquipmentDisplay();
+  
+  // Prevent immediate closure when opening inventory
+  setTimeout(() => {
+    inventoryPanel.addEventListener('click', function(event) {
+      event.stopPropagation();
+    }, { once: true });
+  }, 0);
+};
+
+// Function to handle quest log display
+window.handleQuestLog = function() {
+  // Update quest log before showing
+  const questListDiv = document.getElementById('questList');
+  
+  // Simple placeholder for now
+  questListDiv.innerHTML = `
+    <p>No active quests at the moment.</p>
+    <p>Complete your training and speak with your commanders to receive assignments.</p>
+  `;
+  
+  const questLogPanel = document.getElementById('questLog');
+  questLogPanel.classList.remove('hidden');
+  
+  // Prevent immediate closure when opening quest log
+  setTimeout(() => {
+    questLogPanel.addEventListener('click', function(event) {
+      event.stopPropagation();
+    }, { once: true });
+  }, 0);
 };
 
 // Function to set narrative text
@@ -222,3 +415,53 @@ window.showAchievement = function(achievementId) {
     document.body.removeChild(notificationElement);
   }, 5000);
 };
+
+// Add click-outside-to-close behavior for panels
+window.addClickOutsideToClosePanels = function() {
+  // Function to handle clicks on the document
+  function handleDocumentClick(event) {
+    // Get all open panels
+    const panels = [
+      document.getElementById('profile'),
+      document.getElementById('inventory'),
+      document.getElementById('questLog')
+    ];
+    
+    // Check each panel
+    panels.forEach(panel => {
+      // If panel is open and click is outside the panel
+      if (panel && !panel.classList.contains('hidden') && !panel.contains(event.target)) {
+        // Close the panel
+        panel.classList.add('hidden');
+      }
+    });
+  }
+  
+  // Attach the click event to the document
+  document.addEventListener('click', handleDocumentClick);
+  
+  // Attach panel content click handler to prevent closing when clicking inside
+  const panelContents = [
+    document.getElementById('profileText'),
+    document.getElementById('inventoryList'),
+    document.getElementById('questList')
+  ];
+  
+  panelContents.forEach(content => {
+    if (content) {
+      content.addEventListener('click', function(event) {
+        // Stop the click from propagating to the document
+        event.stopPropagation();
+      });
+    }
+  });
+  
+  console.log("Click-outside-to-close behavior added to panels");
+};
+
+// Run this setup when the DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  console.log("Setting up click-outside-to-close for panels");
+  // Wait a short time to ensure other initialization is complete
+  setTimeout(window.addClickOutsideToClosePanels, 500);
+});
