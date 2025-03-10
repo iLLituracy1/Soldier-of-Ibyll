@@ -9,41 +9,6 @@ window.gameBootstrap = function() {
     window.initializeItemTemplates();
   }
   
-  // Initialize player state if needed
-  if (!window.player) {
-    window.player = {
-      inventory: [],
-      equipment: {
-        head: null,
-        body: null,
-        mainHand: null,
-        offHand: null,
-        accessory: null
-      },
-      inventoryCapacity: 20,
-      taelors: 25
-    };
-  }
-
-  // Initialize equipment stats if needed
-  if (!window.player.equipmentStats) {
-    window.player.equipmentStats = {
-      damage: 0,
-      defense: 0,
-      speed: 0,
-      critChance: 0,
-      blockChance: 0,
-      ranged: 0,
-      stealth: 0,
-      intimidation: 0,
-      charisma: 0,
-      command: 0,
-      armorPenetration: 0,
-      mobility: 0,
-      durability: 0
-    };
-  }
-  
   // Run a safer version of starter items
   window.safeAddStartingItems = function() {
     console.log("Safe add starting items function called");
@@ -105,7 +70,7 @@ window.gameBootstrap = function() {
           break;
           
         default:
-          // Default equipment
+          console.log("Using default equipment for career:", window.player.career.title);
           if (window.itemTemplates.basicSword) window.addItemToInventory(window.itemTemplates.basicSword);
           if (window.itemTemplates.legionArmor) window.addItemToInventory(window.itemTemplates.legionArmor);
           break;
@@ -114,19 +79,21 @@ window.gameBootstrap = function() {
       // Everyone gets a health potion
       if (window.itemTemplates.healthPotion) window.addItemToInventory(window.itemTemplates.healthPotion);
       
-      console.log("Starting items added successfully");
+      // Log inventory state
+      console.log("Starting items added. Current inventory:", window.player.inventory.length, "items");
+      console.log("Equipment state:", window.player.equipment);
+      
       return true;
-    } catch (error) {
-      console.error("Error adding starting items:", error);
+    } catch (err) {
+      console.error("Error adding starting items:", err);
       return false;
     }
   };
   
-  // Override the original startAdventure function
+  // Override startAdventure safely
   const originalStartFn = window.startAdventure;
   window.startAdventure = function() {
     console.log("Modified startAdventure called");
-    
     // First call original
     if (typeof originalStartFn === 'function') {
       originalStartFn();
@@ -134,8 +101,10 @@ window.gameBootstrap = function() {
       console.error("Original startAdventure not found!");
     }
     
-    // Initialize inventory system
-    window.initializeFullInventorySystem();
+    // Make sure inventory UI is properly initialized
+    if (typeof window.initializeInventoryUI === 'function') {
+      window.initializeInventoryUI();
+    }
     
     // Add starting items with a slight delay to ensure state is initialized
     setTimeout(function() {
@@ -150,16 +119,94 @@ window.gameBootstrap = function() {
       if (typeof window.updateEquipmentDisplay === 'function') {
         window.updateEquipmentDisplay();
       }
+      
+      // Auto-equip items after a delay
+      setTimeout(function() {
+        try {
+          const basicSword = window.player.inventory.find(i => i.templateId === 'basic_sword');
+          if (basicSword) window.equipItem(basicSword.instanceId);
+          
+          const legionShield = window.player.inventory.find(i => i.templateId === 'legion_shield');
+          if (legionShield) window.equipItem(legionShield.instanceId);
+          
+          const legionHelmet = window.player.inventory.find(i => i.templateId === 'legion_helmet');
+          if (legionHelmet) window.equipItem(legionHelmet.instanceId);
+          
+          const legionArmor = window.player.inventory.find(i => i.templateId === 'legion_armor');
+          if (legionArmor) window.equipItem(legionArmor.instanceId);
+          
+          const standardWarhorse = window.player.inventory.find(i => i.templateId === 'standard_warhorse');
+          if (standardWarhorse && window.player.career && window.player.career.title === "Castellan Cavalry") {
+            window.equipItem(standardWarhorse.instanceId);
+          }
+          
+          console.log("Starting equipment equipped");
+        } catch (err) {
+          console.error("Error auto-equipping items:", err);
+        }
+      }, 200);
     }, 100);
   };
   
-  // Initialize inventory system
-  window.initializeFullInventorySystem();
+  // Fix inventory UI initialization to properly handle mounts
+  const originalInitInventoryUI = window.initializeInventoryUI;
+  window.initializeInventoryUI = function() {
+    console.log("Enhanced inventory UI initialization");
+    
+    // Call original initialization
+    if (typeof originalInitInventoryUI === 'function') {
+      originalInitInventoryUI();
+    }
+    
+    // Add mount slot check with proper debug info
+    const isCavalry = window.player && window.player.career && 
+                      window.player.career.title === "Castellan Cavalry";
+    
+    console.log("Mount slot check - isCavalry:", isCavalry);
+    console.log("Current career:", window.player && window.player.career ? 
+                window.player.career.title : "Not set");
+    
+    // Force mount slot for cavalry
+    if (isCavalry) {
+      console.log("Adding mount slot for cavalry character");
+      
+      // Ensure equipment has mount slot
+      if (window.player.equipment && !window.player.equipment.mount) {
+        window.player.equipment.mount = null;
+        console.log("Added mount slot to equipment object");
+      }
+      
+      // Add mount slot to paperdoll if it doesn't exist
+      const paperdoll = document.querySelector('.paperdoll');
+      if (paperdoll && !document.getElementById('mount-slot')) {
+        paperdoll.classList.add('has-mount');
+        
+        const mountSlot = document.createElement('div');
+        mountSlot.className = 'equipment-slot mount-slot';
+        mountSlot.id = 'mount-slot';
+        mountSlot.setAttribute('data-slot', 'mount');
+        
+        mountSlot.innerHTML = `
+          <div class="slot-icon">🐎</div>
+          <div class="slot-name">Mount</div>
+        `;
+        
+        paperdoll.appendChild(mountSlot);
+        console.log("Mount slot added to paperdoll UI");
+        
+        // Update slot interaction
+        if (typeof window.fixEquipmentSlotInteraction === 'function') {
+          window.fixEquipmentSlotInteraction();
+        }
+      }
+    }
+  };
   
-  console.log("Game bootstrap complete");
+  console.log("Game bootstrap complete!");
 };
 
-// Run bootstrap when DOM is loaded
+// Execute the bootstrap when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-  window.gameBootstrap();
+  console.log("DOM loaded, running game bootstrap");
+  setTimeout(window.gameBootstrap, 500);
 });

@@ -2,18 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Soldier of Ibyll</title>
+  <title>Ibyll Munda: Full Game</title>
   <link rel="stylesheet" href="css/style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/themed-css-enhancements.css">
-<link rel="stylesheet" href="css/layout-enhancements.css">
-<link rel="stylesheet" href="css/character-display-enhancements.css">
-<link rel="stylesheet" href="css/inventory-enhancements.css">
-<link rel="stylesheet" href="css/narrative-enhancements.css">
-<link rel="stylesheet" href="css/inventory.css">
 </head>
 <body>
   <!-- CHARACTER CREATION AND PROLOGUE SECTIONS -->
@@ -84,6 +74,31 @@
       <div id="timeDisplay"></div>
       <div id="dayDisplay"></div>
     </header>
+    
+    <!-- Status bars -->
+    <div class="status-bars">
+      <div class="status-bar">
+        <div class="status-label">Health</div>
+        <div class="bar-container">
+          <div id="healthBar" class="bar health-bar" style="width: 100%;"></div>
+        </div>
+        <div id="healthValue" class="bar-value">100/100</div>
+      </div>
+      <div class="status-bar">
+        <div class="status-label">Stamina</div>
+        <div class="bar-container">
+          <div id="staminaBar" class="bar stamina-bar" style="width: 100%;"></div>
+        </div>
+        <div id="staminaValue" class="bar-value">100/100</div>
+      </div>
+      <div class="status-bar">
+        <div class="status-label">Morale</div>
+        <div class="bar-container">
+          <div id="moraleBar" class="bar morale-bar" style="width: 75%;"></div>
+        </div>
+        <div id="moraleValue" class="bar-value">75/100</div>
+      </div>
+    </div>
     
     <div id="narrative">
       <p>The road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.</p>
@@ -159,13 +174,5 @@
   <script src="js/ui.js"></script>
   <script src="js/actions.js"></script>
   <script src="js/main.js"></script>
-  <script src="js/ui-enhancements.js"></script>
-  <script src="js/ui-enhancement-fix.js"></script>
-  <script src="js/robust-ui-fix.js"></script>
-  <script src="js/ui-structure-fix.js"></script>
-  <script src="js/profile-fix.js"></script>
-  <script src="js/comprehensive-profile-fix.js"></script>
-  <script src="js/status-bar-fix.js"></script>
-  <script src="js/music-system.js"></script>
 </body>
 </html>

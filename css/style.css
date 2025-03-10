@@ -74,10 +74,11 @@ header {
   border: 1px solid #333;
   background: #1e293b;
   padding: 15px;
-  height: 200px;
+  min-height: 150px;
+  max-height: 300px;
   overflow-y: auto;
   margin-bottom: 20px;
-  border-radius: 8px 8px 0 0;
+  border-radius: 8px;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
   transition: background 0.5s;
 }
@@ -86,15 +87,6 @@ header {
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
-  padding: 15px;
-  background: #1a1a1a;
-  border: 1px solid #333;
-  border-top: none;
-  border-radius: 0 0 8px 8px;
-  margin-bottom: 20px;
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
 }
 #profile, #inventory, #questLog {
   border: 1px solid #444;
@@ -139,48 +131,40 @@ header {
 .time-evening { background: linear-gradient(to bottom, #614385, #516395); }
 .time-night { background: linear-gradient(to bottom, #141e30, #243b55); }
 
-.quick-status {
+.status-bars {
   margin: 15px 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-
 .status-bar {
   display: flex;
   align-items: center;
   margin-bottom: 5px;
 }
-
 .status-label {
-  width: 60px;
+  width: 80px;
   font-weight: bold;
-  font-size: 0.9em;
 }
-
 .bar-container {
   flex-grow: 1;
-  height: 12px;
+  height: 15px;
   background: #333;
-  border-radius: 6px;
+  border-radius: 10px;
   overflow: hidden;
-  margin: 0 8px;
+  margin: 0 10px;
 }
-
 .bar {
   height: 100%;
-  border-radius: 6px;
+  border-radius: 10px;
   transition: width 0.3s ease;
 }
-
 .health-bar { background: linear-gradient(to right, #ff5f6d, #ffc371); }
 .stamina-bar { background: linear-gradient(to right, #56ab2f, #a8e063); }
 .morale-bar { background: linear-gradient(to right, #4776E6, #8E54E9); }
-
 .bar-value {
-  width: 60px;
+  width: 80px;
   text-align: right;
-  font-size: 0.9em;
 }
 
 .achievement-notification {
@@ -363,40 +347,3 @@ header {
 .equipment-slot[data-slot="offHand"] { grid-area: offHand; }
 .equipment-slot[data-slot="accessory"] { grid-area: accessory; }
 .equipment-slot[data-slot="mount"] { grid-area: mount; }
-
-.action-btn {
-  background: #2a2a2a;
-  border: 1px solid #444;
-  color: #e0e0e0;
-  padding: 10px 20px;
-  margin: 5px;
-  cursor: pointer;
-  transition: all 0.3s;
-  border-radius: 4px;
-  min-width: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.action-btn:hover {
-  background: #3a3a3a;
-  transform: translateY(-2px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  border-color: #666;
-}
-
-.action-btn:active {
-  transform: translateY(1px);
-  box-shadow: none;
-}
-
-/* Add icons to common actions */
-.action-btn[data-action="train"]::before { content: "⚔️"; }
-.action-btn[data-action="rest"]::before { content: "💤"; }
-.action-btn[data-action="patrol"]::before { content: "👁️"; }
-.action-btn[data-action="mess"]::before { content: "🍖"; }
-.action-btn[data-action="guard"]::before { content: "🛡️"; }
-.action-btn[data-action="gambling"]::before { content: "🎲"; }
-.action-btn[data-action="brawler_pits"]::before { content: "🥊"; }

@@ -4,16 +4,16 @@
 // Update status bars function
 window.updateStatusBars = function() {
   // Update health bar
-  document.getElementById('sidebarHealthBar').style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
-  document.getElementById('sidebarHealthValue').textContent = `${Math.round(window.gameState.health)}/${window.gameState.maxHealth}`;
+  document.getElementById('healthBar').style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
+  document.getElementById('healthValue').textContent = `${Math.round(window.gameState.health)}/${window.gameState.maxHealth}`;
   
   // Update stamina bar
-  document.getElementById('sidebarStaminaBar').style.width = `${(window.gameState.stamina / window.gameState.maxStamina) * 100}%`;
-  document.getElementById('sidebarStaminaValue').textContent = `${Math.round(window.gameState.stamina)}/${window.gameState.maxStamina}`;
+  document.getElementById('staminaBar').style.width = `${(window.gameState.stamina / window.gameState.maxStamina) * 100}%`;
+  document.getElementById('staminaValue').textContent = `${Math.round(window.gameState.stamina)}/${window.gameState.maxStamina}`;
   
   // Update morale bar
-  document.getElementById('sidebarMoraleBar').style.width = `${window.gameState.morale}%`;
-  document.getElementById('sidebarMoraleValue').textContent = `${Math.round(window.gameState.morale)}/100`;
+  document.getElementById('moraleBar').style.width = `${window.gameState.morale}%`;
+  document.getElementById('moraleValue').textContent = `${Math.round(window.gameState.morale)}/100`;
 };
 
 // Function to update time and day display
@@ -108,6 +108,11 @@ window.updateActionButtons = function() {
       // Add more mission options as the game progresses
     }
   }
+  
+  // Menu buttons - always available
+  window.addActionButton('Profile', 'profile', actionsContainer);
+  window.addActionButton('Inventory', 'inventory', actionsContainer);
+  window.addActionButton('Quest Log', 'questLog', actionsContainer);
 };
 
 // Function to add action button
@@ -116,22 +121,9 @@ window.addActionButton = function(label, action, container) {
   btn.className = 'action-btn';
   btn.textContent = label;
   btn.setAttribute('data-action', action);
-  
-  // Add tooltip with hotkey information if applicable
-  let tooltip = label;
-  switch(action) {
-    case 'train': tooltip += ' [T]'; break;
-    case 'rest': tooltip += ' [R]'; break;
-    case 'patrol': tooltip += ' [P]'; break;
-    case 'mess': tooltip += ' [M]'; break;
-    case 'guard': tooltip += ' [G]'; break;
-  }
-  btn.setAttribute('title', tooltip);
-  
   btn.onclick = function() {
     window.handleAction(action);
   };
-  
   container.appendChild(btn);
 };
 
