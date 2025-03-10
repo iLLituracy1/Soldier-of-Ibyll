@@ -68,10 +68,6 @@ function setupEventHandlers() {
     document.getElementById('inventory').classList.add('hidden');
   });
   
-  document.querySelector('.quest-log-close')?.addEventListener('click', function() {
-    document.getElementById('questLog').classList.add('hidden');
-  });
-  
   console.log("Event handlers set up");
 }
 
@@ -125,47 +121,6 @@ window.handleAction = function(action) {
     return;
   } else if (action === 'inventory') {
     window.handleInventoryClick();
-    return;
-  } else if (action === 'questLog') {
-    // Update quest log before showing
-    const questList = document.getElementById('questList');
-    questList.innerHTML = '';
-    
-    // Add main quest
-    questList.innerHTML += `
-      <div class="quest-item">
-        <div class="quest-title">Main Quest: The Campaign</div>
-        <div>Progress: Stage ${window.gameState.mainQuest.stage}/5</div>
-      </div>
-    `;
-    
-    // Add side quests
-    if (window.gameState.sideQuests.length === 0) {
-      questList.innerHTML += `<p>No active side quests.</p>`;
-    } else {
-      window.gameState.sideQuests.forEach(quest => {
-        questList.innerHTML += `
-          <div class="quest-item">
-            <div class="quest-title">${quest.title}</div>
-            <div>${quest.description}</div>
-            <div>Objectives:</div>
-            <ul>
-        `;
-        
-        quest.objectives.forEach(objective => {
-          const className = objective.completed ? 'quest-objective-complete' : '';
-          questList.innerHTML += `
-            <li class="quest-objective ${className}">
-              ${objective.text}: ${objective.count}/${objective.target}
-            </li>
-          `;
-        });
-        
-        questList.innerHTML += `</ul></div>`;
-      });
-    }
-    
-    document.getElementById('questLog').classList.remove('hidden');
     return;
   }
   
@@ -296,12 +251,6 @@ function handlePatrolAction() {
   window.gameState.dailyPatrolDone = true;
   window.gameState.experience += 10;
   
-  // Improve relationship with a random officer
-  const officers = ["commander", "sergeant"];
-  const randomOfficer = officers[Math.floor(Math.random() * officers.length)];
-  window.player.relationships[randomOfficer].disposition += 3;
-  window.player.relationships[randomOfficer].interactions += 1;
-  
   // Small chance to improve survival skill
   const survivalImprovement = parseFloat((Math.random() * 0.03 + 0.02).toFixed(2));
   const survivalCap = Math.floor((window.player.phy + window.player.men) / 3);
@@ -316,9 +265,6 @@ function handlePatrolAction() {
     window.gameState.discoveredBrawlerPits = true;
     window.addToNarrative("During your patrol, you overhear whispers about underground fighting pits where soldiers test their mettle and bet on matches. Such activities aren't officially sanctioned, but they seem to be an open secret in the camp.");
     window.showNotification("Discovered: Brawler Pits! New activity unlocked at night.", 'success');
-    
-    // Update achievement progress for discovering new locations
-    window.updateAchievementProgress('scout_master', 1);
   }
   
   // Update UI
@@ -345,9 +291,6 @@ function handleMessAction() {
     window.gameState.discoveredGamblingTent = true;
     window.addToNarrative("As you finish your meal, you notice a group of soldiers huddled in the corner of the mess tent. The clink of coins and hushed exclamations draw your attention. One of them notices your interest and nods toward a larger tent near the edge of camp. \"Games start after dusk,\" he mutters. \"Bring your taelors if you're feeling lucky.\"");
     window.showNotification("Discovered: Gambling Tent! New activity unlocked at night.", 'success');
-    
-    // Update achievement progress for discovering new locations
-    window.updateAchievementProgress('scout_master', 1);
   }
   
   // Small chance to improve organization skill

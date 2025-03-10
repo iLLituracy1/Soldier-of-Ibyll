@@ -128,9 +128,6 @@ window.confirmCharacter = function() {
   // Set prologue text based on selected career
   const prologueText = window.prologues[window.player.career.title] || "Your journey begins...";
   document.getElementById('prologueText').innerHTML = prologueText;
-  
-  // Initialize relationships with camp characters
-  window.initializeRelationships();
 };
 
 window.showEmpireUpdate = function() {
@@ -297,34 +294,6 @@ window.applyCapsToSkills = function() {
   for (const skill in window.player.skills) {
     window.player.skills[skill] = Number(window.player.skills[skill].toFixed(1));
   }
-};
-
-window.initializeRelationships = function() {
-  // Initialize relationships with camp characters
-  window.player.relationships = {};
-  
-  // Check if camp characters exist
-  if (!window.campCharacters || !Array.isArray(window.campCharacters)) {
-    console.error("Camp characters not defined - creating default relationships");
-    window.player.relationships = {
-      "commander": { name: "Commander", disposition: 0, interactions: 0 },
-      "sergeant": { name: "Sergeant", disposition: 0, interactions: 0 }
-    };
-    return;
-  }
-  
-  // Create relationship entries for each character
-  window.campCharacters.forEach(character => {
-    if (character && character.id) {
-      window.player.relationships[character.id] = {
-        name: character.name || character.id,
-        disposition: character.disposition || 0,
-        interactions: 0
-      };
-    }
-  });
-  
-  console.log("Relationships initialized:", window.player.relationships);
 };
 
 // Provide a helper to validate numeric attributes - useful during development

@@ -17,11 +17,6 @@ window.gameState = {
   maxStamina: 100,
   morale: 75, // 0-100 scale
   
-  // Quest & Story Tracking
-  mainQuest: { stage: 0, completed: false },
-  sideQuests: [],
-  discoveredLocations: ["Kasvaari Camp"],
-  
   // Environmental conditions
   weather: "clear", // clear, rainy, foggy, etc.
   campMorale: 70, // 0-100 scale
@@ -73,7 +68,6 @@ window.player = {
   },
   inventory: [],
   taelors: 25, // Changed from coins to taelors
-  relationships: {},
   events: []
 };
 
@@ -91,28 +85,6 @@ window.initializeGameState = function() {
     window.gameState.discoveredBrawlerPits = false;
     window.gameState.discoveredGamblingTent = false;
   }
-  
-  // Add initial quests - simplified since quest system is removed
-  window.gameState.sideQuests = [
-    {
-      title: "Basic Training",
-      description: "Complete your basic training at the camp.",
-      type: "training",
-      objectives: [
-        {
-          text: "Complete training sessions",
-          count: 0,
-          target: 5,
-          completed: false
-        }
-      ],
-      rewards: {
-        experience: 50,
-        taelors: 10
-      },
-      completed: false
-    }
-  ];
   
   console.log("Game state initialized");
 };
@@ -149,21 +121,5 @@ window.checkLevelUp = function() {
     
     // Check if there are more levels to gain
     window.checkLevelUp();
-  }
-};
-
-// Update achievement progress
-window.updateAchievementProgress = function(achievementId, amount = 1) {
-  const achievement = window.achievements.find(a => a.id === achievementId);
-  if (!achievement || achievement.unlocked) return;
-  
-  // Update progress if it's a progress-based achievement
-  if ('progress' in achievement) {
-    achievement.progress += amount;
-    
-    // Check if achievement is complete
-    if (achievement.progress >= achievement.target) {
-      window.showAchievement(achievementId);
-    }
   }
 };

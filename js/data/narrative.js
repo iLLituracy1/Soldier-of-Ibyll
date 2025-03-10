@@ -71,14 +71,6 @@ window.narrativeElements = {
   ]
 };
 
-// Add camp characters with relationships
-window.campCharacters = [
-  { id: "commander", name: "Commander Valarius", disposition: 0 },
-  { id: "sergeant", name: "Sergeant Kasia", disposition: 0 },
-  { id: "medic", name: "Medic Joren", disposition: 0 },
-  { id: "quartermaster", name: "Quartermaster Thell", disposition: 0 }
-];
-
 // Define achievements
 window.achievements = [
   {

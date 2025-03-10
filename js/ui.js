@@ -102,17 +102,11 @@ window.updateActionButtons = function() {
         window.addActionButton('Brawler Pits', 'brawler_pits', actionsContainer);
       }
     }
-    
-    // Add more actions based on game progression
-    if (window.gameState.mainQuest.stage >= 1) {
-      // Add more mission options as the game progresses
-    }
   }
   
   // Menu buttons - always available
   window.addActionButton('Profile', 'profile', actionsContainer);
   window.addActionButton('Inventory', 'inventory', actionsContainer);
-  window.addActionButton('Quest Log', 'questLog', actionsContainer);
 };
 
 // Function to add action button
@@ -160,20 +154,6 @@ window.handleProfile = function() {
       <li>Arcana: ${window.player.skills.arcana.toFixed(2)} / ${mentalSkillCap} (MEN based)</li>
     </ul>
   `;
-  
-  // Add relationships
-  profileDiv.innerHTML += `<p><strong>Relationships:</strong></p><ul>`;
-  for (const id in window.player.relationships) {
-    const relationship = window.player.relationships[id];
-    let dispositionText = "Neutral";
-    if (relationship.disposition >= 30) dispositionText = "Friendly";
-    if (relationship.disposition >= 60) dispositionText = "Trusted Ally";
-    if (relationship.disposition <= -30) dispositionText = "Distrustful";
-    if (relationship.disposition <= -60) dispositionText = "Hostile";
-    
-    profileDiv.innerHTML += `<li>${relationship.name}: ${dispositionText} (${relationship.disposition})</li>`;
-  }
-  profileDiv.innerHTML += `</ul>`;
   
   document.getElementById('profile').classList.remove('hidden');
 };

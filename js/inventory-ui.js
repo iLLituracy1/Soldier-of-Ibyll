@@ -1,596 +1,5 @@
-// CONSOLIDATED INVENTORY SYSTEM
-// Combines inventory.js, inventory-ui.js, and inventory-fix.js into a single robust system
-
-/**
- * This file consolidates all inventory functionality including:
- * - Core inventory management (previously in inventory.js)
- * - Inventory UI rendering (previously in inventory-ui.js)
- * - Fixes for mount equipment and initialization (previously in inventory-fix.js)
- * 
- * It eliminates timing issues and patches by providing a clear initialization sequence
- * and proper handling of special cases like mounts.
- */
-
-// ================= CORE INVENTORY MANAGEMENT =================
-
-// Item Categories, Equipment Slots, etc. are defined in items.js
-
-// Initialize the inventory system
-window.initializeInventorySystem = function() {
-  console.log("Initializing inventory system...");
-  
-  // Initialize inventory if it doesn't exist
-  if (!window.player.inventory) {
-    window.player.inventory = [];
-  }
-  
-  // Initialize equipment slots based on career
-  if (!window.player.equipment) {
-    window.player.equipment = {
-      head: null,
-      body: null,
-      mainHand: null,
-      offHand: null,
-      accessory: null
-    };
-    
-    // Add mount slot only for Castellan Cavalry
-    if (window.player.career && (window.player.career.title === "Castellan Cavalry")) {
-      window.player.equipment.mount = null;
-      console.log("Added mount slot for Castellan Cavalry");
-    }
-  }
-  
-  // Initialize currency if it doesn't exist
-  if (!window.player.taelors === undefined) {
-    window.player.taelors = 25;
-  }
-  
-  // Set inventory capacity
-  window.player.inventoryCapacity = 20;
-  
-  // Initialize inventory stats system
-  window.player.equipmentStats = {
-    damage: 0,
-    defense: 0,
-    speed: 0,
-    critChance: 0,
-    blockChance: 0,
-    ranged: 0,
-    stealth: 0,
-    intimidation: 0,
-    charisma: 0,
-    command: 0,
-    armorPenetration: 0,
-    mobility: 0,
-    durability: 0
-  };
-  
-  // Update equipment stats
-  window.recalculateEquipmentStats();
-  
-  console.log("Inventory system initialized");
-  return true; // Return success for chaining
-};
-
-// Add item to inventory
-window.addItemToInventory = function(itemTemplate, quantity = 1) {
-  if (!itemTemplate) {
-    console.error("Cannot add null item template to inventory");
-    return false;
-  }
-  
-  // Create a new item instance from the template
-  const newItem = window.createItemInstance(itemTemplate, quantity);
-  
-  // Check if inventory has space
-  if (window.player.inventory.length >= window.player.inventoryCapacity) {
-    window.showNotification("Your inventory is full!", "warning");
-    return false;
-  }
-  
-  // If item is stackable, check if we already have it
-  if (itemTemplate.stackable) {
-    const existingItem = window.player.inventory.find(item => 
-      item.templateId === itemTemplate.id && item.quantity < itemTemplate.maxStack
-    );
-    
-    if (existingItem) {
-      // Calculate how many we can add to the stack
-      const spaceInStack = itemTemplate.maxStack - existingItem.quantity;
-      const amountToAdd = Math.min(spaceInStack, quantity);
-      
-      existingItem.quantity += amountToAdd;
-      
-      // If we added all, return success
-      if (amountToAdd === quantity) {
-        window.showNotification(`Added ${quantity} ${itemTemplate.name} to inventory`, "success");
-        return true;
-      }
-      
-      // Otherwise, create a new stack with the remainder
-      quantity -= amountToAdd;
-    }
-  }
-  
-  // Add the new item to inventory
-  window.player.inventory.push(newItem);
-  window.showNotification(`Added ${newItem.getName()} to inventory`, "success");
-  
-  return true;
-};
-
-// Remove item from inventory
-window.removeItemFromInventory = function(instanceId, quantity = 1) {
-  const itemIndex = window.player.inventory.findIndex(item => item.instanceId === instanceId);
-  
-  if (itemIndex === -1) {
-    console.error(`Item with instanceId ${instanceId} not found in inventory`);
-    return false;
-  }
-  
-  const item = window.player.inventory[itemIndex];
-  
-  // If stackable, reduce quantity
-  if (item.getTemplate().stackable) {
-    if (item.quantity > quantity) {
-      item.quantity -= quantity;
-      return true;
-    }
-  }
-  
-  // Remove the item completely
-  window.player.inventory.splice(itemIndex, 1);
-  return true;
-};
-
-// Use an item from inventory
-window.useItem = function(instanceId) {
-  const item = window.player.inventory.find(item => item.instanceId === instanceId);
-  
-  if (!item) {
-    console.error(`Item with instanceId ${instanceId} not found in inventory`);
-    return false;
-  }
-  
-  // Check if item is usable
-  if (!item.getTemplate().usable) {
-    window.showNotification(`${item.getName()} is not usable`, "warning");
-    return false;
-  }
-  
-  // Use the item
-  const success = item.use(window.player);
-  
-  if (success) {
-    // If stackable, decrease quantity
-    if (item.getTemplate().stackable) {
-      item.quantity--;
-      
-      // Remove if quantity is 0
-      if (item.quantity <= 0) {
-        window.removeItemFromInventory(instanceId);
-      }
-    } else {
-      // Non-stackable items are removed after use
-      window.removeItemFromInventory(instanceId);
-    }
-    
-    return true;
-  }
-  
-  return false;
-};
-
-// Equip an item
-window.equipItem = function(instanceId) {
-  const item = window.player.inventory.find(item => item.instanceId === instanceId);
-  
-  if (!item) {
-    console.error(`Item with instanceId ${instanceId} not found in inventory`);
-    return false;
-  }
-  
-  const template = item.getTemplate();
-  
-  // Check if item is equippable
-  if (!template.equipSlot) {
-    window.showNotification(`${item.getName()} cannot be equipped`, "warning");
-    return false;
-  }
-  
-  // Check requirements
-  if (!item.canEquip(window.player)) {
-    window.showNotification(`You don't meet the requirements to equip ${item.getName()}`, "warning");
-    return false;
-  }
-  
-  // Handle two-handed weapons
-  const isTwoHanded = template.category === window.ITEM_CATEGORIES.WEAPON && 
-                       template.hands === 2;
-  
-  // Remember old items to return to inventory
-  let oldItems = [];
-  
-  // If equipping a two-handed weapon, need to unequip both mainHand and offHand
-  if (isTwoHanded) {
-    if (window.player.equipment.mainHand) {
-      oldItems.push(window.player.equipment.mainHand);
-    }
-    if (window.player.equipment.offHand && window.player.equipment.offHand !== "occupied") {
-      oldItems.push(window.player.equipment.offHand);
-    }
-    
-    // Clear both slots
-    window.player.equipment.mainHand = null;
-    window.player.equipment.offHand = null;
-  } 
-  // If equipping to mainHand and we have a two-handed weapon, unequip it
-  else if (template.equipSlot === window.EQUIPMENT_SLOTS.MAIN_HAND &&
-           window.player.equipment.mainHand &&
-           window.player.equipment.mainHand.getTemplate().hands === 2) {
-    oldItems.push(window.player.equipment.mainHand);
-    window.player.equipment.mainHand = null;
-    window.player.equipment.offHand = null;
-  }
-  // If equipping to offHand and we have a two-handed weapon, unequip it
-  else if (template.equipSlot === window.EQUIPMENT_SLOTS.OFF_HAND &&
-           window.player.equipment.mainHand &&
-           window.player.equipment.mainHand.getTemplate().hands === 2) {
-    oldItems.push(window.player.equipment.mainHand);
-    window.player.equipment.mainHand = null;
-    window.player.equipment.offHand = null;
-  }
-  // Normal case - just unequip the slot we're equipping to
-  else if (window.player.equipment[template.equipSlot]) {
-    oldItems.push(window.player.equipment[template.equipSlot]);
-    window.player.equipment[template.equipSlot] = null;
-  }
-  
-  // Remove item from inventory
-  window.removeItemFromInventory(instanceId);
-  
-  // Add the old items back to inventory
-  oldItems.forEach(oldItem => {
-    if (oldItem && oldItem !== "occupied") {
-      oldItem.equipped = false;
-      window.player.inventory.push(oldItem);
-    }
-  });
-  
-  // Equip the new item
-  item.equipped = true;
-  window.player.equipment[template.equipSlot] = item;
-  
-  // If two-handed, also mark the off-hand as occupied
-  if (isTwoHanded && template.equipSlot === window.EQUIPMENT_SLOTS.MAIN_HAND) {
-    window.player.equipment.offHand = "occupied";
-  }
-  
-  // Recalculate equipment stats
-  window.recalculateEquipmentStats();
-  
-  window.showNotification(`Equipped ${item.getName()}`, "success");
-  return true;
-};
-
-// Unequip an item
-window.unequipItem = function(slot) {
-  // Check if the slot has an item
-  if (!window.player.equipment[slot] || window.player.equipment[slot] === "occupied") {
-    return false;
-  }
-  
-  // Check if inventory has space
-  if (window.player.inventory.length >= window.player.inventoryCapacity) {
-    window.showNotification("Your inventory is full! Cannot unequip.", "warning");
-    return false;
-  }
-  
-  const item = window.player.equipment[slot];
-  
-  // Add item to inventory
-  window.player.inventory.push(item);
-  
-  // Clear the equipment slot
-  window.player.equipment[slot] = null;
-  item.equipped = false;
-  
-  // If this was a two-handed weapon, also clear the off-hand "occupied" marker
-  if (item.getTemplate().hands === 2 && slot === window.EQUIPMENT_SLOTS.MAIN_HAND) {
-    window.player.equipment.offHand = null;
-  }
-  
-  // Recalculate equipment stats
-  window.recalculateEquipmentStats();
-  
-  window.showNotification(`Unequipped ${item.getName()}`, "success");
-  return true;
-};
-
-// Recalculate all equipment stats
-window.recalculateEquipmentStats = function() {
-  // Reset all stats
-  for (const stat in window.player.equipmentStats) {
-    window.player.equipmentStats[stat] = 0;
-  }
-  
-  // Loop through equipped items
-  for (const slot in window.player.equipment) {
-    const item = window.player.equipment[slot];
-    
-    // Skip empty slots or "occupied" marker
-    if (!item || item === "occupied") continue;
-    
-    const template = item.getTemplate();
-    
-    // Add stats from item
-    if (template.stats) {
-      for (const stat in template.stats) {
-        if (window.player.equipmentStats.hasOwnProperty(stat)) {
-          window.player.equipmentStats[stat] += template.stats[stat];
-        }
-      }
-    }
-  }
-  
-  // Update derived stats if needed (e.g., total attack power, defense, etc.)
-  console.log("Equipment stats recalculated:", window.player.equipmentStats);
-};
-
-// Add currency
-window.addCurrency = function(amount) {
-  window.player.taelors += amount;
-  window.showNotification(`Gained ${amount} taelors`, "success");
-};
-
-// Remove currency
-window.removeCurrency = function(amount) {
-  if (window.player.taelors >= amount) {
-    window.player.taelors -= amount;
-    return true;
-  }
-  
-  window.showNotification("Not enough taelors!", "warning");
-  return false;
-};
-
-// Get current inventory weight
-window.getInventoryWeight = function() {
-  let totalWeight = 0;
-  
-  window.player.inventory.forEach(item => {
-    const template = item.getTemplate();
-    totalWeight += template.weight * (template.stackable ? item.quantity : 1);
-  });
-  
-  return parseFloat(totalWeight.toFixed(1));
-};
-
-// Sort inventory by category, rarity, and name
-window.sortInventory = function(criteria = 'category') {
-  window.player.inventory.sort((a, b) => {
-    const templateA = a.getTemplate();
-    const templateB = b.getTemplate();
-    
-    if (criteria === 'category') {
-      // First sort by category
-      if (templateA.category !== templateB.category) {
-        // Define category sort order
-        const categoryOrder = [
-          window.ITEM_CATEGORIES.WEAPON,
-          window.ITEM_CATEGORIES.ARMOR,
-          window.ITEM_CATEGORIES.ACCESSORY,
-          window.ITEM_CATEGORIES.CONSUMABLE,
-          window.ITEM_CATEGORIES.MATERIAL,
-          window.ITEM_CATEGORIES.QUEST
-        ];
-        
-        return categoryOrder.indexOf(templateA.category) - categoryOrder.indexOf(templateB.category);
-      }
-      
-      // Then by rarity (higher rarity first)
-      const rarityValueA = templateA.rarity.multiplier;
-      const rarityValueB = templateB.rarity.multiplier;
-      
-      if (rarityValueA !== rarityValueB) {
-        return rarityValueB - rarityValueA;
-      }
-      
-      // Finally by name
-      return templateA.name.localeCompare(templateB.name);
-    } 
-    else if (criteria === 'value') {
-      // Sort by value (higher first)
-      const valueA = templateA.value * templateA.rarity.multiplier;
-      const valueB = templateB.value * templateB.rarity.multiplier;
-      
-      return valueB - valueA;
-    }
-    else if (criteria === 'name') {
-      // Sort alphabetically
-      return templateA.name.localeCompare(templateB.name);
-    }
-    
-    return 0;
-  });
-  
-  return window.player.inventory;
-};
-
-// Filter inventory by category
-window.filterInventory = function(category) {
-  if (!category || category === 'all') {
-    return window.player.inventory;
-  }
-  
-  return window.player.inventory.filter(item => 
-    item.getTemplate().category === category
-  );
-};
-
-// Get itemTemplate by ID
-window.getItemTemplateById = function(templateId) {
-  return window.itemTemplates[templateId] || null;
-};
-
-// ================= CAREER-SPECIFIC EQUIPMENT =================
-
-// Add starting items based on character career
-window.addStartingItems = function() {
-  console.log("Adding starting items for career:", window.player.career?.title);
-  
-  // Make sure player and career exist
-  if (!window.player || !window.player.career) {
-    console.error("Cannot add starting items - player or career not initialized!");
-    return false;
-  }
-  
-  // Make sure item templates are initialized
-  if (!window.itemTemplates || Object.keys(window.itemTemplates).length === 0) {
-    console.error("Cannot add starting items - item templates not initialized!");
-    return false;
-  }
-  
-  try {
-    // Add career-specific starting equipment
-    switch(window.player.career.title) {
-      case "Regular":
-      case "Paanic Regular":
-        if (window.itemTemplates.basicSword) window.addItemToInventory(window.itemTemplates.basicSword);
-        if (window.itemTemplates.legionShield) window.addItemToInventory(window.itemTemplates.legionShield);
-        if (window.itemTemplates.legionHelmet) window.addItemToInventory(window.itemTemplates.legionHelmet);
-        if (window.itemTemplates.legionArmor) window.addItemToInventory(window.itemTemplates.legionArmor);
-        break;
-        
-      case "Castellan Cavalry":
-        if (window.itemTemplates.nobleSword) window.addItemToInventory(window.itemTemplates.nobleSword);
-        if (window.itemTemplates.cavalryArmor) window.addItemToInventory(window.itemTemplates.cavalryArmor);
-        if (window.itemTemplates.standardWarhorse) window.addItemToInventory(window.itemTemplates.standardWarhorse);
-        
-        // Ensure mount slot exists
-        if (!window.player.equipment.mount) {
-          window.player.equipment.mount = null;
-        }
-        break;
-        
-      case "Nesian Scout":
-        if (window.itemTemplates.matchlockRifle) window.addItemToInventory(window.itemTemplates.matchlockRifle);
-        if (window.itemTemplates.scoutArmor) window.addItemToInventory(window.itemTemplates.scoutArmor);
-        break;
-        
-      case "Noble Youth":
-      case "Paanic Noble Youth":
-        if (window.itemTemplates.nobleSword) window.addItemToInventory(window.itemTemplates.nobleSword);
-        if (window.itemTemplates.legionArmor) window.addItemToInventory(window.itemTemplates.legionArmor);
-        window.addCurrency(50); // Extra starting money
-        break;
-        
-      case "Wyrdman":
-      case "Plains Huntsman":
-      case "Berserker":
-        if (window.itemTemplates.hunterBow) window.addItemToInventory(window.itemTemplates.hunterBow);
-        if (window.itemTemplates.scoutArmor) window.addItemToInventory(window.itemTemplates.scoutArmor);
-        break;
-        
-      default:
-        console.log("Using default equipment for career:", window.player.career.title);
-        if (window.itemTemplates.basicSword) window.addItemToInventory(window.itemTemplates.basicSword);
-        if (window.itemTemplates.legionArmor) window.addItemToInventory(window.itemTemplates.legionArmor);
-        break;
-    }
-
-    // Everyone gets a health potion
-    if (window.itemTemplates.healthPotion) window.addItemToInventory(window.itemTemplates.healthPotion);
-    
-    console.log("Starting items added successfully");
-    return true;
-  } catch (error) {
-    console.error("Error adding starting items:", error);
-    return false;
-  }
-};
-
-// Auto-equip starting items
-window.autoEquipStartingItems = function() {
-  console.log("Auto-equipping starting items");
-  
-  try {
-    const career = window.player.career.title;
-    
-    // Try to find and equip items based on career
-    switch(career) {
-      case "Regular":
-      case "Paanic Regular":
-        const basicSword = window.player.inventory.find(i => i.templateId === 'basic_sword');
-        if (basicSword) window.equipItem(basicSword.instanceId);
-        
-        const legionShield = window.player.inventory.find(i => i.templateId === 'legion_shield');
-        if (legionShield) window.equipItem(legionShield.instanceId);
-        
-        const legionHelmet = window.player.inventory.find(i => i.templateId === 'legion_helmet');
-        if (legionHelmet) window.equipItem(legionHelmet.instanceId);
-        
-        const legionArmor = window.player.inventory.find(i => i.templateId === 'legion_armor');
-        if (legionArmor) window.equipItem(legionArmor.instanceId);
-        break;
-        
-      case "Castellan Cavalry":
-        const nobleSword = window.player.inventory.find(i => i.templateId === 'noble_sword');
-        if (nobleSword) window.equipItem(nobleSword.instanceId);
-        
-        const cavalryArmor = window.player.inventory.find(i => i.templateId === 'cavalry_armor');
-        if (cavalryArmor) window.equipItem(cavalryArmor.instanceId);
-        
-        const standardWarhorse = window.player.inventory.find(i => i.templateId === 'standard_warhorse');
-        if (standardWarhorse) window.equipItem(standardWarhorse.instanceId);
-        break;
-        
-      case "Nesian Scout":
-        const matchlockRifle = window.player.inventory.find(i => i.templateId === 'matchlock_rifle');
-        if (matchlockRifle) window.equipItem(matchlockRifle.instanceId);
-        
-        const scoutArmor = window.player.inventory.find(i => i.templateId === 'scout_armor');
-        if (scoutArmor) window.equipItem(scoutArmor.instanceId);
-        break;
-        
-      case "Noble Youth":
-      case "Paanic Noble Youth":
-        const youthSword = window.player.inventory.find(i => i.templateId === 'noble_sword');
-        if (youthSword) window.equipItem(youthSword.instanceId);
-        
-        const youthArmor = window.player.inventory.find(i => i.templateId === 'legion_armor');
-        if (youthArmor) window.equipItem(youthArmor.instanceId);
-        break;
-        
-      case "Wyrdman":
-      case "Plains Huntsman":
-      case "Berserker":
-        const hunterBow = window.player.inventory.find(i => i.templateId === 'hunter_bow');
-        if (hunterBow) window.equipItem(hunterBow.instanceId);
-        
-        const hunterArmor = window.player.inventory.find(i => i.templateId === 'scout_armor');
-        if (hunterArmor) window.equipItem(hunterArmor.instanceId);
-        break;
-        
-      default:
-        const defaultSword = window.player.inventory.find(i => i.templateId === 'basic_sword');
-        if (defaultSword) window.equipItem(defaultSword.instanceId);
-        
-        const defaultArmor = window.player.inventory.find(i => i.templateId === 'legion_armor');
-        if (defaultArmor) window.equipItem(defaultArmor.instanceId);
-        break;
-    }
-    
-    console.log("Auto-equipping complete");
-    return true;
-  } catch (error) {
-    console.error("Error auto-equipping items:", error);
-    return false;
-  }
-};
-
-// ================= INVENTORY UI RENDERING =================
+// INVENTORY UI MODULE
+// Handles all inventory interface elements
 
 // Initialize inventory UI
 window.initializeInventoryUI = function() {
@@ -602,22 +11,28 @@ window.initializeInventoryUI = function() {
   // Check if it exists
   if (!inventoryContainer) {
     console.error("Inventory container not found!");
-    return false;
+    return;
   }
   
   // Check for mount slot requirement
-  const isCavalry = window.player?.career?.title === "Castellan Cavalry";
-  console.log("Mount slot check - isCavalry:", isCavalry);
+  // FIXED: Log detailed info about career for debugging
+  let isCavalry = false;
+  if (window.player && window.player.career) {
+    isCavalry = window.player.career.title === "Castellan Cavalry";
+    console.log("Mount slot check - isCavalry:", isCavalry, "Career:", window.player.career.title);
+  } else {
+    console.log("Cannot check for cavalry - player or career not initialized");
+  }
   
   // Create the structure for the inventory UI
   inventoryContainer.innerHTML = `
     <h3>Inventory</h3>
     <div class="inventory-header">
       <div class="inventory-currency">
-        <span id="currency-display">${window.player.taelors || 0} Taelors</span>
+        <span id="currency-display">${window.player.taelors} Taelors</span>
       </div>
       <div class="inventory-capacity">
-        <span id="capacity-display">${window.player.inventory?.length || 0}/${window.player.inventoryCapacity || 20}</span>
+        <span id="capacity-display">0/${window.player.inventoryCapacity}</span>
       </div>
     </div>
     
@@ -698,24 +113,10 @@ window.initializeInventoryUI = function() {
     </div>
   `;
   
-  // Add required CSS for mount slot
-  window.ensureInventoryStyles();
-  
-  // Add event listeners
-  window.setupInventoryEventListeners();
-  
-  console.log("Inventory UI initialized");
-  return true;
-};
-
-// Ensure inventory styles are added
-window.ensureInventoryStyles = function() {
-  // Check if styles already exist
-  if (document.getElementById('inventory-styles')) return;
-  
-  const style = document.createElement('style');
-  style.id = 'inventory-styles';
-  style.textContent = `
+  // FIXED: Add styles for the mount slot inside the function
+  // This ensures the styles are added even if stylesheet wasn't loaded
+  const mountStyle = document.createElement('style');
+  mountStyle.textContent = `
     .paperdoll.has-mount {
       display: grid;
       grid-template-areas:
@@ -748,8 +149,64 @@ window.ensureInventoryStyles = function() {
     .equipment-slot[data-slot="offHand"] { grid-area: offHand; }
     .equipment-slot[data-slot="accessory"] { grid-area: accessory; }
     .equipment-slot[data-slot="mount"] { grid-area: mount; }
-    
-    /* Inventory styling */
+  `;
+  document.head.appendChild(mountStyle);
+  
+  // Add event listeners
+  document.querySelector('.inventory-close').addEventListener('click', function() {
+    document.getElementById('inventory').classList.add('hidden');
+  });
+  
+  // Tab switching
+  const tabs = document.querySelectorAll('.inventory-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', function() {
+      // Remove active class from all tabs
+      tabs.forEach(t => t.classList.remove('active'));
+      
+      // Add active class to clicked tab
+      this.classList.add('active');
+      
+      // Filter items based on selected category
+      const category = this.getAttribute('data-category');
+      window.renderInventoryItems(category);
+    });
+  });
+  
+  // Sort selection
+  const sortSelect = document.getElementById('sort-select');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', function() {
+      const category = document.querySelector('.inventory-tab.active').getAttribute('data-category');
+      window.renderInventoryItems(category, this.value);
+    });
+  }
+  
+  // Equipment slot clicks
+  const equipmentSlots = document.querySelectorAll('.equipment-slot');
+  equipmentSlots.forEach(slot => {
+    slot.addEventListener('click', function() {
+      const slotName = this.getAttribute('data-slot');
+      const equippedItem = window.player.equipment[slotName];
+      
+      // Only show details if an item is equipped
+      if (equippedItem && equippedItem !== "occupied") {
+        window.showItemDetails(equippedItem);
+      }
+    });
+  });
+  
+  // Close item details panel when clicking the X
+  const closeBtn = document.querySelector('.item-details-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function() {
+      document.getElementById('item-details-panel').classList.add('hidden');
+    });
+  }
+  
+  // Add additional style for inventory
+  const style = document.createElement('style');
+  style.textContent = `
     #inventory {
       max-width: 900px;
       margin: 0 auto;
@@ -1057,6 +514,40 @@ window.ensureInventoryStyles = function() {
       background: #623d2a;
     }
     
+    .item-comparison {
+      background: #2a2a2a;
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 15px;
+    }
+    
+    .stat-comparison {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+    
+    .stat-label {
+      flex: 1;
+    }
+    
+    .stat-current {
+      color: #888;
+      margin-right: 10px;
+    }
+    
+    .stat-new {
+      text-align: right;
+    }
+    
+    .stat-better {
+      color: #4CAF50;
+    }
+    
+    .stat-worse {
+      color: #F44336;
+    }
+    
     /* Common rarity colors */
     .rarity-common { color: #aaaaaa; background-color: rgba(170, 170, 170, 0.1); }
     .rarity-uncommon { color: #00aa00; background-color: rgba(0, 170, 0, 0.1); }
@@ -1110,91 +601,8 @@ window.ensureInventoryStyles = function() {
     }
   `;
   document.head.appendChild(style);
-};
-
-// Set up inventory event listeners
-window.setupInventoryEventListeners = function() {
-  // Click handler for close button
-  const closeBtn = document.querySelector('.inventory-close');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', function() {
-      document.getElementById('inventory').classList.add('hidden');
-    });
-  }
   
-  // Tab switching
-  const tabs = document.querySelectorAll('.inventory-tab');
-  tabs.forEach(tab => {
-    tab.addEventListener('click', function() {
-      // Remove active class from all tabs
-      tabs.forEach(t => t.classList.remove('active'));
-      
-      // Add active class to clicked tab
-      this.classList.add('active');
-      
-      // Filter items based on selected category
-      const category = this.getAttribute('data-category');
-      window.renderInventoryItems(category);
-    });
-  });
-  
-  // Sort selection
-  const sortSelect = document.getElementById('sort-select');
-  if (sortSelect) {
-    sortSelect.addEventListener('change', function() {
-      const category = document.querySelector('.inventory-tab.active').getAttribute('data-category');
-      window.renderInventoryItems(category, this.value);
-    });
-  }
-  
-  // Fix equipment slot interaction
-  window.fixEquipmentSlotInteraction();
-  
-  // Close item details panel when clicking the X
-  const detailsCloseBtn = document.querySelector('.item-details-close');
-  if (detailsCloseBtn) {
-    detailsCloseBtn.addEventListener('click', function() {
-      document.getElementById('item-details-panel').classList.add('hidden');
-    });
-  }
-};
-
-// Fix equipment slots interaction
-window.fixEquipmentSlotInteraction = function() {
-  // Get all equipment slots
-  const equipmentSlots = document.querySelectorAll('.equipment-slot');
-  
-  // Remove any existing click listeners
-  equipmentSlots.forEach(slot => {
-    const newSlot = slot.cloneNode(true);
-    slot.parentNode.replaceChild(newSlot, slot);
-    
-    // Add new click listener
-    newSlot.addEventListener('click', function() {
-      const slotName = this.getAttribute('data-slot');
-      console.log(`Clicked equipment slot: ${slotName}`);
-      
-      // Convert from DOM slot name (dash format) to JS property name (camelCase)
-      // e.g., 'main-hand' → 'mainHand'
-      const propertyName = slotName;
-      
-      if (!window.player.equipment) {
-        console.error("Equipment object not initialized!");
-        return;
-      }
-      
-      const equippedItem = window.player.equipment[propertyName];
-      
-      console.log(`Equipped item in slot ${propertyName}:`, equippedItem);
-      
-      // Only show details if an item is equipped
-      if (equippedItem && equippedItem !== "occupied") {
-        window.showItemDetails(equippedItem);
-      } else {
-        console.log("No item in this slot or slot is occupied by two-handed weapon");
-      }
-    });
-  });
+  console.log("Inventory UI initialized");
 };
 
 // Render the player's inventory items
@@ -1480,7 +888,7 @@ window.updateEquipmentDisplay = function() {
     const slotElement = document.getElementById(slotElementId);
     
     if (!slotElement) {
-      console.log(`Slot element '${slotElementId}' not found in DOM for slot ${slot}. This may be normal if this slot type isn't available for this character.`);
+      console.warn(`Slot element '${slotElementId}' not found in DOM for slot ${slot}`);
       continue;
     }
     
@@ -1588,62 +996,162 @@ window.updateEquipmentDisplay = function() {
   window.fixEquipmentSlotInteraction();
 };
 
-// ================= UNIFIED INVENTORY SYSTEM INITIALIZATION =================
-
-// Primary initialization function for the inventory system
-window.initializeFullInventorySystem = function() {
-  console.log("Initializing full inventory system...");
+// Fix equipment slots interaction
+window.fixEquipmentSlotInteraction = function() {
+  // Get all equipment slots
+  const equipmentSlots = document.querySelectorAll('.equipment-slot');
   
-  // Step 1: Make sure item templates are initialized first
-  if (!window.itemTemplates || Object.keys(window.itemTemplates).length === 0) {
-    window.initializeItemTemplates();
-  }
-  
-  // Step 2: Initialize the inventory data system
-  window.initializeInventorySystem();
-  
-  // Step 3: Initialize the UI
-  window.initializeInventoryUI();
-  
-  // Step 4: Add starting items based on character career
-  window.addStartingItems();
-  
-  // Step 5: Auto-equip items
-  window.autoEquipStartingItems();
-  
-  // Step 6: Update display once everything is ready
-  window.renderInventoryItems();
-  
-  console.log("Full inventory system initialization complete!");
-  return true;
+  // Remove any existing click listeners
+  equipmentSlots.forEach(slot => {
+    const newSlot = slot.cloneNode(true);
+    slot.parentNode.replaceChild(newSlot, slot);
+    
+    // Add new click listener
+    newSlot.addEventListener('click', function() {
+      const slotName = this.getAttribute('data-slot');
+      console.log(`Clicked equipment slot: ${slotName}`);
+      
+      // Convert from DOM slot name (dash format) to JS property name (camelCase)
+      // e.g., 'main-hand' → 'mainHand'
+      const propertyName = slotName.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+      
+      if (!window.player.equipment) {
+        console.error("Equipment object not initialized!");
+        return;
+      }
+      
+      const equippedItem = window.player.equipment[propertyName];
+      
+      console.log(`Equipped item in slot ${propertyName}:`, equippedItem);
+      
+      // Only show details if an item is equipped
+      if (equippedItem && equippedItem !== "occupied") {
+        window.showItemDetails(equippedItem);
+      } else {
+        console.log("No item in this slot or slot is occupied by two-handed weapon");
+      }
+    });
+  });
 };
 
-// Handler function for opening inventory
-window.handleInventoryClick = function() {
-  console.log("Opening inventory");
+// Handle drag and drop functionality
+window.implementDragAndDrop = function() {
+  // Track dragged item
+  let draggedItem = null;
+  let draggedElement = null;
+  let offsetX, offsetY;
   
-  // Make sure inventory system is initialized
-  if (!window.player.equipment) {
-    console.log("Initializing inventory system on first open");
-    window.initializeInventorySystem();
-  }
+  // Helper function to find the closest drop target
+  const findDropTarget = function(x, y) {
+    // Equipment slots
+    const equipmentSlots = document.querySelectorAll('.equipment-slot');
+    for (const slot of equipmentSlots) {
+      const rect = slot.getBoundingClientRect();
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        return slot;
+      }
+    }
+    
+    return null;
+  };
   
-  // Display the inventory panel
-  const inventoryPanel = document.getElementById('inventory');
-  inventoryPanel.classList.remove('hidden');
+  // Handle dragstart
+  document.addEventListener('mousedown', function(e) {
+    // Check if item card
+    if (e.target.closest('.item-card')) {
+      const itemCard = e.target.closest('.item-card');
+      
+      // Get item instance ID
+      const instanceId = itemCard.getAttribute('data-instance-id');
+      draggedItem = window.player.inventory.find(item => item.instanceId === instanceId);
+      
+      if (draggedItem) {
+        // Create a clone for dragging
+        draggedElement = itemCard.cloneNode(true);
+        draggedElement.classList.add('dragging');
+        
+        // Calculate offset
+        const rect = itemCard.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+        
+        // Position the dragged element
+        draggedElement.style.width = `${rect.width}px`;
+        draggedElement.style.height = `${rect.height}px`;
+        
+        // Add to body
+        document.body.appendChild(draggedElement);
+        
+        // Hide original
+        itemCard.style.opacity = '0.3';
+      }
+    }
+  });
   
-  // Ensure inventory UI is initialized
-  if (!document.querySelector('.paperdoll')) {
-    console.log("Initializing inventory UI on first open");
-    window.initializeInventoryUI();
-  }
+  // Handle drag movement
+  document.addEventListener('mousemove', function(e) {
+    if (draggedElement) {
+      // Move the dragged element
+      draggedElement.style.left = `${e.clientX - offsetX}px`;
+      draggedElement.style.top = `${e.clientY - offsetY}px`;
+      
+      // Check for drop targets
+      const dropTarget = findDropTarget(e.clientX, e.clientY);
+      
+      // Clear previous drop targets
+      document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+      
+      // Highlight valid drop target
+      if (dropTarget) {
+        const slotName = dropTarget.getAttribute('data-slot');
+        const template = draggedItem.getTemplate();
+        
+        // Only highlight if this item can be equipped in this slot
+        if (template.equipSlot === slotName) {
+          dropTarget.classList.add('drop-target');
+        }
+      }
+    }
+  });
   
-  // Render inventory items
-  window.renderInventoryItems();
-  window.updateEquipmentDisplay();
+  // Handle drop
+  document.addEventListener('mouseup', function(e) {
+    if (draggedElement) {
+      // Check for drop target
+      const dropTarget = findDropTarget(e.clientX, e.clientY);
+      
+      if (dropTarget) {
+        const slotName = dropTarget.getAttribute('data-slot');
+        const template = draggedItem.getTemplate();
+        
+        // Equip if valid slot
+        if (template.equipSlot === slotName) {
+          window.equipItem(draggedItem.instanceId);
+          window.renderInventoryItems(document.querySelector('.inventory-tab.active').getAttribute('data-category'));
+          window.updateEquipmentDisplay();
+        }
+      }
+      
+      // Remove the dragged element
+      document.body.removeChild(draggedElement);
+      draggedElement = null;
+      
+      // Restore original item
+      const originalItem = document.querySelector(`.item-card[data-instance-id="${draggedItem.instanceId}"]`);
+      if (originalItem) {
+        originalItem.style.opacity = '1';
+      }
+      
+      // Clear drag state
+      draggedItem = null;
+      
+      // Clear drop targets
+      document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+    }
+  });
 };
 
-// Game integration - automatically initialize when DOM is loaded
+// Override the inventory button handler
 document.addEventListener('DOMContentLoaded', function() {
-  console.log("DOM loaded, inventory system ready to initialize");
+  console.log("DOM loaded, inventory UI module ready");
 });
