@@ -118,8 +118,9 @@ window.addActionButton = function(label, action, container) {
 };
 
 // Function to handle profile panel display
+// Updated handleProfile function for enhanced UI design
+// Updated handleProfile function with fixed sizing
 window.handleProfile = function() {
-  // Update profile text before showing
   const profileDiv = document.getElementById('profile');
   const profileText = document.getElementById('profileText');
   
@@ -162,7 +163,7 @@ window.handleProfile = function() {
     originColor = "#99cc66"; // Green
   }
   
-  // Create the modern profile UI
+  // Create the modern profile UI - simplified for better fit
   profileText.innerHTML = `
     <div class="profile-container">
       <div class="profile-header">
@@ -289,74 +290,13 @@ window.handleProfile = function() {
   
   // Show the profile panel
   profileDiv.classList.remove('hidden');
-  
-  // Prevent immediate closure when opening panel
-  setTimeout(() => {
-    profileDiv.addEventListener('click', function(event) {
-      event.stopPropagation();
-    }, { once: true });
-  }, 0);
 };
 
-// Function to update profile if it's currently visible
+// Update profile if it's currently visible
 window.updateProfileIfVisible = function() {
   if (!document.getElementById('profile').classList.contains('hidden')) {
     window.handleProfile();
   }
-};
-
-// Function to handle inventory panel display
-window.handleInventoryClick = function() {
-  console.log("Opening inventory");
-  
-  // Make sure inventory system is initialized
-  if (!window.player.equipment) {
-    console.log("Initializing inventory system on first open");
-    window.initializeInventorySystem();
-  }
-  
-  // Display the inventory panel
-  const inventoryPanel = document.getElementById('inventory');
-  inventoryPanel.classList.remove('hidden');
-  
-  // Ensure inventory UI is initialized
-  if (!document.querySelector('.paperdoll')) {
-    console.log("Initializing inventory UI on first open");
-    window.initializeInventoryUI();
-  }
-  
-  // Render inventory items
-  window.renderInventoryItems();
-  window.updateEquipmentDisplay();
-  
-  // Prevent immediate closure when opening inventory
-  setTimeout(() => {
-    inventoryPanel.addEventListener('click', function(event) {
-      event.stopPropagation();
-    }, { once: true });
-  }, 0);
-};
-
-// Function to handle quest log display
-window.handleQuestLog = function() {
-  // Update quest log before showing
-  const questListDiv = document.getElementById('questList');
-  
-  // Simple placeholder for now
-  questListDiv.innerHTML = `
-    <p>No active quests at the moment.</p>
-    <p>Complete your training and speak with your commanders to receive assignments.</p>
-  `;
-  
-  const questLogPanel = document.getElementById('questLog');
-  questLogPanel.classList.remove('hidden');
-  
-  // Prevent immediate closure when opening quest log
-  setTimeout(() => {
-    questLogPanel.addEventListener('click', function(event) {
-      event.stopPropagation();
-    }, { once: true });
-  }, 0);
 };
 
 // Function to set narrative text
@@ -415,53 +355,3 @@ window.showAchievement = function(achievementId) {
     document.body.removeChild(notificationElement);
   }, 5000);
 };
-
-// Add click-outside-to-close behavior for panels
-window.addClickOutsideToClosePanels = function() {
-  // Function to handle clicks on the document
-  function handleDocumentClick(event) {
-    // Get all open panels
-    const panels = [
-      document.getElementById('profile'),
-      document.getElementById('inventory'),
-      document.getElementById('questLog')
-    ];
-    
-    // Check each panel
-    panels.forEach(panel => {
-      // If panel is open and click is outside the panel
-      if (panel && !panel.classList.contains('hidden') && !panel.contains(event.target)) {
-        // Close the panel
-        panel.classList.add('hidden');
-      }
-    });
-  }
-  
-  // Attach the click event to the document
-  document.addEventListener('click', handleDocumentClick);
-  
-  // Attach panel content click handler to prevent closing when clicking inside
-  const panelContents = [
-    document.getElementById('profileText'),
-    document.getElementById('inventoryList'),
-    document.getElementById('questList')
-  ];
-  
-  panelContents.forEach(content => {
-    if (content) {
-      content.addEventListener('click', function(event) {
-        // Stop the click from propagating to the document
-        event.stopPropagation();
-      });
-    }
-  });
-  
-  console.log("Click-outside-to-close behavior added to panels");
-};
-
-// Run this setup when the DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-  console.log("Setting up click-outside-to-close for panels");
-  // Wait a short time to ensure other initialization is complete
-  setTimeout(window.addClickOutsideToClosePanels, 500);
-});

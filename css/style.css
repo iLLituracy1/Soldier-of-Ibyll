@@ -519,28 +519,23 @@ input[type="text"], input[type="number"] {
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   border: 1px solid #2a3448;
-  overflow: hidden;
-  max-height: 90vh; /* Limit height to 90% of viewport */
-  display: flex;
-  flex-direction: column;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .panel-header {
   background-color: #232c3f;
   padding: 10px 15px;
   border-bottom: 1px solid #2a3448;
-  flex-shrink: 0; /* Prevent header from shrinking */
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .panel-header h3 {
   margin: 0;
   color: #c9aa71;
   text-align: left;
-}
-
-#profileText {
-  overflow-y: auto; /* Add scrollbar only when needed */
-  flex-grow: 1; /* Allow content to take remaining space */
 }
 
 .profile-container {
@@ -550,26 +545,25 @@ input[type="text"], input[type="number"] {
 
 .profile-header {
   display: flex;
-  padding: 20px;
+  padding: 15px;
   border-bottom: 1px solid #2a3448;
 }
 
 .profile-avatar {
   width: 70px;
-  height: 70px; /* Slightly smaller avatar */
+  height: 70px;
   border-radius: 50%;
   background-color: rgba(160, 160, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  margin-right: 20px;
+  margin-right: 15px;
   border: 2px solid #2a3448;
-  flex-shrink: 0; /* Prevent avatar from shrinking */
 }
 
 .avatar-icon {
-  font-size: 2.2em; /* Slightly smaller icon */
+  font-size: 2em;
 }
 
 .secondary-icon {
@@ -596,7 +590,7 @@ input[type="text"], input[type="number"] {
   margin: 0 0 5px 0;
   color: #c9aa71;
   text-align: left;
-  font-size: 1.6em; /* Slightly smaller heading */
+  font-size: 1.6em;
 }
 
 .profile-subtitle {
@@ -614,7 +608,7 @@ input[type="text"], input[type="number"] {
   background-color: #232c3f;
   padding: 3px 8px;
   border-radius: 15px;
-  font-size: 0.8em;
+  font-size: 0.75em;
   white-space: nowrap;
 }
 
@@ -650,7 +644,7 @@ input[type="text"], input[type="number"] {
 }
 
 .attribute-value {
-  font-size: 2.5em; /* Slightly smaller values */
+  font-size: 2.6em;
   font-weight: bold;
   color: #e0e0e0;
   margin-bottom: 5px;
@@ -667,11 +661,16 @@ input[type="text"], input[type="number"] {
   margin: 0;
   color: #c9aa71;
   text-align: left;
+  font-size: 1.1em;
+  background-color: #1e2636;
+  position: sticky;
+  top: 0;
+  z-index: 9;
 }
 
 .skills-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* More columns on wider screens */
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   padding: 0 15px 15px 15px;
 }
@@ -686,16 +685,16 @@ input[type="text"], input[type="number"] {
 }
 
 .skill-name {
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   text-align: center;
   font-size: 0.85em;
 }
 
 .skill-meter {
   position: relative;
-  width: 60px; /* Smaller skill circles */
+  width: 60px;
   height: 60px;
-  margin-bottom: 5px;
+  margin-bottom: 3px;
 }
 
 .skill-circle {
@@ -734,6 +733,7 @@ input[type="text"], input[type="number"] {
   position: relative;
   z-index: 1;
   font-weight: bold;
+  font-size: 0.95em;
 }
 
 .skill-cap {
@@ -741,12 +741,12 @@ input[type="text"], input[type="number"] {
   color: #888;
 }
 
-@media (max-width: 600px) {
-  .profile-attributes {
-    flex-direction: column;
+@media (max-width: 500px) {
+  .skills-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
   
-  .skills-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  .profile-attributes {
+    flex-direction: column;
   }
 }
