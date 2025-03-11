@@ -277,6 +277,60 @@ function handlePatrolAction() {
     return;
   }
   
+  // Determine if combat occurs (30% chance)
+  const combatChance = 0.9;
+  const encounterRoll = Math.random();
+  
+  if (encounterRoll < combatChance) {
+    // Begin combat sequence
+    window.setNarrative("While on patrol, you encounter a hostile figure lurking near the camp perimeter. They draw their weapon when they spot you!");
+    
+    // Ensure combat system is initialized
+    if (!window.combatSystem || !window.combatSystem.initialized) {
+      console.error("Combat system not initialized properly");
+      window.showNotification("Combat system error - continuing patrol", 'warning');
+      proceedWithNormalPatrol();
+      return;
+    }
+    
+    // Select an appropriate enemy
+    const enemyTypes = ["ARRASI_VAELGORR", "IMPERIAL_DESERTER"];
+    const randomEnemy = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+    
+    // Log for debugging
+    console.log("Starting combat with enemy:", randomEnemy);
+    
+    // Show combat interface manually in case it's hidden
+    document.getElementById('combatInterface').classList.remove('hidden');
+    
+    // Initiate combat with slight delay for narrative flow
+    setTimeout(() => {
+      try {
+        // Explicitly call the combat initiation function
+        window.combatSystem.initiateCombat(randomEnemy);
+        
+        // Set game state flags
+        window.gameState.stamina = Math.max(0, window.gameState.stamina - 15);
+        window.gameState.dailyPatrolDone = true;
+        
+        // Update UI
+        window.updateStatusBars();
+      } catch (error) {
+        console.error("Combat initiation error:", error);
+        window.showNotification("Combat failed to start - continuing patrol", 'warning');
+        proceedWithNormalPatrol();
+      }
+    }, 1000);
+    
+    return;
+  }
+  
+  // If no combat, proceed with normal patrol
+  proceedWithNormalPatrol();
+}
+
+// Extract normal patrol logic to reuse
+function proceedWithNormalPatrol() {
   // Patrol action
   const patrolText = window.narrativeElements.patrol[Math.floor(Math.random() * window.narrativeElements.patrol.length)];
   window.setNarrative(patrolText);

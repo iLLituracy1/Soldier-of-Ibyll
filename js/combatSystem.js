@@ -1,5 +1,5 @@
-// combatSystem.js  COMBAT SYSTEM MODULE 
-// Implements a narrative-driven combat system with stances, distances, and weapon-based actions
+// combatSystem.js - COMPLETE UPDATED COMBAT SYSTEM MODULE 
+// Implements a narrative-driven combat system with stances, distances, counter chains, and weapon-based actions
 
 // Combat state and management object
 window.combatSystem = {
@@ -14,7 +14,12 @@ window.combatSystem = {
     enemyStance: "neutral",
     counterWindowOpen: false,
     targetArea: "body", // head, body, legs
-    combatLog: []
+    combatLog: [],
+    
+    // Counter system properties
+    counterChain: 0,          // Tracks how many counters in a row
+    maxCounterChain: 4,       // Maximum number of back-and-forth exchanges
+    lastCounterActor: null,   // Who performed the last counter ("player" or "enemy")
   },
   
   // Distance descriptors for UI
@@ -42,6 +47,8 @@ window.combatSystem = {
   // Initialize combat system
   initialize: function() {
     console.log("Combat system initialized");
+    // Add an initialization flag for systems that need to check
+    this.initialized = true;
     // Add any one-time initialization here
   },
   
@@ -57,7 +64,12 @@ window.combatSystem = {
       enemyStance: "neutral",
       counterWindowOpen: false,
       targetArea: "body",
-      combatLog: []
+      combatLog: [],
+      
+      // Counter system properties
+      counterChain: 0,
+      maxCounterChain: 4,
+      lastCounterActor: null
     };
     
     // Create enemy instance
@@ -106,6 +118,19 @@ window.combatSystem = {
     const previousPhase = this.state.phase;
     this.state.phase = phase;
     
+    // If we're in a counter window, don't change phases normally
+    if (this.state.counterWindowOpen && phase !== "initial" && phase !== "resolution") {
+      if (this.state.lastCounterActor === "player") {
+        // Enemy should counter
+        setTimeout(() => this.handleEnemyCounter(), 1000);
+        return;
+      } else if (this.state.lastCounterActor === "enemy") {
+        // Show player counter options
+        this.updateCounterOptions();
+        return;
+      }
+    }
+    
     switch(phase) {
       case "initial":
         // Handle intro narrative and setup
@@ -141,6 +166,11 @@ window.combatSystem = {
   
   // Process enemy's turn
   processEnemyTurn: function() {
+
+    // If already processed an action this turn, don't process again
+    if (this._processingEnemyTurn) return;
+    this._processingEnemyTurn = true;
+
     // If enemy can counter attack
     if (this.state.counterWindowOpen) {
       this.handleEnemyCounter();
@@ -166,7 +196,10 @@ window.combatSystem = {
     }
     
     // Move to resolution phase
-    setTimeout(() => this.enterPhase("resolution"), 1000);
+    setTimeout(() => {
+      this._processingEnemyTurn = false;
+      this.enterPhase("resolution");
+    }, 1500);
   },
   
   // Determine enemy's next action based on AI logic
@@ -269,6 +302,10 @@ window.combatSystem = {
         this.handlePlayerAttack(params.attackType);
         break;
       
+      case "counter":
+        this.handlePlayerCounter(params.attackType);
+        break;
+      
       case "flee":
         this.attemptFlee();
         break;
@@ -279,7 +316,7 @@ window.combatSystem = {
     }
     
     // Move to enemy phase unless combat has ended
-    if (this.state.active) {
+    if (this.state.active && !this.state.counterWindowOpen) {
       this.enterPhase("enemy");
     }
   },
@@ -363,6 +400,11 @@ window.combatSystem = {
       // Generate hit narrative
       this.addCombatMessage(this.generateHitNarrative(weaponTemplate, attackType, damage));
       
+      // Reset counter chain after successful hit
+      this.state.counterChain = 0;
+      this.state.counterWindowOpen = false;
+      this.state.lastCounterActor = null;
+      
       // Check if enemy is defeated
       if (this.state.enemy.health <= 0) {
         this.addCombatMessage(this.generateVictoryNarrative());
@@ -378,8 +420,87 @@ window.combatSystem = {
       // Potential counterattack window
       if (this.shouldEnemyCounter()) {
         this.state.counterWindowOpen = true;
+        this.state.counterChain = 0; // Reset counter chain at start of new exchange
         this.addCombatMessage(`The ${this.state.enemy.name} sees an opening and prepares to counter!`);
+        
+        // Move to enemy phase for counter
+        setTimeout(() => this.handleEnemyCounter(), 1000);
+        return;
       }
+    }
+    
+    // Update UI
+    this.updateCombatInterface();
+    
+    // Move to enemy phase if no counter
+    if (!this.state.counterWindowOpen) {
+      setTimeout(() => this.enterPhase("enemy"), 1000);
+    }
+  },
+  
+  // Handle player counter attack
+  handlePlayerCounter: function(attackType) {
+    this.state.counterChain++;
+    this.state.lastCounterActor = "player";
+    
+    // Get player weapon
+    const weapon = window.player.equipment?.mainHand;
+    const weaponTemplate = weapon ? weapon.getTemplate() : null;
+    
+    // Generate counter narrative
+    this.addCombatMessage(`You seize the opportunity with a lightning-fast counter-riposte!`);
+    
+    // Check if we've reached maximum counter chain
+    if (this.state.counterChain >= this.state.maxCounterChain) {
+      this.addCombatMessage(`After a frenzied exchange of feints and counters, both you and the ${this.state.enemy.name} back off, breathing heavily.`);
+      this.state.counterChain = 0;
+      this.state.counterWindowOpen = false;
+      this.state.lastCounterActor = null;
+      
+      // Continue to resolution phase
+      setTimeout(() => this.enterPhase("resolution"), 1000);
+      return;
+    }
+    
+    // Counter attacks have higher hit chance
+    const hitBonus = 20; // +20% hit chance on counters
+    const hitSuccess = this.resolveAttackSuccess(weaponTemplate, attackType, hitBonus);
+    
+    if (hitSuccess) {
+      // Calculate damage with bonus for counters
+      const damage = this.calculateDamage(weaponTemplate, attackType) * 1.5;
+      
+      // Apply damage to enemy
+      this.state.enemy.health = Math.max(0, this.state.enemy.health - damage);
+      
+      // Generate hit narrative
+      this.addCombatMessage(`Your counter-riposte lands perfectly, dealing ${Math.round(damage)} damage!`);
+      
+      // Reset counter chain after successful hit
+      this.state.counterChain = 0;
+      this.state.counterWindowOpen = false;
+      this.state.lastCounterActor = null;
+      
+      // Check if enemy is defeated
+      if (this.state.enemy.health <= 0) {
+        this.addCombatMessage(this.generateVictoryNarrative());
+        
+        // End combat
+        setTimeout(() => this.endCombat(true), 1500);
+        return;
+      }
+      
+      // Continue to next phase
+      setTimeout(() => this.enterPhase("enemy"), 1000);
+    } else {
+      // Counter missed
+      this.addCombatMessage(`Your counter-riposte misses as the ${this.state.enemy.name} deftly evades!`);
+      
+      // Enemy gets counter opportunity
+      this.state.counterWindowOpen = true;
+      
+      // Go to enemy phase for counter
+      setTimeout(() => this.handleEnemyCounter(), 1000);
     }
     
     // Update UI
@@ -447,6 +568,11 @@ window.combatSystem = {
       // Generate hit narrative
       this.addCombatMessage(`The attack lands, dealing ${damage} damage!`);
       
+      // Reset counter chain after successful hit
+      this.state.counterChain = 0;
+      this.state.counterWindowOpen = false;
+      this.state.lastCounterActor = null;
+      
       // Check if player is defeated
       if (window.gameState.health <= 0) {
         this.addCombatMessage(`You've been critically wounded and can no longer fight.`);
@@ -462,7 +588,13 @@ window.combatSystem = {
       // Player gets counterattack chance if in aggressive stance
       if (this.state.playerStance === "aggressive" && Math.random() < 0.6) {
         this.addCombatMessage(`Your aggressive stance pays off, giving you a chance to counter!`);
-        // Counter will be handled in player phase
+        this.state.counterWindowOpen = true;
+        this.state.counterChain = 0; // Reset counter chain at start of new exchange
+        this.state.lastCounterActor = "enemy";
+        
+        // Update UI to show counter options
+        this.updateCounterOptions();
+        return;
       }
     }
     
@@ -473,9 +605,23 @@ window.combatSystem = {
   // Handle enemy counterattack
   handleEnemyCounter: function() {
     const enemy = this.state.enemy;
-    
+    this.state.counterChain++;
+    this.state.lastCounterActor = "enemy";
+  
     this.addCombatMessage(`The ${enemy.name} capitalizes on your misstep with a swift counterattack!`);
     
+    // Check if we've reached maximum counter chain
+    if (this.state.counterChain >= this.state.maxCounterChain) {
+      this.addCombatMessage(`After a frenzied exchange of missed attacks and counters, both you and the ${enemy.name} back off to reassess.`);
+      this.state.counterChain = 0;
+      this.state.counterWindowOpen = false;
+      this.state.lastCounterActor = null;
+      
+      // Continue to resolution phase
+      setTimeout(() => this.enterPhase("resolution"), 1000);
+      return;
+    }
+  
     // Counter attacks have higher chance to hit
     const hitChance = 70 + (enemy.accuracy || 0) - (window.player.skills?.melee * 3 || 0);
     const hitRoll = Math.random() * 100;
@@ -487,6 +633,11 @@ window.combatSystem = {
       
       this.addCombatMessage(`The counterattack connects with devastating effect, dealing ${Math.round(damage)} damage!`);
       
+      // Reset counter chain after successful hit
+      this.state.counterChain = 0;
+      this.state.counterWindowOpen = false;
+      this.state.lastCounterActor = null;
+      
       // Check if player is defeated
       if (window.gameState.health <= 0) {
         this.addCombatMessage(`You've been critically wounded and can no longer fight.`);
@@ -495,15 +646,18 @@ window.combatSystem = {
         setTimeout(() => this.endCombat(false), 1500);
         return;
       }
+      
+      // Continue to resolution phase
+      setTimeout(() => this.enterPhase("resolution"), 1000);
     } else {
-      this.addCombatMessage(`You narrowly avoid the counterattack.`);
+      this.addCombatMessage(`You narrowly avoid the counterattack, creating an opening for your own riposte!`);
+      
+      // Player gets counter opportunity - stay in player phase
+      this.state.counterWindowOpen = true;
+      
+      // Update UI to show only counter attack options
+      this.updateCounterOptions();
     }
-    
-    // Reset counter window
-    this.state.counterWindowOpen = false;
-    
-    // Continue to resolution phase
-    setTimeout(() => this.enterPhase("resolution"), 1000);
   },
   
   // Calculate enemy damage
@@ -570,13 +724,16 @@ window.combatSystem = {
     return Math.round(damage);
   },
   
-  // Resolve if an attack hits
-  resolveAttackSuccess: function(weaponTemplate, attackType) {
+  // Resolve if an attack hits with optional hit bonus
+  resolveAttackSuccess: function(weaponTemplate, attackType, hitBonus = 0) {
     const enemy = this.state.enemy;
     const accuracyMultiplier = this.getAttackAccuracyMultiplier(attackType);
     
     // Base chance from player skill
     let hitChance = 50 + (window.player.skills?.melee * 5 || 0);
+    
+    // Add any bonus hit chance (for counters)
+    hitChance += hitBonus;
     
     // Apply accuracy multiplier from attack type
     hitChance *= accuracyMultiplier;
@@ -696,6 +853,12 @@ window.combatSystem = {
     // Hide combat interface
     document.getElementById('combatInterface').classList.add('hidden');
     
+    // Hide the modal container
+    const modalContainer = document.querySelector('.combat-modal');
+    if (modalContainer) {
+      modalContainer.style.display = 'none';
+    }
+    
     // Update game UI
     window.updateStatusBars();
     window.updateActionButtons();
@@ -739,9 +902,85 @@ window.combatSystem = {
   
   // Render the combat interface
   renderCombatInterface: function() {
-    // Show combat interface
+    // Create modal container if needed
+    let modalContainer = document.querySelector('.combat-modal');
+    if (!modalContainer) {
+      modalContainer = document.createElement('div');
+      modalContainer.className = 'combat-modal';
+      document.body.appendChild(modalContainer);
+      
+      // Move combat interface into modal
+      const combatInterface = document.getElementById('combatInterface');
+      modalContainer.appendChild(combatInterface);
+      
+      // Add a title to the combat interface
+      const titleElement = document.createElement('h2');
+      titleElement.className = 'combat-title';
+      titleElement.textContent = 'Combat Encounter';
+      combatInterface.insertBefore(titleElement, combatInterface.firstChild);
+      
+      // Adjust the actions container class for better styling
+      const actionsContainer = document.getElementById('combatActions');
+      actionsContainer.className = 'combat-actions';
+    }
+    
+    // Show the combat interface
     const combatInterface = document.getElementById('combatInterface');
     combatInterface.classList.remove('hidden');
+    modalContainer.style.display = 'flex';
+    
+    // Add combat styles
+    if (!document.getElementById('combat-styles')) {
+      const combatStyles = `
+      .combat-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.85);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+      
+      #combatInterface {
+        width: 90%;
+        max-width: 800px;
+        background: #1a1a1a;
+        border: 2px solid #444;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+      }
+      
+      .combat-title {
+        text-align: center;
+        margin-bottom: 10px;
+        color: #c9aa71;
+        font-size: 1.4em;
+      }
+      
+      .combat-actions {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-top: 15px;
+      }
+      
+      @media (max-width: 600px) {
+        .combat-actions {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      `;
+      
+      const styleElement = document.createElement('style');
+      styleElement.id = 'combat-styles';
+      styleElement.textContent = combatStyles;
+      document.head.appendChild(styleElement);
+    }
     
     // Update initial UI elements
     this.updateCombatInterface();
@@ -761,9 +1000,13 @@ window.combatSystem = {
     
     // Combat log is updated via addCombatMessage
     
-    // Update action buttons
+    // Update action buttons based on phase and counter state
     if (this.state.phase === "player") {
-      this.updateCombatOptions();
+      if (this.state.counterWindowOpen && this.state.lastCounterActor === "enemy") {
+        this.updateCounterOptions();
+      } else {
+        this.updateCombatOptions();
+      }
     }
   },
   
@@ -817,6 +1060,30 @@ window.combatSystem = {
     
     // Add flee button
     this.addCombatButton("Attempt to Flee", () => this.handleCombatAction("flee"), actionsContainer);
+  },
+  
+  // Update UI for counter options
+  updateCounterOptions: function() {
+    const actionsContainer = document.getElementById('combatActions');
+    actionsContainer.innerHTML = '';
+    
+    // Get equipped weapon
+    const weapon = window.player.equipment?.mainHand;
+    const weaponTemplate = weapon ? weapon.getTemplate() : null;
+    
+    // In a counter situation, only show attack options
+    if (weaponTemplate) {
+      // Get available attacks for weapon
+      const attacks = this.getWeaponAttacks(weaponTemplate);
+      
+      // Add button for each counter attack
+      for (const attack of attacks) {
+        this.addCombatButton(`Counter: ${attack}`, () => this.handleCombatAction("counter", {attackType: attack}), actionsContainer);
+      }
+    } else {
+      // No weapon, just basic counter
+      this.addCombatButton("Counter Punch", () => this.handleCombatAction("counter", {attackType: "Punch"}), actionsContainer);
+    }
   },
   
   // Add a button to the combat interface
@@ -1265,3 +1532,5 @@ window.addEventListener('DOMContentLoaded', function() {
   console.log("DOM loaded, initializing combat system");
   window.combatSystem.initialize();
 });
+
+// Combat styles are defined in combatUI.js

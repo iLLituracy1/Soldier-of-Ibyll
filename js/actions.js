@@ -144,6 +144,19 @@ window.handleAction = function(action) {
     // Patrol action
     const patrolText = window.narrativeElements.patrol[Math.floor(Math.random() * window.narrativeElements.patrol.length)];
     window.setNarrative(patrolText); // Use setNarrative instead of addToNarrative
+
+    // Chance of combat during patrol
+    if (Math.random() < 0.9) { // 30% chance of combat
+      window.addToNarrative("During your patrol, you encounter a hostile figure...");
+      
+      // Determine enemy type based on location/level
+      const enemyTypes = ["ARRASI_VAELGORR", "IMPERIAL_DESERTER", "ARRASI_DRUSKARI"];
+      const randomEnemy = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+      
+      // Initiate combat with slight delay for narrative flow
+      setTimeout(() => window.combatSystem.initiateCombat(randomEnemy), 1500);
+      return;
+    }
     
     // Update game state
     window.gameState.stamina = Math.max(0, window.gameState.stamina - 25);
