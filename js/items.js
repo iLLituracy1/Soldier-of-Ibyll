@@ -8,6 +8,7 @@ window.ITEM_CATEGORIES = {
   ACCESSORY: 'accessory',
   CONSUMABLE: 'consumable',
   MATERIAL: 'material',
+  AMMUNITION:'ammunition',
   QUEST: 'quest'
 };
 
@@ -18,6 +19,7 @@ window.EQUIPMENT_SLOTS = {
   MAIN_HAND: 'mainHand',
   OFF_HAND: 'offHand',
   ACCESSORY: 'accessory',
+  AMMUNITION: 'ammunition',
   MOUNT:  'mount'
 };
 
@@ -32,7 +34,6 @@ window.ITEM_RARITIES = {
 };
 
 // Item Symbols (instead of custom icons)
-// FIXED: Moved all symbols including mount symbols into original definition
 window.ITEM_SYMBOLS = {
   // Weapons
   SWORD: '⚔️',
@@ -69,7 +70,7 @@ window.ITEM_SYMBOLS = {
   // Quest
   QUEST: '❗',
   
-  // Mounts - FIXED: Added inside the original definition
+  // Mounts
   MOUNT: '🐎',
   WARHORSE: '🐎',
   CHARGER: '🐎',
@@ -141,6 +142,9 @@ window.createItemTemplate = function(config) {
     maxDurability: config.maxDurability || (config.category === window.ITEM_CATEGORIES.WEAPON ? 100 : 
                                           config.category === window.ITEM_CATEGORIES.ARMOR ? 150 : null),
     
+    // Block chance for shields
+    blockChance: config.blockChance || null,
+    
     // Requirements to use
     requirements: config.requirements || {}
   };
@@ -154,6 +158,28 @@ window.createItemInstance = function(template, quantity = 1) {
     quantity: template.stackable ? quantity : 1,
     durability: template.maxDurability || null,
     equipped: false,
+    ammoType: template.ammoType || null,
+    capacity: template.capacity || null,
+    currentAmount: template.capacity || null,
+    compatibleWeapons: template.compatibleWeapons || [],
+
+     // Add method to use ammunition
+     useAmmo: function(amount = 1) {
+      if (this.currentAmount !== null) {
+        this.currentAmount = Math.max(0, this.currentAmount - amount);
+        return this.currentAmount > 0;
+      }
+      return true; // If not ammunition, always return true
+    },
+    
+    // Add method to reload ammunition
+    reloadAmmo: function(amount = null) {
+      if (this.currentAmount !== null && this.capacity !== null) {
+        this.currentAmount = amount || this.capacity;
+        return true;
+      }
+      return false;
+    },
     
     // Reference to template for easy access
     getTemplate: function() {
@@ -219,6 +245,12 @@ window.createItemInstance = function(template, quantity = 1) {
         desc += `\n\nDurability: ${this.durability}/${template.maxDurability} ${durabilityStatus}`;
       }
       
+      // Add shield block chance if applicable
+      if (template.weaponType && template.weaponType.name === 'Shield' && template.blockChance) {
+        desc += `\n\nBlock Chance: ${template.blockChance}%`;
+        desc += `\n(+15% in Defensive Stance)`;
+      }
+      
       // Add stats information if equipment
       if (template.equipSlot && Object.keys(template.stats).length > 0) {
         desc += "\n\nStats:";
@@ -227,6 +259,19 @@ window.createItemInstance = function(template, quantity = 1) {
           desc += `\n${stat}: ${sign}${value}`;
         }
       }
+
+        // Add ammunition information if applicable
+        if (this.ammoType) {
+          desc += `\n\nAmmunition Type: ${this.ammoType}`;
+          desc += `\nAmount: ${this.currentAmount}/${this.capacity}`;
+          
+          if (this.compatibleWeapons && this.compatibleWeapons.length > 0) {
+            desc += `\n\nCompatible with: ${this.compatibleWeapons.map(w => {
+              const weapon = window.itemTemplates[w];
+              return weapon ? weapon.name : w;
+            }).join(', ')}`;
+          }
+        }
       
       // Add effects information
       if (template.effects && template.effects.length > 0) {
@@ -287,9 +332,11 @@ window.createWeapon = function(config) {
     weaponType: weaponType,
     stats: {
       damage: config.damage || 5,
+      armorPenetration: config.armorPenetration || 0,
       ...config.stats
     },
     maxDurability: config.maxDurability || Math.round(baseDurability),
+    blockChance: weaponType.name === 'Shield' ? (config.blockChance || 20) : null,
     requirements: config.requirements || {},
     ...config
   });
@@ -404,6 +451,20 @@ window.compareItems = function(itemA, itemB) {
       };
     });
     
+    // Compare block chance for shields
+    if (templateA.weaponType && templateA.weaponType.name === 'Shield' &&
+        templateB.weaponType && templateB.weaponType.name === 'Shield') {
+      const blockA = templateA.blockChance || 0;
+      const blockB = templateB.blockChance || 0;
+      
+      comparison.stats.blockChance = {
+        a: blockA,
+        b: blockB,
+        diff: blockB - blockA,
+        better: blockB > blockA ? 'b' : blockB < blockA ? 'a' : 'equal'
+      };
+    }
+    
     // Also compare durability if applicable
     if (itemA.durability !== undefined && itemB.durability !== undefined) {
       const durA = itemA.durability || 0;
@@ -435,6 +496,26 @@ window.compareItems = function(itemA, itemB) {
   };
 };
 
+  // Item Factory - Create ammunition
+  window.createAmmunition = function(config) {
+    return window.createItemTemplate({
+      name: config.name || "Ammunition",
+      description: config.description || "Ammunition for ranged weapons.",
+      category: window.ITEM_CATEGORIES.AMMUNITION,
+      rarity: config.rarity || window.ITEM_RARITIES.COMMON,
+      value: config.value || 5,
+      weight: config.weight || 0.5,
+      symbol: config.symbol || '🏹',
+      equipSlot: window.EQUIPMENT_SLOTS.AMMUNITION,
+      stackable: false,
+      ammoType: config.ammoType || "arrow",
+      capacity: config.capacity || 20,
+      currentAmount: config.capacity || 20,
+      compatibleWeapons: config.compatibleWeapons || [],
+      ...config
+    });
+  };
+
 // Create a predefined set of item templates
 window.initializeItemTemplates = function() {
   // Store all item templates here
@@ -463,7 +544,8 @@ window.initializeItemTemplates = function() {
       damage: 10,
       critChance: 5
     },
-    maxDurability: 90
+    maxDurability: 90,
+    armorPenetration: 5
   });
   
   window.itemTemplates.royalGreatsword = window.createWeapon({
@@ -484,6 +566,8 @@ window.initializeItemTemplates = function() {
     },
     maxDurability: 120
   });
+
+  // Ranged
   
   window.itemTemplates.matchlockRifle = window.createWeapon({
     id: 'matchlock_rifle',
@@ -496,7 +580,8 @@ window.initializeItemTemplates = function() {
     stats: {
       damage: 25,
       range: 40,
-      speed: -20
+      speed: -20,
+      armorPenetration: 15
     },
     requirements: {
       minMen: 2
@@ -515,32 +600,144 @@ window.initializeItemTemplates = function() {
     stats: {
       damage: 12,
       range: 30,
-      critChance: 10
+      critChance: 10,
+      armorPenetration: 5
     },
     maxDurability: 60
   });
+
+  window.itemTemplates.throwingJavelin = window.createWeapon({
+    id: 'throwing_javelin',
+    name: 'Throwing Javelin',
+    description: 'A lightweight spear designed to be thrown at enemies from a distance.',
+    weaponType: window.WEAPON_TYPES.SPEAR,
+    rarity: window.ITEM_RARITIES.COMMON,
+    damage: 10,
+    value: 15,
+    stats: {
+      damage: 10,
+      range: 2, // Can attack at medium range
+      armorPenetration: 10
+    },
+    maxDurability: 50
+  });
+
+  // Ammunition items
+window.itemTemplates.quiver = window.createAmmunition({
+  id: 'quiver',
+  name: 'Arrow Quiver',
+  description: 'A sturdy quiver that holds up to 20 arrows for bows.',
+  ammoType: 'arrow',
+  capacity: 20,
+  symbol: '🏹',
+  value: 15,
+  compatibleWeapons: ['hunter_bow']
+});
+
+window.itemTemplates.javelinPack = window.createAmmunition({
+  id: 'javelin_pack',
+  name: 'Javelin Pack',
+  description: 'A harness designed to carry up to 6 throwing javelins.',
+  ammoType: 'javelin',
+  capacity: 6,
+  symbol: '🔱',
+  value: 30,
+  compatibleWeapons: []
+});
+
+window.itemTemplates.cartridgePouch = window.createAmmunition({
+  id: 'cartridge_pouch',
+  name: 'Powder & Shot Pouch',
+  description: 'A leather pouch containing powder, shot, and supplies for up to 12 firearm loads.',
+  ammoType: 'shot',
+  capacity: 12,
+  symbol: '💼',
+  value: 40,
+  compatibleWeapons: ['matchlock_rifle']
+});
   
+  // SHIELDS - Updated with blockChance values
   window.itemTemplates.legionShield = window.createWeapon({
     id: 'legion_shield',
     name: 'Paanic Legion Shield',
-    description: 'A standard-issue military shield bearing the emblem of the Paanic Legion.',
+    description: 'A standard-issue military shield bearing the emblem of the Paanic Legion. Provides reliable protection against frontal attacks.',
     weaponType: window.WEAPON_TYPES.SHIELD,
     rarity: window.ITEM_RARITIES.COMMON,
     damage: 2,
     value: 40,
     stats: {
       damage: 2,
-      defense: 15,
-      blockChance: 30
+      defense: 15
     },
-    maxDurability: 120
+    maxDurability: 120,
+    blockChance: 30 // Added block chance
   });
   
-  // ARMOR
+  // NEW: Additional shield types
+  window.itemTemplates.towerShield = window.createWeapon({
+    id: 'tower_shield',
+    name: 'Nesian Tower Shield',
+    description: 'A massive rectangular shield used by front-line infantry. Offers exceptional protection at the cost of mobility.',
+    weaponType: window.WEAPON_TYPES.SHIELD,
+    rarity: window.ITEM_RARITIES.UNCOMMON,
+    damage: 1,
+    value: 150,
+    stats: {
+      damage: 1,
+      defense: 25,
+      speed: -15
+    },
+    maxDurability: 180,
+    blockChance: 45, // Higher block chance
+    requirements: {
+      minPhy: 6
+    }
+  });
+  
+  window.itemTemplates.buckler = window.createWeapon({
+    id: 'buckler',
+    name: 'Lunarine Buckler',
+    description: 'A small, round shield favored by duelists. Offers less protection than larger shields but allows for greater mobility and counterattacks.',
+    weaponType: window.WEAPON_TYPES.SHIELD,
+    rarity: window.ITEM_RARITIES.UNCOMMON,
+    damage: 3,
+    value: 100,
+    stats: {
+      damage: 3,
+      defense: 8,
+      speed: 5,
+      critChance: 5
+    },
+    maxDurability: 90,
+    blockChance: 20 // Lower block chance but other benefits
+  });
+  
+  window.itemTemplates.plateShield = window.createWeapon({
+    id: 'plate_shield',
+    name: 'Arrasi Battle Shield',
+    description: 'A heavy metal shield reinforced with steel plates. Extremely durable and capable of withstanding powerful blows.',
+    weaponType: window.WEAPON_TYPES.SHIELD,
+    rarity: window.ITEM_RARITIES.RARE,
+    damage: 4,
+    value: 300,
+    stats: {
+      damage: 4,
+      defense: 20,
+      speed: -10,
+      armorPenetration: 5
+    },
+    maxDurability: 200,
+    blockChance: 40, // High block chance
+    requirements: {
+      minPhy: 8
+    }
+  });
+  
+  // ARMOR - Updated with appropriate durability values
   window.itemTemplates.legionHelmet = window.createArmor({
     id: 'legion_helmet',
     name: 'Legion Helmet',
-    description: 'Standard issue helmet of the Paanic Legion. Provides decent protection.',
+    description: 'Standard issue helmet of the Paanic Legion. Provides decent protection against overhead strikes.',
     equipSlot: window.EQUIPMENT_SLOTS.HEAD,
     armorType: window.ARMOR_TYPES.MEDIUM,
     defense: 5,
@@ -562,7 +759,7 @@ window.initializeItemTemplates = function() {
   window.itemTemplates.cavalryArmor = window.createArmor({
     id: 'cavalry_armor',
     name: 'Nesian Cavalry Armor',
-    description: 'Heavy plate armor worn by the elite cavalry of Nesia.',
+    description: 'Heavy plate armor worn by the elite cavalry of Nesia. Offers excellent protection while mounted.',
     equipSlot: window.EQUIPMENT_SLOTS.BODY,
     armorType: window.ARMOR_TYPES.HEAVY,
     rarity: window.ITEM_RARITIES.UNCOMMON,
@@ -593,6 +790,47 @@ window.initializeItemTemplates = function() {
       stealth: 15
     },
     maxDurability: 80
+  });
+  
+  // NEW: Heavy armor option
+  window.itemTemplates.druskariPlate = window.createArmor({
+    id: 'druskari_plate',
+    name: 'Arrasi Druskari Platemail',
+    description: 'Massive, ornate plate armor worn by Arrasi heavy infantry. Nearly impenetrable but extremely heavy and restrictive.',
+    equipSlot: window.EQUIPMENT_SLOTS.BODY,
+    armorType: window.ARMOR_TYPES.HEAVY,
+    rarity: window.ITEM_RARITIES.RARE,
+    defense: 30,
+    value: 450,
+    stats: {
+      defense: 30,
+      speed: -20,
+      intimidation: 25
+    },
+    requirements: {
+      minPhy: 10
+    },
+    maxDurability: 220
+  });
+  
+  // NEW: Heavy helmet option
+  window.itemTemplates.druskariHelm = window.createArmor({
+    id: 'druskari_helm',
+    name: 'Arrasi Druskari Helm',
+    description: 'A fearsome full helm with decorative horns and a face mask, worn by elite Arrasi warriors.',
+    equipSlot: window.EQUIPMENT_SLOTS.HEAD,
+    armorType: window.ARMOR_TYPES.HEAVY,
+    rarity: window.ITEM_RARITIES.RARE,
+    defense: 12,
+    value: 200,
+    stats: {
+      defense: 12,
+      intimidation: 15
+    },
+    requirements: {
+      minPhy: 6
+    },
+    maxDurability: 180
   });
   
   // ACCESSORIES
@@ -702,7 +940,7 @@ window.initializeItemTemplates = function() {
       }
       
       // If multiple items need repair, show a dialog to choose
-      // For simplicity in this example, repair the first item
+      // For simplicity, repair the first item
       const itemToRepair = repairableItems[0];
       const oldDurability = itemToRepair.durability;
       const template = itemToRepair.getTemplate();

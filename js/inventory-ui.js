@@ -69,6 +69,10 @@ window.initializeInventoryUI = function() {
             <div class="slot-icon">📿</div>
             <div class="slot-name">Accessory</div>
           </div>
+            <div class="equipment-slot" data-slot="${window.EQUIPMENT_SLOTS.AMMUNITION}" id="ammunition-slot">
+            <div class="slot-icon">🎯</div>
+            <div class="slot-name">Ammunition</div>
+          </div>
           ${isCavalry ? `
           <div class="equipment-slot mount-slot" data-slot="${window.EQUIPMENT_SLOTS.MOUNT}" id="mount-slot">
             <div class="slot-icon">🐎</div>
@@ -1000,6 +1004,7 @@ window.updateEquipmentDisplay = function() {
     'mainHand': 'main-hand-slot',
     'offHand': 'off-hand-slot',
     'accessory': 'accessory-slot',
+    'ammunition': 'ammunition-slot',
     'mount': 'mount-slot'
   };
   
@@ -1064,6 +1069,17 @@ window.updateEquipmentDisplay = function() {
           <div class="item-icon ${rarityClass} ${categoryClass}">${template.symbol}</div>
           <div class="slot-name">${slotName}</div>
         `;
+
+        // Add special handling for ammunition slot
+        if (slot === 'ammunition' && item) {
+          const template = item.getTemplate();
+          slotElement.innerHTML = `
+            <div class="item-icon ${rarityClass} ${categoryClass}">${template.symbol}</div>
+            <div class="slot-name">${slotName}</div>
+            <div class="ammo-counter">${item.currentAmount}/${item.capacity}</div>
+          `;
+          continue;
+        }
 
         // Add durability bar for equipment with durability
         if (item.durability !== null && item.durability !== undefined) {

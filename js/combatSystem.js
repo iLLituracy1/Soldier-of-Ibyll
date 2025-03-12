@@ -375,17 +375,55 @@ window.combatSystem = {
       return;
     }
     
-    // Check if player is in range
+    // Get weapon template
     const weaponTemplate = weapon.getTemplate();
-    const weaponRange = weaponTemplate.range || 1;
     
-    if (this.state.distance > weaponRange) {
-      this.addCombatMessage("You're too far away to attack effectively.");
-      return;
+    // Check if weapon is ranged
+    const isRanged = weaponTemplate.weaponType?.name === "Bow" || 
+                     weaponTemplate.weaponType?.name === "Crossbow" ||
+                     weaponTemplate.weaponType?.name === "Rifle";
+    
+    // If ranged, check for ammunition
+    if (isRanged) {
+      const ammo = window.player.equipment?.ammunition;
+      
+      // If no ammunition equipped
+      if (!ammo) {
+        this.addCombatMessage("You need ammunition to use this weapon!");
+        return;
+      }
+      
+      // Check if ammunition is compatible
+      const weaponId = weaponTemplate.id;
+      if (ammo.compatibleWeapons && 
+          ammo.compatibleWeapons.length > 0 && 
+          !ammo.compatibleWeapons.includes(weaponId)) {
+        this.addCombatMessage(`${ammo.getName()} is not compatible with your ${weaponTemplate.name}!`);
+        return;
+      }
+      
+      // Check if ammunition is depleted
+      if (ammo.currentAmount <= 0) {
+        this.addCombatMessage("You're out of ammunition!");
+        return;
+      }
     }
     
     // Generate attack narrative
     this.addCombatMessage(this.generateAttackNarrative(weaponTemplate, attackType));
+    
+    // Reduce weapon durability with each use (NEW)
+    if (weapon.durability !== undefined) {
+      // Random durability reduction between 1-2 points
+      const durabilityLoss = Math.floor(Math.random() * 2) + 1;
+      weapon.durability = Math.max(0, weapon.durability - durabilityLoss);
+      
+      // Check if weapon breaks
+      if (weapon.durability <= 0) {
+        this.addCombatMessage(`Your ${weaponTemplate.name} breaks during the attack!`);
+        // Weapon still hits in this attack, but will be unusable after
+      }
+    }
     
     // Check for shield block first (before determining hit success)
     if (this.checkEnemyShieldBlock()) {
@@ -410,6 +448,15 @@ window.combatSystem = {
       // Generate hit narrative
       this.addCombatMessage(this.generateHitNarrative(weaponTemplate, attackType, damage));
       
+      // After a successful hit with a ranged weapon, consume ammunition
+      if (hitSuccess && isRanged) {
+        const ammo = window.player.equipment?.ammunition;
+        if (ammo && ammo.useAmmo()) {
+          // Show remaining ammo in message
+          this.addCombatMessage(`Ammunition remaining: ${ammo.currentAmount}/${ammo.capacity}`);
+        }
+      }
+
       // Reset counter chain after successful hit
       this.state.counterChain = 0;
       this.state.counterWindowOpen = false;
@@ -459,6 +506,19 @@ window.combatSystem = {
     
     // Generate counter narrative
     this.addCombatMessage(`You seize the opportunity with a lightning-fast counter-riposte!`);
+    
+    // Reduce weapon durability with each use (NEW)
+    if (weapon && weapon.durability !== undefined) {
+      // Random durability reduction between 1-2 points
+      const durabilityLoss = Math.floor(Math.random() * 2) + 1;
+      weapon.durability = Math.max(0, weapon.durability - durabilityLoss);
+      
+      // Check if weapon breaks
+      if (weapon.durability <= 0) {
+        this.addCombatMessage(`Your ${weaponTemplate.name} breaks during the counter-attack!`);
+        // Weapon still hits in this attack, but will be unusable after
+      }
+    }
     
     // Check if we've reached maximum counter chain
     if (this.state.counterChain >= this.state.maxCounterChain) {
@@ -594,13 +654,16 @@ window.combatSystem = {
     if (hitRoll < hitChance) {
       // Attack hits
       // Calculate damage based on enemy power and player defense
-      const damage = this.calculateEnemyDamage();
+      const damage = this.calculateEnemyDamage(targetArea);
       
       // Apply damage to player
       window.gameState.health = Math.max(0, window.gameState.health - damage);
       
       // Generate hit narrative
       this.addCombatMessage(`The attack lands, dealing ${damage} damage!`);
+      
+      // Reduce armor durability if hit (NEW)
+      this.reducePlayerArmorDurability(targetArea, 1);
       
       // Reset counter chain after successful hit
       this.state.counterChain = 0;
@@ -677,10 +740,13 @@ window.combatSystem = {
     
     if (hitRoll < hitChance) {
       // Counter hits
-      const damage = this.calculateEnemyDamage() * 1.5; // Counters do more damage
+      const damage = this.calculateEnemyDamage('body') * 1.5; // Counters do more damage
       window.gameState.health = Math.max(0, window.gameState.health - damage);
       
       this.addCombatMessage(`The counterattack connects with devastating effect, dealing ${Math.round(damage)} damage!`);
+      
+      // Reduce armor durability if hit (NEW)
+      this.reducePlayerArmorDurability('body', 2); // Counter attacks cause more durability damage
       
       // Reset counter chain after successful hit
       this.state.counterChain = 0;
@@ -706,6 +772,35 @@ window.combatSystem = {
       
       // Update UI to show only counter attack options
       this.updateCounterOptions();
+    }
+  },
+  
+  // NEW: Reduce player armor durability when hit
+  reducePlayerArmorDurability: function(targetArea, amount = 1) {
+    let armorPiece = null;
+    
+    // Determine which armor piece is hit based on target area
+    if (targetArea === 'head') {
+      armorPiece = window.player.equipment?.head;
+    } else if (targetArea === 'body' || targetArea === 'legs') {
+      armorPiece = window.player.equipment?.body;
+    }
+    
+    // If armor exists and has durability, reduce it
+    if (armorPiece && armorPiece !== "occupied" && armorPiece.durability !== undefined) {
+      const oldDurability = armorPiece.durability;
+      armorPiece.durability = Math.max(0, armorPiece.durability - amount);
+      
+      // Log durability change for debugging
+      console.log(`Armor durability reduced: ${oldDurability} -> ${armorPiece.durability}`);
+      
+      // Add message if armor is getting critically damaged
+      const template = armorPiece.getTemplate();
+      if (armorPiece.durability === 0) {
+        this.addCombatMessage(`Your ${template.name} has been severely damaged and offers minimal protection!`);
+      } else if (armorPiece.durability <= template.maxDurability * 0.25 && oldDurability > template.maxDurability * 0.25) {
+        this.addCombatMessage(`Your ${template.name} is getting critically damaged!`);
+      }
     }
   },
   
@@ -751,8 +846,8 @@ window.combatSystem = {
     return Math.random() * 100 < blockChance;
   },
   
-  // Calculate enemy damage
-  calculateEnemyDamage: function() {
+  // Calculate enemy damage - updated with armor durability damage reduction
+  calculateEnemyDamage: function(targetArea) {
     const enemy = this.state.enemy;
     const baseDamage = enemy.power || 5;
     
@@ -768,21 +863,31 @@ window.combatSystem = {
     let armorDurabilityReduction = 0;
     
     // Body armor defense & durability reduction
-    if (bodyArmor) {
+    if (bodyArmor && targetArea !== 'head') {
       defenseValue += bodyArmor.stats.defense || 0;
       
-      // Add durability-based damage reduction (max 40%)
-      const durabilityPercent = Math.min(50, bodyArmor.durability || 0); // Cap at 50%
-      armorDurabilityReduction += durabilityPercent;
+      // Get current body armor piece
+      const bodyArmorPiece = window.player.equipment.body;
+      
+      // Add durability-based damage reduction (max 50%)
+      if (bodyArmorPiece && bodyArmorPiece.durability !== undefined) {
+        const durabilityPercent = (bodyArmorPiece.durability / bodyArmor.maxDurability) * 100;
+        armorDurabilityReduction += Math.min(50, durabilityPercent / 2); // Cap at 50%
+      }
     }
     
     // Helmet defense & durability reduction (if hit area is head)
-    if (helmet && this.state.targetArea === "head") {
+    if (helmet && targetArea === 'head') {
       defenseValue += helmet.stats.defense || 0;
       
-      // Add durability-based damage reduction (max 40%)
-      const durabilityPercent = Math.min(50, helmet.durability || 0); // Cap at 50%
-      armorDurabilityReduction += (durabilityPercent * 0.5); // Helmet contributes half as much
+      // Get current helmet piece
+      const helmetPiece = window.player.equipment.head;
+      
+      // Add durability-based damage reduction (max 50%)
+      if (helmetPiece && helmetPiece.durability !== undefined) {
+        const durabilityPercent = (helmetPiece.durability / helmet.maxDurability) * 100;
+        armorDurabilityReduction += Math.min(50, durabilityPercent / 2); // Cap at 50%
+      }
     }
     
     // Calculate damage with randomness
@@ -811,7 +916,7 @@ window.combatSystem = {
     return Math.round(damage);
   },
   
-  // Calculate player damage based on weapon and attack
+  // Calculate player damage based on weapon and attack - updated with armor penetration
   calculateDamage: function(weaponTemplate, attackType) {
     const baseDamage = weaponTemplate.stats.damage || 5;
     const damageMultiplier = this.getAttackDamageMultiplier(attackType);
@@ -840,6 +945,21 @@ window.combatSystem = {
       damage *= 1.5; // Headshots do more damage
     } else if (this.state.targetArea === "legs") {
       damage *= 0.8; // Leg hits do less damage
+    }
+    
+    // Get current weapon durability and apply reduction if almost broken
+    if (weaponTemplate.hasOwnProperty('durability') && weaponTemplate.durability !== undefined) {
+      // Get current weapon instance
+      const weapon = window.player.equipment?.mainHand;
+      
+      if (weapon && weapon.durability !== undefined) {
+        // If weapon is below 25% durability, it's becoming dull/weak
+        if (weapon.durability < weaponTemplate.maxDurability * 0.25) {
+          // Reduce damage by up to 30% for nearly broken weapons
+          const durabilityFactor = Math.max(0.7, weapon.durability / (weaponTemplate.maxDurability * 0.25));
+          damage *= durabilityFactor;
+        }
+      }
     }
     
     // Apply armor penetration against enemy defense
@@ -1026,12 +1146,12 @@ window.combatSystem = {
       if (template.durability !== undefined) {
         // Reduce durability by 1-3 points (modified by combat outcome)
         const damage = Math.round((1 + Math.floor(Math.random() * 3)) * modifier);
-        template.durability = Math.max(0, template.durability - damage);
+        bodyArmor.durability = Math.max(0, bodyArmor.durability - damage);
         
         // Notify if armor is getting damaged
-        if (template.durability < template.maxDurability * 0.25) {
+        if (bodyArmor.durability < template.maxDurability * 0.25) {
           window.showNotification("Your armor is severely damaged and needs repair!", 'warning');
-        } else if (template.durability === 0) {
+        } else if (bodyArmor.durability === 0) {
           window.showNotification("Your armor is completely broken and provides minimal protection!", 'warning');
         }
       }
@@ -1043,7 +1163,7 @@ window.combatSystem = {
       if (template.durability !== undefined) {
         // Reduce durability by 0-2 points (modified by combat outcome)
         const damage = Math.round((Math.floor(Math.random() * 2)) * modifier);
-        template.durability = Math.max(0, template.durability - damage);
+        helmet.durability = Math.max(0, helmet.durability - damage);
       }
     }
   },
@@ -1079,8 +1199,8 @@ window.combatSystem = {
       this.addCombatMessage(`You found ${coins} taelors!`);
       
       // Small chance to also find repair kit
-      if (Math.random() < 0.15 && window.itemTemplates.armorRepairKit) {
-        window.addItemToInventory(window.itemTemplates.armorRepairKit);
+      if (Math.random() < 0.15 && window.itemTemplates.repairKit) {
+        window.addItemToInventory(window.itemTemplates.repairKit);
         this.addCombatMessage(`You also found an armor repair kit!`);
       }
     }
@@ -1246,6 +1366,31 @@ window.combatSystem = {
     if (weaponTemplate) {
       const weaponRange = weaponTemplate.range || 1;
       
+      // Show weapon durability if it has it
+      if (weapon.durability !== undefined) {
+        // Calculate durability percentage
+        const durabilityPercent = Math.round((weapon.durability / weaponTemplate.maxDurability) * 100);
+        let durabilityStatus = ""; 
+        
+        // Add status text based on percentage
+        if (durabilityPercent <= 0) durabilityStatus = " (Broken)";
+        else if (durabilityPercent < 20) durabilityStatus = " (Very Poor)";
+        else if (durabilityPercent < 40) durabilityStatus = " (Poor)";
+        else if (durabilityPercent < 60) durabilityStatus = " (Worn)";
+        
+        // Only show status if not in excellent condition
+        if (durabilityStatus) {
+          this.addCombatButton(`Weapon: ${durabilityPercent}%${durabilityStatus}`, () => {}, actionsContainer, true);
+        }
+        
+        // Disable attacks if weapon is broken
+        if (weapon.durability <= 0) {
+          this.addCombatButton("Weapon Broken!", () => {}, actionsContainer, true);
+          // Don't add attack buttons for broken weapons
+          weaponRange = -1; // Ensure no attacks are added
+        }
+      }
+      
       if (this.state.distance <= weaponRange) {
         // Get available attacks for weapon
         const attacks = this.getWeaponAttacks(weaponTemplate);
@@ -1271,7 +1416,7 @@ window.combatSystem = {
     const weaponTemplate = weapon ? weapon.getTemplate() : null;
     
     // In a counter situation, only show attack options
-    if (weaponTemplate) {
+    if (weaponTemplate && weapon.durability > 0) {
       // Get available attacks for weapon
       const attacks = this.getWeaponAttacks(weaponTemplate);
       
@@ -1280,7 +1425,7 @@ window.combatSystem = {
         this.addCombatButton(`Counter: ${attack}`, () => this.handleCombatAction("counter", {attackType: attack}), actionsContainer);
       }
     } else {
-      // No weapon, just basic counter
+      // No weapon or broken weapon - just basic counter
       this.addCombatButton("Counter Punch", () => this.handleCombatAction("counter", {attackType: "Punch"}), actionsContainer);
     }
   },
