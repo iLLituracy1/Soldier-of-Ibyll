@@ -1,4 +1,4 @@
-// QUEST SYSTEM MODULE - Scene-Based Approach
+// QUEST SYSTEM MODULE
 // Handles quest management, tracking, and progression
 
 // Quest status constants
@@ -23,6 +23,9 @@ window.initializeQuestSystem = function() {
   
   // Initialize quest templates
   window.initializeQuestTemplates();
+  
+  // Add inQuestSequence flag to gameState
+  window.gameState.inQuestSequence = false;
   
   // Set up quest log button handler if not already defined
   if (!window.handleQuestLog) {
@@ -197,7 +200,10 @@ window.assignQuest = function(templateId) {
   window.addToNarrative(`<strong>New Quest: ${quest.title}</strong><br>${quest.description}`);
   window.addToNarrative(`A messenger approaches you with orders from Sarkein Reval. "The Sarkein requests your presence at once. There's a mission that requires your attention."`);
   
-  // Add a special action button to report to the Sarkein
+  // Set inQuestSequence to false initially - will be set to true when player reports to Sarkein
+  window.gameState.inQuestSequence = false;
+  
+  // Clear current actions and add only the quest action
   window.updateActionButtons();
   window.addActionButton('Report to Sarkein', 'report_to_sarkein_action', document.getElementById('actions'));
   
@@ -229,6 +235,11 @@ window.progressQuest = function(questId, action) {
   // Mark current stage as completed
   currentStage.completed = true;
   
+  // Set quest sequence flag to true when player is in an action-required stage
+  if (quest.stages[quest.currentStageIndex].action) {
+    window.gameState.inQuestSequence = true;
+  }
+  
   // Handle stage-specific actions
   window.handleQuestStageAction(quest, currentStage);
   
@@ -240,9 +251,6 @@ window.progressQuest = function(questId, action) {
       
       // Show notification
       window.showQuestNotification(quest, 'updated');
-      
-      // Update quest UI if in quest scene
-      window.updateQuestSceneUI(quest);
       
       // Update quest log if visible
       window.renderQuestLog();
@@ -260,6 +268,15 @@ window.progressQuest = function(questId, action) {
 // Handle quest stage actions
 window.handleQuestStageAction = function(quest, stage) {
   console.log(`Handling quest stage action: ${stage.action}`);
+  
+  // Set quest sequence flag based on stage
+  if (stage.action) {
+    // If stage requires a specific action, we're in a quest sequence
+    window.gameState.inQuestSequence = true;
+  } else {
+    // For stages like preparation that don't require immediate action
+    window.gameState.inQuestSequence = false;
+  }
   
   // Branch based on the action
   switch(stage.action) {
@@ -304,6 +321,9 @@ window.completeQuest = function(questId) {
   quest.status = window.QUEST_STATUS.COMPLETED;
   quest.completionDay = window.gameDay;
   
+  // Reset quest sequence flag
+  window.gameState.inQuestSequence = false;
+  
   // Apply rewards
   if (quest.rewards) {
     // Experience
@@ -335,11 +355,11 @@ window.completeQuest = function(questId) {
   // Update quest log if visible
   window.renderQuestLog();
   
-  // Return to regular game view
-  window.exitQuestScene();
-  
   // Check for level up
   window.checkLevelUp();
+  
+  // Update action buttons to show regular camp actions
+  window.updateActionButtons();
   
   return true;
 };
@@ -356,14 +376,17 @@ window.failQuest = function(questId) {
   quest.status = window.QUEST_STATUS.FAILED;
   quest.failureDay = window.gameDay;
   
+  // Reset quest sequence flag
+  window.gameState.inQuestSequence = false;
+  
   // Show failure notification
   window.showQuestNotification(quest, 'failed');
   
   // Update quest log if visible
   window.renderQuestLog();
   
-  // Return to regular game view
-  window.exitQuestScene();
+  // Update action buttons to show regular camp actions
+  window.updateActionButtons();
   
   return true;
 };
@@ -525,447 +548,328 @@ window.renderQuestLog = function() {
   });
 };
 
-// QUEST SCENE FUNCTIONS
-
-// Enter quest scene with the specified quest
-window.enterQuestScene = function(quest) {
-  console.log("Entering quest scene for:", quest.title);
+// Quest stage handler functions
+window.handleReportToSarkein = function(quest) {
+  window.setNarrative(`
+    <p>You make your way to Sarkein Reval's command tent. The interior is sparse but organized, with maps of the frontier spread across a sturdy wooden table. The Sarkein, a weathered veteran with a scar crossing his left eye, looks up as you enter.</p>
+    
+    <p>"Ah, good. You're here," he says, gesturing for you to approach the table. "I have a mission for your spear host. Our scouts have identified an Arrasi outpost near the frontier that's been a staging ground for raids on our supply lines. We need to neutralize it."</p>
+    
+    <p>He points to a location on the map. "The outpost is here, a half-day's march to the west. It's lightly garrisoned - perhaps twenty men - but they have good visibility of the surrounding area. We'll need to move quickly and quietly."</p>
+    
+    <p>"Your objective is to disable the outpost - eliminate the garrison, destroy any supplies, and burn the structures. We move out at dawn tomorrow. Use today to prepare."</p>
+    
+    <p>The Sarkein fixes you with a steady gaze. "Any questions?"</p>
+  `);
   
-  // Hide game container and show quest scene
-  document.getElementById('gameContainer').classList.add('hidden');
-  document.getElementById('questSceneContainer').classList.remove('hidden');
-  
-  // Set up quest scene UI
-  document.getElementById('questTitle').textContent = quest.title;
-  
-  // Update objective
-  const currentStage = quest.stages[quest.currentStageIndex];
-  document.getElementById('questObjective').textContent = currentStage.objective;
-  
-  // Copy over time and day display
-  document.getElementById('questTimeDisplay').textContent = document.getElementById('timeDisplay').textContent;
-  document.getElementById('questDayDisplay').textContent = document.getElementById('dayDisplay').textContent;
-  
-  // Copy day/night indicator class
-  document.getElementById('questDayNightIndicator').className = document.getElementById('dayNightIndicator').className;
-  
-  // Update status bars
-  document.getElementById('questHealthValue').textContent = document.getElementById('healthValue').textContent;
-  document.getElementById('questHealthBar').style.width = document.getElementById('healthBar').style.width;
-  
-  document.getElementById('questStaminaValue').textContent = document.getElementById('staminaValue').textContent;
-  document.getElementById('questStaminaBar').style.width = document.getElementById('staminaBar').style.width;
-  
-  document.getElementById('questMoraleValue').textContent = document.getElementById('moraleValue').textContent;
-  document.getElementById('questMoraleBar').style.width = document.getElementById('moraleBar').style.width;
-  
-  // Create progress steps visualization
-  updateQuestProgressSteps(quest);
-  
-  // Update action buttons
-  updateQuestActionButtons(quest);
-};
-
-// Exit quest scene
-window.exitQuestScene = function() {
-  console.log("Exiting quest scene");
-  
-  // Hide quest scene and show game container
-  document.getElementById('questSceneContainer').classList.add('hidden');
-  document.getElementById('gameContainer').classList.remove('hidden');
-  
-  // Update regular game UI
-  window.updateStatusBars();
+  // Update action buttons to reflect preparation
   window.updateActionButtons();
+  window.addActionButton('Prepare for Raid', 'prepare_for_raid', document.getElementById('actions'));
 };
 
-// Update quest scene UI based on current quest state
-window.updateQuestSceneUI = function(quest) {
-  console.log("Updating quest scene UI");
+window.handleBeginMarch = function(quest) {
+  window.setNarrative(`
+    <p>Dawn breaks with a blood-red sun as your unit assembles at the camp's edge. The Sarkein inspects the troops briefly, then gives the order to move out. The column of soldiers winds its way westward, shields and spears glinting in the early morning light.</p>
+    
+    <p>The terrain grows increasingly rugged as you approach the frontier. The column moves in practiced silence, with scouts ranging ahead and to the flanks. Dust clings to your armor and throat as the hours pass.</p>
+    
+    <p>By midday, you've reached a ridge overlooking a shallow valley. The Sarkein calls for a halt and gathers the squad leaders.</p>
+    
+    <p>"The outpost is just beyond that next rise," he says, pointing westward. "We'll need to scout it properly before we commit to an attack. I need a small team to approach from the north and assess their defenses."</p>
+    
+    <p>He turns to you. "Take two others and circle around. I want to know guard positions, routines, and any weak points. Report back within the hour."</p>
+  `);
   
-  // Update objective
-  const currentStage = quest.stages[quest.currentStageIndex];
-  document.getElementById('questObjective').textContent = currentStage.objective;
+  // Add the action button for scouting
+  window.updateActionButtons();
+  window.addActionButton('Begin Scouting', 'scout_outpost_action', document.getElementById('actions'));
   
-  // Update progress steps
-  updateQuestProgressSteps(quest);
-  
-  // Update quest action buttons
-  updateQuestActionButtons(quest);
-  
-  // Update status bars
-  updateQuestStatusBars();
-};
-
-// Update quest progress steps visualization
-function updateQuestProgressSteps(quest) {
-  const progressSteps = document.getElementById('questProgressSteps');
-  progressSteps.innerHTML = '';
-  
-  quest.stages.forEach((stage, index) => {
-    // Only show completed stages and the current one
-    if (index <= quest.currentStageIndex || stage.completed) {
-      const stepElement = document.createElement('div');
-      stepElement.className = 'quest-step';
-      
-      const markerElement = document.createElement('div');
-      markerElement.className = 'step-marker';
-      
-      if (stage.completed) {
-        markerElement.classList.add('completed');
-        markerElement.innerHTML = '✓';
-      } else if (index === quest.currentStageIndex) {
-        markerElement.classList.add('current');
-      }
-      
-      const contentElement = document.createElement('div');
-      contentElement.className = 'step-content';
-      
-      if (stage.completed) {
-        contentElement.classList.add('completed');
-      } else if (index === quest.currentStageIndex) {
-        contentElement.classList.add('current');
-      }
-      
-      contentElement.textContent = stage.objective;
-      
-      stepElement.appendChild(markerElement);
-      stepElement.appendChild(contentElement);
-      progressSteps.appendChild(stepElement);
+  // Set up the handler for the scouting action
+  window.handleAction = function(action) {
+    if (action === 'scout_outpost_action') {
+      window.progressQuest(quest.id, 'scout_outpost');
+      return;
     }
-  });
-}
-
-// Update quest status bars
-function updateQuestStatusBars() {
-  // Copy from main status bars
-  document.getElementById('questHealthValue').textContent = document.getElementById('healthValue').textContent;
-  document.getElementById('questHealthBar').style.width = document.getElementById('healthBar').style.width;
-  
-  document.getElementById('questStaminaValue').textContent = document.getElementById('staminaValue').textContent;
-  document.getElementById('questStaminaBar').style.width = document.getElementById('staminaBar').style.width;
-  
-  document.getElementById('questMoraleValue').textContent = document.getElementById('moraleValue').textContent;
-  document.getElementById('questMoraleBar').style.width = document.getElementById('moraleBar').style.width;
-}
-
-// Update quest action buttons
-function updateQuestActionButtons(quest) {
-  const actionsContainer = document.getElementById('questActions');
-  actionsContainer.innerHTML = '';
-  
-  const currentStage = quest.stages[quest.currentStageIndex];
-  
-  // Add appropriate action button based on current stage
-  if (currentStage.action) {
-    switch (currentStage.action) {
-      case 'report_to_sarkein':
-        addQuestActionButton('Meet with the Sarkein', 'report_to_sarkein_action', actionsContainer);
-        break;
-        
-      case 'begin_march':
-        addQuestActionButton('Begin the March', 'begin_march_action', actionsContainer);
-        break;
-        
-      case 'scout_outpost':
-        addQuestActionButton('Scout the Outpost', 'scout_outpost_action', actionsContainer);
-        break;
-        
-      case 'combat_patrol':
-        addQuestActionButton('Deal with the Patrol', 'combat_patrol_action', actionsContainer);
-        break;
-        
-      case 'assault_outpost':
-        addQuestActionButton('Begin the Assault', 'assault_outpost_action', actionsContainer);
-        break;
-        
-      case 'return_to_camp':
-        addQuestActionButton('Return to Camp', 'return_to_camp_action', actionsContainer);
-        break;
-        
-      default:
-        addQuestActionButton('Continue Quest', 'continue_quest_action', actionsContainer);
-    }
-  } else if (currentStage.id === 'stage_preparation') {
-    // Special case for preparation stage
-    addQuestActionButton('Prepare for Raid', 'prepare_for_raid', actionsContainer);
-  }
-}
-
-// Add a quest action button
-function addQuestActionButton(label, action, container) {
-  const btn = document.createElement('button');
-  btn.className = 'quest-action-btn';
-  btn.textContent = label;
-  btn.setAttribute('data-action', action);
-  btn.onclick = function() {
-    window.handleQuestAction(action);
+    
+    // Call the original handler for other actions
+    window.originalHandleAction(action);
   };
-  container.appendChild(btn);
-}
+};
 
-// Handle quest action button click
-window.handleQuestAction = function(action) {
-  console.log('Quest action handled:', action);
+window.handleScoutOutpost = function(quest) {
+  window.setNarrative(`
+    <p>You select two experienced soldiers - Fen, a quiet Nesian with sharp eyes, and Dorrel, a burly Paanic veteran - and begin circling wide around the valley to approach the outpost from the north.</p>
+    
+    <p>Moving from cover to cover, you gradually work your way closer to the Arrasi position. The outpost comes into view: a wooden palisade surrounding several structures, with a larger central building that appears to be the command post. Two watchtowers stand at opposite corners, each manned by a single guard.</p>
+    
+    <p>You signal Fen and Dorrel to hold position while you crawl forward to a better vantage point. From here, you can see movement within the compound - perhaps fifteen to twenty soldiers moving with the casual confidence of men who don't expect trouble.</p>
+    
+    <p>As you're about to retreat and report your findings, you hear voices approaching. An Arrasi patrol is coming your way, following a path that will take them directly past your position!</p>
+  `);
   
-  // Find the active quest
-  const activeQuest = window.quests.find(q => q.status === window.QUEST_STATUS.ACTIVE);
-  if (!activeQuest) {
-    console.error("No active quest found");
+  // Add the action button for handling the patrol
+  window.updateActionButtons();
+  window.addActionButton('Deal with the Patrol', 'combat_patrol_action', document.getElementById('actions'));
+  
+  // Set up the handler for the patrol action
+  window.handleAction = function(action) {
+    if (action === 'combat_patrol_action') {
+      window.progressQuest(quest.id, 'combat_patrol');
+      return;
+    }
+    
+    // Call the original handler for other actions
+    window.originalHandleAction(action);
+  };
+};
+
+window.handleCombatPatrol = function(quest) {
+  window.setNarrative(`
+    <p>You signal urgently to Fen and Dorrel as the patrol approaches. There are four Arrasi soldiers - too many to let pass, too many to ambush without risk of raising the alarm.</p>
+    
+    <p>You ready your weapons as the patrol draws closer, hearts pounding, knowing that the success of the entire mission now hinges on silencing these men quickly and quietly...</p>
+  `);
+  
+  // Initiate combat with an Arrasi patrol
+  setTimeout(() => {
+    // Use existing combat system
+    window.combatSystem.initiateCombat("ARRASI_VAELGORR");
+    
+    // Store the original end combat function so we can override it
+    const originalEndCombat = window.combatSystem.endCombat;
+    
+    // Override the endCombat function to continue the quest after combat
+    window.combatSystem.endCombat = function(outcome) {
+      // Call the original function first
+      originalEndCombat.call(window.combatSystem, outcome);
+      
+      // Restore the original function
+      window.combatSystem.endCombat = originalEndCombat;
+      
+      // Continue the quest only if player won
+      if (outcome === true) {
+        setTimeout(() => {
+          window.addToNarrative(`
+            <p>The last Arrasi soldier falls, and you quickly drag the bodies into the underbrush. Fen checks the trail in both directions, then gives the all-clear sign.</p>
+            
+            <p>"That was too close," Dorrel mutters, cleaning his blade. "The outpost will notice they're missing soon."</p>
+            
+            <p>You nod grimly. "We need to report back and move quickly. Our element of surprise won't last long."</p>
+          `);
+          
+          // Add action button to continue
+          window.updateActionButtons();
+          window.addActionButton('Return to the Sarkein', 'return_to_sarkein_action', document.getElementById('actions'));
+          
+          // Handler for returning to Sarkein
+          window.handleAction = function(action) {
+            if (action === 'return_to_sarkein_action') {
+              window.addToNarrative(`
+                <p>You hurry back to the main force and report your findings to the Sarkein, including the patrol you eliminated.</p>
+                
+                <p>"Good work handling that patrol," he says grimly, "but we've lost the luxury of time. We attack now, before they realize something's wrong."</p>
+                
+                <p>He rapidly issues orders, dividing the force into three groups for the assault.</p>
+              `);
+              
+              // Progress to the assault stage
+              window.progressQuest(quest.id, 'assault_outpost');
+              return;
+            }
+            
+            // Call the original handler for other actions
+            window.originalHandleAction(action);
+          };
+        }, 1500);
+      }
+      else {
+        // Player lost the combat - fail the quest
+        setTimeout(() => {
+          window.failQuest(quest.id);
+          window.addToNarrative(`
+            <p>You find yourself overwhelmed by the Arrasi patrol. As consciousness fades, you hear shouts of alarm being raised.</p>
+            
+            <p>Hours later, you awaken, having been dragged back to safety by Fen and Dorrel, who managed to escape. The mission is a failure, and the Sarkein's disappointment is palpable.</p>
+          `);
+          
+          // Resume normal actions
+          window.updateActionButtons();
+        }, 1500);
+      }
+    };
+  }, 1500);
+};
+
+window.handleAssaultOutpost = function(quest) {
+  window.setNarrative(`
+    <p>The Sarkein divides your forces into three groups. "First group will create a diversion at the main gate. Second group will scale the eastern wall. Third group, with me, will breach from the west once their attention is divided."</p>
+    
+    <p>You're assigned to the second group, tasked with scaling the eastern wall. The plan is set, and with grim determination, your forces move into position.</p>
+    
+    <p>The attack begins with a barrage of flaming arrows arcing toward the front gate. Shouts of alarm erupt from within the outpost. As the Arrasi soldiers rush to defend the main entrance, your group hurries toward the eastern wall with scaling ladders.</p>
+  `);
+  
+  // Initiate the assault combat
+  setTimeout(() => {
+    // Use existing combat system for a tougher enemy
+    window.combatSystem.initiateCombat("ARRASI_DRUSKARI");
+    
+    // Store the original end combat function so we can override it
+    const originalEndCombat = window.combatSystem.endCombat;
+    
+    // Override the endCombat function to continue the quest after combat
+    window.combatSystem.endCombat = function(outcome) {
+      // Call the original function first
+      originalEndCombat.call(window.combatSystem, outcome);
+      
+      // Restore the original function
+      window.combatSystem.endCombat = originalEndCombat;
+      
+      // Continue the quest only if player won
+      if (outcome === true) {
+        setTimeout(() => {
+          window.addToNarrative(`
+            <p>The fighting is intense but brief. The Arrasi garrison, caught between three attacking forces, is quickly overwhelmed. Within minutes, the outpost is secured.</p>
+            
+            <p>The Sarkein moves efficiently through the compound, directing soldiers to gather intelligence, supplies, and set fire to the structures. You help secure several prisoners and discover a cache of maps showing Arrasi patrol routes and supply lines - valuable intelligence for the Paanic command.</p>
+            
+            <p>"Good work, all of you," the Sarkein says as the outpost burns behind him. "We've cut off their eyes in this sector and gained critical information. Now we return to camp before reinforcements arrive."</p>
+            
+            <p>The march back is swift but cautious. Your mission is a clear success, and you feel a surge of pride at having contributed to the Paanic cause.</p>
+          `);
+          
+          // Add action button to complete mission
+          window.updateActionButtons();
+          window.addActionButton('Return to Camp', 'return_to_camp_action', document.getElementById('actions'));
+          
+          // Handler for returning to camp
+          window.handleAction = function(action) {
+            if (action === 'return_to_camp_action') {
+              window.progressQuest(quest.id, 'return_to_camp');
+              return;
+            }
+            
+            // Call the original handler for other actions
+            window.originalHandleAction(action);
+          };
+        }, 1500);
+      }
+      else {
+        // Player lost the combat - fail the quest
+        setTimeout(() => {
+          window.failQuest(quest.id);
+          window.addToNarrative(`
+            <p>The assault goes poorly. The Arrasi defenders are more numerous and better prepared than expected. As casualties mount, the Sarkein gives the order to withdraw.</p>
+            
+            <p>Your force retreats under covering fire, dragging wounded comrades back to safety. The mission is a failure, and the frontier will remain vulnerable to Arrasi raids.</p>
+            
+            <p>Back at camp, the Sarkein is somber. "We'll have another opportunity," he says, though the disappointment in his voice is clear. "Rest and recover. The Empire still needs its soldiers."</p>
+          `);
+          
+          // Resume normal actions
+          window.updateActionButtons();
+        }, 1500);
+      }
+    };
+  }, 1500);
+};
+
+window.handleReturnToCamp = function(quest) {
+  window.setNarrative(`
+    <p>Your unit returns to camp victorious, bearing captured supplies and valuable intelligence. The elimination of the Arrasi outpost represents a significant blow to enemy operations in the region.</p>
+    
+    <p>Later that evening, the Sarkein summons you to his tent. "Your performance today was exemplary," he says, sliding a small pouch of taelors across the table toward you. "The intelligence we recovered will help us plan our next moves in this sector."</p>
+    
+    <p>He studies you thoughtfully. "I'll remember your initiative when it comes time to assign future missions. The Empire needs soldiers who can think and act decisively."</p>
+    
+    <p>As you leave the Sarkein's tent, there's a new respect in the eyes of your fellow soldiers. Your actions today have made a difference, and your reputation within the Kasvaari has grown.</p>
+  `);
+  
+  // Show notification of quest completion
+  window.updateActionButtons();
+  
+  // Complete the quest with a short delay
+  setTimeout(() => {
+    window.completeQuest(quest.id);
+  }, 3000);
+};
+
+// Call when "prepare for raid" action is selected
+window.handlePrepareForRaid = function() {
+  window.setNarrative(`
+    <p>You spend the day preparing for tomorrow's raid. You inspect your equipment, carefully checking your armor for weak spots and ensuring your weapons are in good condition. You also visit the quartermaster to procure any necessary supplies.</p>
+    
+    <p>Around camp, other soldiers are similarly engaged in preparation. Some practice formations, others sharpen blades or repair armor. There's a quiet tension in the air - the anticipation of combat.</p>
+    
+    <p>You take time to rest and mentally prepare yourself for what lies ahead. Tomorrow will bring danger, but also an opportunity to prove your worth to the Kasvaari.</p>
+  `);
+  
+  // Find the raid frontier quest
+  const raidQuest = window.quests.find(q => q.templateId === 'raid_frontier' && q.status === window.QUEST_STATUS.ACTIVE);
+  
+  if (raidQuest) {
+    // Advance time by a full day
+    window.updateTimeAndDay(1440); // 24 hours
+    
+    // Progress to the next stage
+    window.progressQuest(raidQuest.id, null); // null action as this auto-advances
+    
+    // Add the 'begin march' button
+    window.updateActionButtons();
+    window.addActionButton('Begin March', 'begin_march_action', document.getElementById('actions'));
+    
+    // Set up handler for the march action
+    window.handleAction = function(action) {
+      if (action === 'begin_march_action') {
+        window.progressQuest(raidQuest.id, 'begin_march');
+        return;
+      }
+      
+      // Call the original handler for other actions
+      window.originalHandleAction(action);
+    };
+  }
+};
+
+// Store the original action handler to call from our overrides
+window.originalHandleAction = window.handleAction;
+
+// Override the main action handler to include quest-specific actions
+window.handleAction = function(action) {
+  console.log('Action handled:', action);
+  
+  // Handle quest-specific actions
+  if (action === 'prepare_for_raid') {
+    window.handlePrepareForRaid();
     return;
   }
   
-  const currentStage = activeQuest.stages[activeQuest.currentStageIndex];
-  
-  switch(action) {
-    case 'report_to_sarkein_action':
-      // First action of the quest - enter quest scene
-      window.enterQuestScene(activeQuest);
-      window.setQuestNarrative(`
-        <p>You make your way to Sarkein Reval's command tent. The interior is sparse but organized, with maps of the frontier spread across a sturdy wooden table. The Sarkein, a weathered veteran with a scar crossing his left eye, looks up as you enter.</p>
-        
-        <p>"Ah, good. You're here," he says, gesturing for you to approach the table. "I have a mission for your spear host. Our scouts have identified an Arrasi outpost near the frontier that's been a staging ground for raids on our supply lines. We need to neutralize it."</p>
-        
-        <p>He points to a location on the map. "The outpost is here, a half-day's march to the west. It's lightly garrisoned - perhaps twenty men - but they have good visibility of the surrounding area. We'll need to move quickly and quietly."</p>
-        
-        <p>"Your objective is to disable the outpost - eliminate the garrison, destroy any supplies, and burn the structures. We move out at dawn tomorrow. Use today to prepare."</p>
-        
-        <p>The Sarkein fixes you with a steady gaze. "Any questions?"</p>
-      `);
-      window.progressQuest(activeQuest.id, 'report_to_sarkein');
-      break;
-      
-    case 'prepare_for_raid':
-      window.setQuestNarrative(`
-        <p>You spend the day preparing for tomorrow's raid. You inspect your equipment, carefully checking your armor for weak spots and ensuring your weapons are in good condition. You also visit the quartermaster to procure any necessary supplies.</p>
-        
-        <p>Around camp, other soldiers are similarly engaged in preparation. Some practice formations, others sharpen blades or repair armor. There's a quiet tension in the air - the anticipation of combat.</p>
-        
-        <p>You take time to rest and mentally prepare yourself for what lies ahead. Tomorrow will bring danger, but also an opportunity to prove your worth to the Kasvaari.</p>
-      `);
-      
-      // Advance time by a full day
-      window.updateTimeAndDay(1440); // 24 hours
-      
-      // Progress to the next stage
-      window.progressQuest(activeQuest.id, null); // null action as this auto-advances
-      break;
-      
-    case 'begin_march_action':
-      window.setQuestNarrative(`
-        <p>Dawn breaks with a blood-red sun as your unit assembles at the camp's edge. The Sarkein inspects the troops briefly, then gives the order to move out. The column of soldiers winds its way westward, shields and spears glinting in the early morning light.</p>
-        
-        <p>The terrain grows increasingly rugged as you approach the frontier. The column moves in practiced silence, with scouts ranging ahead and to the flanks. Dust clings to your armor and throat as the hours pass.</p>
-        
-        <p>By midday, you've reached a ridge overlooking a shallow valley. The Sarkein calls for a halt and gathers the squad leaders.</p>
-        
-        <p>"The outpost is just beyond that next rise," he says, pointing westward. "We'll need to scout it properly before we commit to an attack. I need a small team to approach from the north and assess their defenses."</p>
-        
-        <p>He turns to you. "Take two others and circle around. I want to know guard positions, routines, and any weak points. Report back within the hour."</p>
-      `);
-      window.progressQuest(activeQuest.id, 'begin_march');
-      break;
-      
-    case 'scout_outpost_action':
-      window.setQuestNarrative(`
-        <p>You select two experienced soldiers - Fen, a quiet Nesian with sharp eyes, and Dorrel, a burly Paanic veteran - and begin circling wide around the valley to approach the outpost from the north.</p>
-        
-        <p>Moving from cover to cover, you gradually work your way closer to the Arrasi position. The outpost comes into view: a wooden palisade surrounding several structures, with a larger central building that appears to be the command post. Two watchtowers stand at opposite corners, each manned by a single guard.</p>
-        
-        <p>You signal Fen and Dorrel to hold position while you crawl forward to a better vantage point. From here, you can see movement within the compound - perhaps fifteen to twenty soldiers moving with the casual confidence of men who don't expect trouble.</p>
-        
-        <p>As you're about to retreat and report your findings, you hear voices approaching. An Arrasi patrol is coming your way, following a path that will take them directly past your position!</p>
-      `);
-      window.progressQuest(activeQuest.id, 'scout_outpost');
-      break;
-      
-    case 'combat_patrol_action':
-      window.setQuestNarrative(`
-        <p>You signal urgently to Fen and Dorrel as the patrol approaches. There are four Arrasi soldiers - too many to let pass, too many to ambush without risk of raising the alarm.</p>
-        
-        <p>You ready your weapons as the patrol draws closer, hearts pounding, knowing that the success of the entire mission now hinges on silencing these men quickly and quietly...</p>
-      `);
-      
-      // Initiate combat with an Arrasi patrol
-      setTimeout(() => {
-        // Store quest narrative for safe keeping
-        const narrativeElement = document.getElementById('questNarrative');
-        const originalNarrative = narrativeElement.innerHTML;
-        
-        // Use existing combat system
-        window.combatSystem.initiateCombat("ARRASI_VAELGORR");
-        
-        // Store the original end combat function so we can override it
-        const originalEndCombat = window.combatSystem.endCombat;
-        
-        // Override the endCombat function to continue the quest after combat
-        window.combatSystem.endCombat = function(outcome) {
-          // Call the original function first
-          originalEndCombat.call(window.combatSystem, outcome);
-          
-          // Restore the original function
-          window.combatSystem.endCombat = originalEndCombat;
-          
-          // Restore the quest narrative that was there before combat
-          document.getElementById('questNarrative').innerHTML = originalNarrative;
-          
-          // Continue the quest only if player won
-          if (outcome === true) {
-            setTimeout(() => {
-              window.addToQuestNarrative(`
-                <p>The last Arrasi soldier falls, and you quickly drag the bodies into the underbrush. Fen checks the trail in both directions, then gives the all-clear sign.</p>
-                
-                <p>"That was too close," Dorrel mutters, cleaning his blade. "The outpost will notice they're missing soon."</p>
-                
-                <p>"We need to report back and move quickly. Our element of surprise won't last long."</p>
-              `);
-              
-              setTimeout(() => {
-                window.addToQuestNarrative(`
-                  <p>You hurry back to the main force and report your findings to the Sarkein, including the patrol you eliminated.</p>
-                  
-                  <p>"Good work handling that patrol," he says grimly, "but we've lost the luxury of time. We attack now, before they realize something's wrong."</p>
-                  
-                  <p>He rapidly issues orders, dividing the force into three groups for the assault.</p>
-                `);
-                
-                // Progress to the assault stage
-                window.progressQuest(activeQuest.id, 'combat_patrol');
-              }, 2000);
-            }, 1000);
-          }
-          else {
-            // Player lost the combat - fail the quest
-            setTimeout(() => {
-              window.addToQuestNarrative(`
-                <p>You find yourself overwhelmed by the Arrasi patrol. As consciousness fades, you hear shouts of alarm being raised.</p>
-                
-                <p>Hours later, you awaken, having been dragged back to safety by Fen and Dorrel, who managed to escape. The mission is a failure, and the Sarkein's disappointment is palpable.</p>
-              `);
-              
-              // Fail the quest after a short delay
-              setTimeout(() => {
-                window.failQuest(activeQuest.id);
-              }, 3000);
-            }, 1500);
-          }
-        };
-      }, 1500);
-      break;
-      
-    case 'assault_outpost_action':
-      window.setQuestNarrative(`
-        <p>The Sarkein divides your forces into three groups. "First group will create a diversion at the main gate. Second group will scale the eastern wall. Third group, with me, will breach from the west once their attention is divided."</p>
-        
-        <p>You're assigned to the second group, tasked with scaling the eastern wall. The plan is set, and with grim determination, your forces move into position.</p>
-        
-        <p>The attack begins with a barrage of flaming arrows arcing toward the front gate. Shouts of alarm erupt from within the outpost. As the Arrasi soldiers rush to defend the main entrance, your group hurries toward the eastern wall with scaling ladders.</p>
-      `);
-      
-      // Initiate the assault combat
-      setTimeout(() => {
-        // Store quest narrative for safe keeping
-        const narrativeElement = document.getElementById('questNarrative');
-        const originalNarrative = narrativeElement.innerHTML;
-        
-        // Use existing combat system for a tougher enemy
-        window.combatSystem.initiateCombat("ARRASI_DRUSKARI");
-        
-        // Store the original end combat function so we can override it
-        const originalEndCombat = window.combatSystem.endCombat;
-        
-        // Override the endCombat function to continue the quest after combat
-        window.combatSystem.endCombat = function(outcome) {
-          // Call the original function first
-          originalEndCombat.call(window.combatSystem, outcome);
-          
-          // Restore the original function
-          window.combatSystem.endCombat = originalEndCombat;
-          
-          // Restore the quest narrative that was there before combat
-          document.getElementById('questNarrative').innerHTML = originalNarrative;
-          
-          // Continue the quest only if player won
-          if (outcome === true) {
-            setTimeout(() => {
-              window.addToQuestNarrative(`
-                <p>The fighting is intense but brief. The Arrasi garrison, caught between three attacking forces, is quickly overwhelmed. Within minutes, the outpost is secured.</p>
-                
-                <p>The Sarkein moves efficiently through the compound, directing soldiers to gather intelligence, supplies, and set fire to the structures. You help secure several prisoners and discover a cache of maps showing Arrasi patrol routes and supply lines - valuable intelligence for the Paanic command.</p>
-                
-                <p>"Good work, all of you," the Sarkein says as the outpost burns behind him. "We've cut off their eyes in this sector and gained critical information. Now we return to camp before reinforcements arrive."</p>
-                
-                <p>The march back is swift but cautious. Your mission is a clear success, and you feel a surge of pride at having contributed to the Paanic cause.</p>
-              `);
-              
-              // Update quest UI
-              window.progressQuest(activeQuest.id, 'assault_outpost');
-            }, 1500);
-          }
-          else {
-            // Player lost the combat - fail the quest
-            setTimeout(() => {
-              window.addToQuestNarrative(`
-                <p>The assault goes poorly. The Arrasi defenders are more numerous and better prepared than expected. As casualties mount, the Sarkein gives the order to withdraw.</p>
-                
-                <p>Your force retreats under covering fire, dragging wounded comrades back to safety. The mission is a failure, and the frontier will remain vulnerable to Arrasi raids.</p>
-                
-                <p>Back at camp, the Sarkein is somber. "We'll have another opportunity," he says, though the disappointment in his voice is clear. "Rest and recover. The Empire still needs its soldiers."</p>
-              `);
-              
-              // Fail the quest after a short delay
-              setTimeout(() => {
-                window.failQuest(activeQuest.id);
-              }, 3000);
-            }, 1500);
-          }
-        };
-      }, 1500);
-      break;
-      
-    case 'return_to_camp_action':
-      window.setQuestNarrative(`
-        <p>Your unit returns to camp victorious, bearing captured supplies and valuable intelligence. The elimination of the Arrasi outpost represents a significant blow to enemy operations in the region.</p>
-        
-        <p>Later that evening, the Sarkein summons you to his tent. "Your performance today was exemplary," he says, sliding a small pouch of taelors across the table toward you. "The intelligence we recovered will help us plan our next moves in this sector."</p>
-        
-        <p>He studies you thoughtfully. "I'll remember your initiative when it comes time to assign future missions. The Empire needs soldiers who can think and act decisively."</p>
-        
-        <p>As you leave the Sarkein's tent, there's a new respect in the eyes of your fellow soldiers. Your actions today have made a difference, and your reputation within the Kasvaari has grown.</p>
-      `);
-      
-      // Complete the quest with a short delay
-      setTimeout(() => {
-        window.progressQuest(activeQuest.id, 'return_to_camp');
-      }, 5000);
-      break;
-      
-    case 'continue_quest_action':
-      // Generic continue button - find the current stage and use its action
-      if (currentStage.action) {
-        window.progressQuest(activeQuest.id, currentStage.action);
-      } else {
-        console.error('Current stage has no action to continue');
-      }
-      break;
+  // Call the original handler for regular actions
+  window.originalHandleAction(action);
+};
+
+// Add event listeners
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize quest system when everything is loaded
+  if (typeof window.initializeQuestSystem === 'function') {
+    window.initializeQuestSystem();
   }
-};
+  
+  // Add quest log button handler if it doesn't exist
+  document.querySelector('.control-btn[onclick="handleQuestLog()"]')?.addEventListener('click', function() {
+    window.handleQuestLog();
+  });
+  
+  // Add day change event listener
+  window.addEventListener('dayChanged', function() {
+    window.checkQuestDeadlines();
+  });
+});
 
-// Set the quest narrative content
-window.setQuestNarrative = function(text) {
-  const questNarrative = document.getElementById('questNarrative');
-  questNarrative.innerHTML = text;
-  questNarrative.scrollTop = 0; // Scroll to top
-};
+// Create a custom event for day changes
+window.dayChangedEvent = new Event('dayChanged');
 
-// Add to the quest narrative content
-window.addToQuestNarrative = function(text) {
-  const questNarrative = document.getElementById('questNarrative');
-  questNarrative.innerHTML += text;
-  questNarrative.scrollTop = questNarrative.scrollHeight; // Scroll to bottom to show new content
-};
-
-// Override for updateTimeAndDay to update quest scene time display too
+// Override updateTimeAndDay to dispatch our custom event
 const originalUpdateTimeAndDay = window.updateTimeAndDay;
 window.updateTimeAndDay = function(minutesToAdd) {
   const oldDay = window.gameDay;
@@ -973,61 +877,17 @@ window.updateTimeAndDay = function(minutesToAdd) {
   // Call original function
   originalUpdateTimeAndDay(minutesToAdd);
   
-  // Update quest scene time display if visible
-  if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
-    document.getElementById('questTimeDisplay').textContent = document.getElementById('timeDisplay').textContent;
-    document.getElementById('questDayDisplay').textContent = document.getElementById('dayDisplay').textContent;
-    document.getElementById('questDayNightIndicator').className = document.getElementById('dayNightIndicator').className;
-    
-    updateQuestStatusBars();
-  }
-  
   // Check if day changed
   if (window.gameDay > oldDay) {
     // Dispatch the day changed event
-    window.dispatchEvent(window.dayChangedEvent || new Event('dayChanged'));
+    window.dispatchEvent(window.dayChangedEvent);
     
     // Check for quest assignment
     window.checkForQuestAssignment();
-    
-    // Check quest deadlines
-    window.checkQuestDeadlines();
   }
 };
-
-// Override handleAction to support quest actions
-const originalHandleAction = window.handleAction;
-window.handleAction = function(action) {
-  console.log('Action handled:', action);
-  
-  // Handle quest-specific actions
-  if (action === 'report_to_sarkein_action') {
-    // Find the active quest
-    const activeQuest = window.quests.find(q => 
-      q.status === window.QUEST_STATUS.ACTIVE && 
-      q.stages[q.currentStageIndex].action === 'report_to_sarkein');
-    
-    if (activeQuest) {
-      window.handleQuestAction('report_to_sarkein_action');
-      return;
-    }
-  }
-  
-  // Pass to original handler for regular actions
-  originalHandleAction(action);
-};
-
-// Create a custom event for day changes if it doesn't exist
-if (!window.dayChangedEvent) {
-  window.dayChangedEvent = new Event('dayChanged');
-}
 
 // Manual trigger for testing - will assign the raid quest regardless of chance
 window.forceAssignRaidQuest = function() {
   window.assignQuest('raid_frontier');
 };
-
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-  window.initializeQuestSystem();
-});
