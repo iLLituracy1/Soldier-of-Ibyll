@@ -461,9 +461,9 @@ window.combatSystem = {
       if (this.state.enemy.health <= 0) {
         this.addCombatMessage(this.generateVictoryNarrative());
         
-        // End combat
+        // End combat immediately instead of going to enemy phase
         setTimeout(() => this.endCombat(true), 1500);
-        return;
+        return; // Important: return here to prevent proceeding to enemy phase
       }
     } else {
       // Generate miss narrative
@@ -535,9 +535,9 @@ window.combatSystem = {
       if (this.state.enemy.health <= 0) {
         this.addCombatMessage(this.generateVictoryNarrative());
         
-        // End combat
+        // End combat immediately instead of going to enemy phase
         setTimeout(() => this.endCombat(true), 1500);
-        return;
+        return; // Important: return here to prevent proceeding to enemy phase
       }
     } else {
       // Generate miss narrative
@@ -626,9 +626,9 @@ window.combatSystem = {
       if (this.state.enemy.health <= 0) {
         this.addCombatMessage(this.generateVictoryNarrative());
         
-        // End combat
+        // End combat immediately instead of going to enemy phase
         setTimeout(() => this.endCombat(true), 1500);
-        return;
+        return; // Important: return here to prevent proceeding to enemy phase
       }
       
       // Continue to next phase
