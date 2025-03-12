@@ -268,7 +268,6 @@ window.setInitialSkills = function(career) {
     window.player.skills.melee = Number(1.5);
     window.player.skills.marksmanship = Number(1.5);
     window.player.skills.survival = Number(1);
-    window.player.skills.tactics = Number(1);
     console.log("Applied Sellsword/Marine skills");
   } 
   // Cavalry careers
@@ -284,7 +283,6 @@ window.setInitialSkills = function(career) {
     window.player.skills.melee = Number(1.5);
     window.player.skills.command = Number(0.5);
     window.player.skills.tactics = Number(1);
-    window.player.skills.survival = Number(1);
     console.log("Applied Marauder skills");
   } 
   // Corsair careers
@@ -325,6 +323,23 @@ window.setInitialSkills = function(career) {
     window.player.skills.survival = Number(1);
   }
   
+  // Add a bit of randomness to initial skill values - ensuring we use numbers
+  for (const skill in window.player.skills) {
+    if (window.player.skills[skill] > 0) {
+      // Generate a random bonus between 0.0 and 0.3 (less variance than before)
+      const randomBonus = Number((Math.random() * 0.3).toFixed(1));
+      
+      // Add the bonus
+      window.player.skills[skill] = Number(window.player.skills[skill]) + Number(randomBonus);
+      
+      // Ensure each skill is explicitly a number and rounded to 1 decimal place
+      window.player.skills[skill] = Math.round(window.player.skills[skill] * 10) / 10;
+    }
+  }
+  
+  // Log the pre-capped skills
+  console.log("Skills before applying caps:", {...window.player.skills});
+  
   // Apply skill caps by attribute
   window.applyCapsToSkills();
   
@@ -348,37 +363,28 @@ window.applyCapsToSkills = function() {
   const survivalCap = Math.floor((window.player.phy + window.player.men) / 3);
   const commandCap = Math.floor((window.player.men * 0.8 + window.player.phy * 0.2) / 1.5);
   const mentalSkillCap = Math.floor(window.player.men / 1.5);
-
-  // Apply caps only if skills are increased beyond initial values
+  
+  console.log("Calculated skill caps:", {
+    meleeCap,
+    marksmanshipCap,
+    survivalCap,
+    commandCap,
+    mentalSkillCap
+  });
+  
+  // Apply caps - using variables instead of recalculating for consistency
+  window.player.skills.melee = Math.min(Number(window.player.skills.melee), meleeCap);
+  window.player.skills.marksmanship = Math.min(Number(window.player.skills.marksmanship), marksmanshipCap);
+  window.player.skills.survival = Math.min(Number(window.player.skills.survival), survivalCap);
+  window.player.skills.command = Math.min(Number(window.player.skills.command), commandCap);
+  window.player.skills.discipline = Math.min(Number(window.player.skills.discipline), mentalSkillCap);
+  window.player.skills.tactics = Math.min(Number(window.player.skills.tactics), mentalSkillCap);
+  window.player.skills.organization = Math.min(Number(window.player.skills.organization), mentalSkillCap);
+  window.player.skills.arcana = Math.min(Number(window.player.skills.arcana), mentalSkillCap);
+  
+  // Round all skills to 1 decimal place
   for (const skill in window.player.skills) {
-    const initialSkillValue = window.player.skills[skill];
-    let cap;
-    switch (skill) {
-      case 'melee':
-        cap = meleeCap;
-        break;
-      case 'marksmanship':
-        cap = marksmanshipCap;
-        break;
-      case 'survival':
-        cap = survivalCap;
-        break;
-      case 'command':
-        cap = commandCap;
-        break;
-      case 'discipline':
-      case 'tactics':
-      case 'organization':
-      case 'arcana':
-        cap = mentalSkillCap;
-        break;
-      default:
-        cap = initialSkillValue; // No cap for unknown skills
-    }
-    // Only apply cap if the skill is increased beyond its initial value
-    if (initialSkillValue > cap) {
-      window.player.skills[skill] = cap;
-    }
+    window.player.skills[skill] = Math.round(Number(window.player.skills[skill]) * 10) / 10;
   }
 };
 

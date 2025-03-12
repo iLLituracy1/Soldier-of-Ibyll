@@ -22,14 +22,6 @@ window.initializeGame = function() {
     window.initializeItemTemplates();
   }
   
-  // Initialize quest system
-  if (window.QuestSystem && !window.QuestSystem.initialized) {
-    window.QuestSystem.initialize();
-  }
-  
-  // Add quest log button
-  window.initializeQuestLogButton();
-  
   console.log("Game initialized and ready to play!");
 };
 
@@ -461,82 +453,3 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log("DOM loaded, initializing game");
   window.initializeGame();
 });
-
-// Update the updateTimeAndDay function to ensure quest triggers happen at a reasonable time
-window.updateTimeAndDay = function(minutesToAdd) {
-  // Store old day
-  const oldDay = window.gameDay;
-  
-  // Add time
-  window.gameTime += minutesToAdd;
-  
-  // Check for day change
-  while (window.gameTime >= 1440) { // 24 hours * 60 minutes
-    window.gameTime -= 1440;
-    window.gameDay++;
-    
-    // Reset daily flags
-    window.gameState.dailyTrainingCount = 0;
-    window.gameState.dailyPatrolDone = false;
-    window.gameState.dailyScoutDone = false;
-  }
-  
-  // Format time for display
-  const hours = Math.floor(window.gameTime / 60);
-  const minutes = window.gameTime % 60;
-  const ampm = hours < 12 ? 'AM' : 'PM';
-  const displayHours = hours % 12 || 12; // Convert 0 to 12 for display
-  
-  document.getElementById('timeDisplay').textContent = `Time: ${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
-  document.getElementById('dayDisplay').textContent = `Day ${window.gameDay}`;
-  
-  // Update day/night indicator
-  const timeOfDay = window.getTimeOfDay();
-  document.getElementById('dayNightIndicator').className = 'day-night-indicator time-' + timeOfDay;
-  
-  // Check for quest triggers - ONLY on day change AND at a reasonable morning hour
-  if (window.gameDay > oldDay && window.gameTime >= 480 && window.gameTime < 540) { // Between 8-9 AM
-    console.log("New day started, checking for quests...");
-    window.QuestSystem.checkDailyQuests();
-  }
-  
-  // Update action buttons based on time
-  window.updateActionButtons();
-};
-
-// Add quest log button to the UI initialization
-window.initializeQuestLogButton = function() {
-  const statusContainer = document.querySelector('.status-container');
-  if (!statusContainer) return;
-  
-  // Create quest log button if it doesn't exist
-  if (!document.getElementById('questLogButton')) {
-    const questLogButton = document.createElement('button');
-    questLogButton.id = 'questLogButton';
-    questLogButton.className = 'status-button';
-    questLogButton.innerHTML = '📜 Quests';
-    questLogButton.onclick = window.handleQuestLog;
-    
-    statusContainer.appendChild(questLogButton);
-    
-    // Add styles
-    const style = document.createElement('style');
-    style.textContent = `
-      .status-button {
-        background: #2a2a2a;
-        border: 1px solid #444;
-        color: #e0e0e0;
-        padding: 5px 10px;
-        border-radius: 4px;
-        cursor: pointer;
-        margin-left: 10px;
-        transition: all 0.2s;
-      }
-      
-      .status-button:hover {
-        background: #3a3a3a;
-      }
-    `;
-    document.head.appendChild(style);
-  }
-};
