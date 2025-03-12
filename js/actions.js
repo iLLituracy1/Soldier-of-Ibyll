@@ -970,3 +970,103 @@ window.handleBrawl = function(action) {
     window.showBrawlerPitOptions();
   }, 1500);
 };
+
+// Add quest-related actions
+window.handleQuestAction = function(actionId) {
+  if (!window.QuestSystem) return;
+  
+  const quest = window.QuestSystem.getQuestById(actionId);
+  if (!quest) {
+    console.error(`Quest with ID ${actionId} not found.`);
+    return;
+  }
+  
+  // Perform quest action
+  if (quest.isActive) {
+    quest.performAction();
+    console.log(`Performed action for quest: ${quest.name}`);
+  } else {
+    console.warn(`Quest ${quest.name} is not active.`);
+  }
+};
+
+// Update UI for active quests
+window.updateQuestUI = function() {
+  const questContainer = document.getElementById('questContainer');
+  if (!questContainer) return;
+  
+  // Clear existing quests
+  questContainer.innerHTML = '';
+  
+  // Add active quests
+  const activeQuests = window.QuestSystem.getActiveQuests();
+  activeQuests.forEach(quest => {
+    const questElement = document.createElement('div');
+    questElement.className = 'quest-item';
+    questElement.textContent = `${quest.name}: ${quest.description}`;
+    
+    // Add action button
+    const actionButton = document.createElement('button');
+    actionButton.textContent = 'Perform Action';
+    actionButton.onclick = () => window.handleQuestAction(quest.id);
+    
+    questElement.appendChild(actionButton);
+    questContainer.appendChild(questElement);
+  });
+  
+  console.log('Quest UI updated with active quests.');
+};
+
+// Initialize quest UI on game start
+window.initializeQuestUI = function() {
+  const gameContainer = document.getElementById('gameContainer');
+  if (!gameContainer) return;
+  
+  // Create quest container if it doesn't exist
+  if (!document.getElementById('questContainer')) {
+    const questContainer = document.createElement('div');
+    questContainer.id = 'questContainer';
+    questContainer.className = 'quest-container';
+    
+    gameContainer.appendChild(questContainer);
+    
+    // Add styles
+    const style = document.createElement('style');
+    style.textContent = `
+      .quest-container {
+        margin-top: 20px;
+        padding: 10px;
+        background: #f4f4f4;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      
+      .quest-item {
+        margin-bottom: 10px;
+        padding: 5px;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      
+      .quest-item button {
+        margin-top: 5px;
+        padding: 5px 10px;
+        background: #2a2a2a;
+        color: #e0e0e0;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      
+      .quest-item button:hover {
+        background: #3a3a3a;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  // Update quest UI initially
+  window.updateQuestUI();
+};
