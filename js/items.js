@@ -137,6 +137,10 @@ window.createItemTemplate = function(config) {
     armorType: config.armorType || null,
     damageType: config.damageType || null,
     
+    // Durability system
+    maxDurability: config.maxDurability || (config.category === window.ITEM_CATEGORIES.WEAPON ? 100 : 
+                                          config.category === window.ITEM_CATEGORIES.ARMOR ? 150 : null),
+    
     // Requirements to use
     requirements: config.requirements || {}
   };
@@ -193,8 +197,27 @@ window.createItemInstance = function(template, quantity = 1) {
       return true;
     },
     
+    getDurabilityStatus: function() {
+      if (this.durability === null || template.maxDurability === null) return '';
+      
+      const durabilityPercent = (this.durability / template.maxDurability) * 100;
+      
+      if (durabilityPercent <= 0) return '(Broken)';
+      if (durabilityPercent < 20) return '(Very Poor)';
+      if (durabilityPercent < 40) return '(Poor)';
+      if (durabilityPercent < 60) return '(Worn)';
+      if (durabilityPercent < 80) return '(Good)';
+      return '(Excellent)';
+    },
+    
     getDescription: function() {
       let desc = template.description;
+      
+      // Add durability status if applicable
+      if (this.durability !== null) {
+        const durabilityStatus = this.getDurabilityStatus();
+        desc += `\n\nDurability: ${this.durability}/${template.maxDurability} ${durabilityStatus}`;
+      }
       
       // Add stats information if equipment
       if (template.equipSlot && Object.keys(template.stats).length > 0) {
@@ -237,6 +260,7 @@ window.createMount = function(config) {
       durability: config.durability || 50,
       ...config.stats
     },
+    maxDurability: config.maxDurability || 200, // Mounts have high durability
     requirements: config.requirements || {},
     ...config
   });
@@ -245,6 +269,10 @@ window.createMount = function(config) {
 // Item Factory - Create weapons
 window.createWeapon = function(config) {
   const weaponType = config.weaponType || window.WEAPON_TYPES.SWORD;
+  
+  // Calculate appropriate durability based on rarity
+  const rarityMultiplier = config.rarity ? config.rarity.multiplier : 1.0;
+  const baseDurability = 50 + (rarityMultiplier * 20); // Common: 70, Uncommon: 80, Rare: 100, etc.
   
   return window.createItemTemplate({
     name: config.name || `${weaponType.name}`,
@@ -261,6 +289,7 @@ window.createWeapon = function(config) {
       damage: config.damage || 5,
       ...config.stats
     },
+    maxDurability: config.maxDurability || Math.round(baseDurability),
     requirements: config.requirements || {},
     ...config
   });
@@ -282,6 +311,14 @@ window.createArmor = function(config) {
       symbol = window.ITEM_SYMBOLS.CHEST;
   }
   
+  // Calculate appropriate durability based on rarity and armor type
+  const rarityMultiplier = config.rarity ? config.rarity.multiplier : 1.0;
+  let armorTypeMultiplier = 1.0;
+  if (armorType === window.ARMOR_TYPES.LIGHT) armorTypeMultiplier = 0.8;
+  if (armorType === window.ARMOR_TYPES.HEAVY) armorTypeMultiplier = 1.2;
+  
+  const baseDurability = 75 + (rarityMultiplier * 25 * armorTypeMultiplier);
+  
   return window.createItemTemplate({
     name: config.name || `${armorType.name}`,
     description: config.description || `A standard piece of ${armorType.name.toLowerCase()}.`,
@@ -296,6 +333,7 @@ window.createArmor = function(config) {
       defense: config.defense || 3,
       ...config.stats
     },
+    maxDurability: config.maxDurability || Math.round(baseDurability),
     requirements: config.requirements || {},
     ...config
   });
@@ -366,6 +404,25 @@ window.compareItems = function(itemA, itemB) {
       };
     });
     
+    // Also compare durability if applicable
+    if (itemA.durability !== undefined && itemB.durability !== undefined) {
+      const durA = itemA.durability || 0;
+      const durB = itemB.durability || 0;
+      const maxDurA = templateA.maxDurability || 1;
+      const maxDurB = templateB.maxDurability || 1;
+      
+      // Compare by percentage
+      const durPercentA = (durA / maxDurA) * 100;
+      const durPercentB = (durB / maxDurB) * 100;
+      
+      comparison.stats.durability = {
+        a: `${durA}/${maxDurA} (${Math.round(durPercentA)}%)`,
+        b: `${durB}/${maxDurB} (${Math.round(durPercentB)}%)`,
+        diff: durPercentB - durPercentA,
+        better: durPercentB > durPercentA ? 'b' : durPercentB < durPercentA ? 'a' : 'equal'
+      };
+    }
+    
     return comparison;
   }
   
@@ -390,7 +447,8 @@ window.initializeItemTemplates = function() {
     description: 'A standard issue military sword from the Paanic Empire. Reliable but unremarkable.',
     weaponType: window.WEAPON_TYPES.SWORD,
     damage: 8,
-    value: 25
+    value: 25,
+    maxDurability: 75
   });
   
   window.itemTemplates.nobleSword = window.createWeapon({
@@ -404,7 +462,8 @@ window.initializeItemTemplates = function() {
     stats: {
       damage: 10,
       critChance: 5
-    }
+    },
+    maxDurability: 90
   });
   
   window.itemTemplates.royalGreatsword = window.createWeapon({
@@ -422,7 +481,8 @@ window.initializeItemTemplates = function() {
     },
     requirements: {
       minPhy: 8
-    }
+    },
+    maxDurability: 120
   });
   
   window.itemTemplates.matchlockRifle = window.createWeapon({
@@ -440,7 +500,8 @@ window.initializeItemTemplates = function() {
     },
     requirements: {
       minMen: 2
-    }
+    },
+    maxDurability: 70
   });
   
   window.itemTemplates.hunterBow = window.createWeapon({
@@ -455,7 +516,8 @@ window.initializeItemTemplates = function() {
       damage: 12,
       range: 30,
       critChance: 10
-    }
+    },
+    maxDurability: 60
   });
   
   window.itemTemplates.legionShield = window.createWeapon({
@@ -470,7 +532,8 @@ window.initializeItemTemplates = function() {
       damage: 2,
       defense: 15,
       blockChance: 30
-    }
+    },
+    maxDurability: 120
   });
   
   // ARMOR
@@ -481,7 +544,8 @@ window.initializeItemTemplates = function() {
     equipSlot: window.EQUIPMENT_SLOTS.HEAD,
     armorType: window.ARMOR_TYPES.MEDIUM,
     defense: 5,
-    value: 30
+    value: 30,
+    maxDurability: 85
   });
   
   window.itemTemplates.legionArmor = window.createArmor({
@@ -491,7 +555,8 @@ window.initializeItemTemplates = function() {
     equipSlot: window.EQUIPMENT_SLOTS.BODY,
     armorType: window.ARMOR_TYPES.MEDIUM,
     defense: 12,
-    value: 75
+    value: 75,
+    maxDurability: 100
   });
   
   window.itemTemplates.cavalryArmor = window.createArmor({
@@ -510,7 +575,8 @@ window.initializeItemTemplates = function() {
     },
     requirements: {
       minPhy: 1
-    }
+    },
+    maxDurability: 145
   });
   
   window.itemTemplates.scoutArmor = window.createArmor({
@@ -525,7 +591,8 @@ window.initializeItemTemplates = function() {
       defense: 6,
       speed: 10,
       stealth: 15
-    }
+    },
+    maxDurability: 80
   });
   
   // ACCESSORIES
@@ -588,6 +655,71 @@ window.initializeItemTemplates = function() {
       return true;
     }
   });
+  
+  // Repair kit for weapons and armor
+  window.itemTemplates.repairKit = window.createConsumable({
+    id: 'repair_kit',
+    name: 'Field Repair Kit',
+    description: 'A set of tools and materials for field repairs of weapons and armor. Restores 50 durability points to an equipped item.',
+    symbol: '🔧',
+    value: 30,
+    useFunction: function(character, item) {
+      // Find equipped items that need repair
+      let repairableItems = [];
+      
+      for (const slot in window.player.equipment) {
+        const equippedItem = window.player.equipment[slot];
+        if (equippedItem && equippedItem !== "occupied" && 
+            equippedItem.durability !== null && 
+            equippedItem.durability < equippedItem.getTemplate().maxDurability) {
+          repairableItems.push(equippedItem);
+        }
+      }
+      
+      // If no items need repair
+      if (repairableItems.length === 0) {
+        window.showNotification('You have no equipped items that need repair.', 'warning');
+        return false;
+      }
+      
+      // If only one item needs repair, repair it
+      if (repairableItems.length === 1) {
+        const itemToRepair = repairableItems[0];
+        const oldDurability = itemToRepair.durability;
+        const template = itemToRepair.getTemplate();
+        
+        // Calculate repair amount
+        const repairAmount = 50;
+        itemToRepair.durability = Math.min(template.maxDurability, itemToRepair.durability + repairAmount);
+        
+        // Show notification
+        window.showNotification(`Repaired ${itemToRepair.getName()} (${oldDurability} → ${itemToRepair.durability})`, 'success');
+        
+        // Update the UI if inventory is open
+        window.updateInventoryDisplayIfOpen();
+        
+        return true;
+      }
+      
+      // If multiple items need repair, show a dialog to choose
+      // For simplicity in this example, repair the first item
+      const itemToRepair = repairableItems[0];
+      const oldDurability = itemToRepair.durability;
+      const template = itemToRepair.getTemplate();
+      
+      // Calculate repair amount
+      const repairAmount = 50;
+      itemToRepair.durability = Math.min(template.maxDurability, itemToRepair.durability + repairAmount);
+      
+      // Show notification
+      window.showNotification(`Repaired ${itemToRepair.getName()} (${oldDurability} → ${itemToRepair.durability})`, 'success');
+      
+      // Update the UI if inventory is open
+      window.updateInventoryDisplayIfOpen();
+      
+      return true;
+    }
+  });
 
   // Add mount items
   window.itemTemplates.standardWarhorse = window.createMount({
@@ -642,3 +774,20 @@ window.initializeItemTemplates = function() {
 
 // Initialize item templates when the script loads
 window.initializeItemTemplates();
+
+// Helper function to update the inventory display if it's open
+window.updateInventoryDisplayIfOpen = function() {
+  // Check if inventory panel is visible
+  const inventoryPanel = document.getElementById('inventory');
+  if (inventoryPanel && !inventoryPanel.classList.contains('hidden')) {
+    // Re-render inventory items
+    if (typeof window.renderInventoryItems === 'function') {
+      window.renderInventoryItems();
+    }
+    
+    // Update equipment display
+    if (typeof window.updateEquipmentDisplay === 'function') {
+      window.updateEquipmentDisplay();
+    }
+  }
+};

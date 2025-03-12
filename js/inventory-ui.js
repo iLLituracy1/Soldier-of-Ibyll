@@ -398,6 +398,22 @@ window.initializeInventoryUI = function() {
       font-size: 14px;
     }
     
+    .item-durability-indicator {
+      position: absolute;
+      bottom: 5px;
+      left: 5px;
+      height: 3px;
+      width: 60%;
+      background: #444;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    
+    .durability-bar {
+      height: 100%;
+      background: linear-gradient(to right, #ff5f6d, #ffc371);
+    }
+    
     .item-details-panel {
       position: fixed;
       top: 50%;
@@ -472,7 +488,33 @@ window.initializeInventoryUI = function() {
     .item-details-description {
       margin-bottom: 15px;
       line-height: 1.4;
+      white-space: pre-line;
     }
+    
+    .item-durability {
+      margin-top: 10px;
+      margin-bottom: 15px;
+    }
+    
+    .durability-progress {
+      height: 6px;
+      width: 100%;
+      background: #333;
+      border-radius: 3px;
+      margin-top: 5px;
+      overflow: hidden;
+    }
+    
+    .durability-value {
+      height: 100%;
+      background: linear-gradient(to right, #ff5f6d, #ffc371);
+    }
+    
+    .durability-excellent { background: linear-gradient(to right, #56ab2f, #a8e063); }
+    .durability-good { background: linear-gradient(to right, #a8e063, #ffc371); }
+    .durability-worn { background: linear-gradient(to right, #ffc371, #ff9966); }
+    .durability-poor { background: linear-gradient(to right, #ff9966, #ff5f6d); }
+    .durability-very-poor { background: linear-gradient(to right, #ff5f6d, #ff0000); }
     
     .item-details-stats {
       background: #2a2a2a;
@@ -512,6 +554,10 @@ window.initializeInventoryUI = function() {
     
     .item-action-btn.unequip {
       background: #623d2a;
+    }
+    
+    .item-action-btn.repair {
+      background: #3d622a;
     }
     
     .item-comparison {
@@ -675,12 +721,26 @@ window.renderInventoryItems = function(categoryFilter = 'all', sortBy = 'categor
       itemCard.setAttribute('data-instance-id', item.instanceId);
       
       // Generate HTML for item card
-      itemCard.innerHTML = `
+      let cardHTML = `
         <div class="item-icon ${rarityClass} ${categoryClass}">${template.symbol}</div>
         <div class="item-name">${template.name}</div>
         ${template.stackable ? `<div class="item-quantity">x${item.quantity}</div>` : ''}
         <div class="item-rarity-indicator" style="color: ${template.rarity.color}">${template.rarity.symbol}</div>
       `;
+      
+      // Add durability bar for equipment
+      if (item.durability !== null && item.durability !== undefined && 
+          (template.category === window.ITEM_CATEGORIES.WEAPON || 
+           template.category === window.ITEM_CATEGORIES.ARMOR)) {
+        const durabilityPercent = (item.durability / template.maxDurability) * 100;
+        cardHTML += `
+          <div class="item-durability-indicator">
+            <div class="durability-bar" style="width: ${durabilityPercent}%"></div>
+          </div>
+        `;
+      }
+      
+      itemCard.innerHTML = cardHTML;
       
       // Add click event to show item details
       itemCard.addEventListener('click', function() {
@@ -733,6 +793,42 @@ window.showItemDetails = function(item) {
     
     <div class="item-details-description">${template.description.replace(/\n/g, '<br>')}</div>
   `;
+  
+  // Add durability information if applicable
+  if (item.durability !== null && item.durability !== undefined) {
+    const durabilityPercent = (item.durability / template.maxDurability) * 100;
+    let durabilityStatus = "";
+    let durabilityClass = "";
+    
+    if (durabilityPercent <= 0) {
+      durabilityStatus = "Broken";
+      durabilityClass = "durability-very-poor";
+    } else if (durabilityPercent < 20) {
+      durabilityStatus = "Very Poor";
+      durabilityClass = "durability-very-poor";
+    } else if (durabilityPercent < 40) {
+      durabilityStatus = "Poor";
+      durabilityClass = "durability-poor";
+    } else if (durabilityPercent < 60) {
+      durabilityStatus = "Worn";
+      durabilityClass = "durability-worn";
+    } else if (durabilityPercent < 80) {
+      durabilityStatus = "Good";
+      durabilityClass = "durability-good";
+    } else {
+      durabilityStatus = "Excellent";
+      durabilityClass = "durability-excellent";
+    }
+    
+    contentHTML += `
+      <div class="item-durability">
+        <div class="durability-label">Durability: ${item.durability}/${template.maxDurability} (${durabilityStatus})</div>
+        <div class="durability-progress">
+          <div class="durability-value ${durabilityClass}" style="width: ${durabilityPercent}%"></div>
+        </div>
+      </div>
+    `;
+  }
   
   // Add stats if applicable
   if (template.stats && Object.keys(template.stats).length > 0) {
@@ -835,6 +931,49 @@ window.showItemDetails = function(item) {
       window.updateEquipmentDisplay();
     });
     actionsContainer.appendChild(unequipButton);
+    
+    // Add repair button if item has durability and is damaged
+    if (item.durability !== null && item.durability < template.maxDurability) {
+      // Check if player has a repair kit
+      const hasRepairKit = window.player.inventory.some(invItem => 
+        invItem.templateId === 'repair_kit' && invItem.quantity > 0
+      );
+      
+      if (hasRepairKit) {
+        const repairButton = document.createElement('button');
+        repairButton.className = 'item-action-btn repair';
+        repairButton.textContent = 'Repair';
+        repairButton.addEventListener('click', function() {
+          // Find repair kit
+          const repairKit = window.player.inventory.find(invItem => 
+            invItem.templateId === 'repair_kit' && invItem.quantity > 0
+          );
+          
+          if (repairKit) {
+            // Use repair kit
+            const oldDurability = item.durability;
+            const maxDurability = template.maxDurability;
+            
+            // Apply repair (50 points)
+            item.durability = Math.min(maxDurability, item.durability + 50);
+            
+            // Show notification
+            window.showNotification(`Repaired ${item.getName()} (${oldDurability} → ${item.durability})`, 'success');
+            
+            // Consume repair kit
+            window.removeItemFromInventory(repairKit.instanceId, 1);
+            
+            // Close panel and update UI
+            detailsPanel.classList.add('hidden');
+            window.renderInventoryItems(document.querySelector('.inventory-tab.active').getAttribute('data-category'));
+            window.updateEquipmentDisplay();
+          } else {
+            window.showNotification('No repair kits available', 'warning');
+          }
+        });
+        actionsContainer.appendChild(repairButton);
+      }
+    }
   }
   
   // Close button
@@ -920,10 +1059,23 @@ window.updateEquipmentDisplay = function() {
         const rarityClass = `rarity-${template.rarity.name.toLowerCase()}`;
         const categoryClass = `category-${template.category}`;
 
-        slotElement.innerHTML = `
+        // Build HTML including durability bar if applicable
+        let slotHTML = `
           <div class="item-icon ${rarityClass} ${categoryClass}">${template.symbol}</div>
           <div class="slot-name">${slotName}</div>
         `;
+
+        // Add durability bar for equipment with durability
+        if (item.durability !== null && item.durability !== undefined) {
+          const durabilityPercent = (item.durability / template.maxDurability) * 100;
+          slotHTML += `
+            <div class="item-durability-indicator">
+              <div class="durability-bar" style="width: ${durabilityPercent}%"></div>
+            </div>
+          `;
+        }
+
+        slotElement.innerHTML = slotHTML;
       } catch (e) {
         console.error(`Error displaying item in slot ${slot}:`, e);
         slotElement.innerHTML = `
@@ -1151,7 +1303,7 @@ window.implementDragAndDrop = function() {
   });
 };
 
-// Override the inventory button handler
+// Document ready event handler
 document.addEventListener('DOMContentLoaded', function() {
   console.log("DOM loaded, inventory UI module ready");
 });

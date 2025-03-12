@@ -302,10 +302,10 @@ window.handleTraining = function(trainingType) {
   let staminaLoss = 20;
   let skillImprovements = [];
   
-  // Calculate random improvement values
-  const smallImprovement = Number(Math.random() * 0.03 + 0.02); // 0.02 to 0.05
-  const mediumImprovement = Number(Math.random() * 0.05 + 0.05); // 0.05 to 0.10
-  const largeImprovement = Number(Math.random() * 0.05 + 0.1);  // 0.10 to 0.15
+ // Calculate random improvement values
+const smallImprovement = Number(Math.max(0.05, Math.random() * 0.03 + 0.05)); // 0.05 to 0.08
+const mediumImprovement = Number(Math.max(0.05, Math.random() * 0.05 + 0.05)); // 0.05 to 0.10
+const largeImprovement = Number(Math.max(0.05, Math.random() * 0.05 + 0.10)); // 0.10 to 0.15
   
   console.log("DETAILED PLAYER STATE BEFORE:", {
     phy: window.player.phy,
