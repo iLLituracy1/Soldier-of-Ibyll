@@ -718,7 +718,7 @@ window.addStartingItems = function() {
     case "Marine":
       // Add equipment for Marine: Paanic Sword, Shield, and javelin pack
       window.addItemToInventory(window.itemTemplates.basicSword); // Paanic Military Sword
-      window.addItemToInventory(window.itemTemplates.legionShield);
+      window.addItemToInventory(window.itemTemplates.buckler); // Marine Buckler
       window.addItemToInventory(window.itemTemplates.legionArmor); // Standard armor
       window.addItemToInventory(window.itemTemplates.javelinPack); // Throwing javelins
       
@@ -728,7 +728,7 @@ window.addStartingItems = function() {
           const basicSword = window.player.inventory.find(i => i.templateId === 'basic_sword');
           if (basicSword) window.equipItem(basicSword.instanceId);
           
-          const legionShield = window.player.inventory.find(i => i.templateId === 'legion_shield');
+          const legionShield = window.player.inventory.find(i => i.templateId === 'buckler');
           if (legionShield) window.equipItem(legionShield.instanceId);
           
           const legionArmor = window.player.inventory.find(i => i.templateId === 'legion_armor');

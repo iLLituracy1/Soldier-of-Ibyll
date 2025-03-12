@@ -652,7 +652,7 @@ window.initializeItemTemplates = function() {
 window.itemTemplates.quiver = window.createAmmunition({
   id: 'quiver',
   name: 'Arrow Quiver',
-  description: 'A sturdy quiver that holds up to 20 arrows for bows.',
+  description: 'A sturdy quiver that holds up to 32 arrows for bows.',
   ammoType: 'arrow',
   capacity: 32,
   symbol: '🏹',
@@ -675,7 +675,7 @@ window.itemTemplates.javelinPack = window.createAmmunition({
 window.itemTemplates.cartridgePouch = window.createAmmunition({
   id: 'cartridge_pouch',
   name: 'Powder & Shot Pouch',
-  description: 'A leather pouch containing powder, shot, and supplies for up to 12 firearm loads.',
+  description: 'A leather pouch containing powder, shot, and supplies for up to 60 firearm loads.',
   ammoType: 'shot',
   capacity: 60,
   symbol: '💼',
