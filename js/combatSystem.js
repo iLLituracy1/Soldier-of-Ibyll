@@ -394,10 +394,7 @@ window.combatSystem = {
       }
       
       // Check if ammunition is compatible
-      const weaponId = weaponTemplate.id;
-      if (ammo.compatibleWeapons && 
-          ammo.compatibleWeapons.length > 0 && 
-          !ammo.compatibleWeapons.includes(weaponId)) {
+      if (!window.checkWeaponAmmoCompatibility()) {
         this.addCombatMessage(`${ammo.getName()} is not compatible with your ${weaponTemplate.name}!`);
         return;
       }
@@ -407,6 +404,10 @@ window.combatSystem = {
         this.addCombatMessage("You're out of ammunition!");
         return;
       }
+      
+      // Use 1 ammunition
+      ammo.useAmmo(1);
+      this.addCombatMessage(`You fire your ${weaponTemplate.name}. (${ammo.currentAmount}/${ammo.capacity} ${ammo.getTemplate().ammoType}s remaining)`);
     }
     
     // Generate attack narrative

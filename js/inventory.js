@@ -17,7 +17,8 @@ window.initializeInventorySystem = function() {
       body: null,
       mainHand: null,
       offHand: null,
-      accessory: null
+      accessory: null,
+      ammunition: null
     };
     
     // Add mount slot only for Castellan Cavalry
@@ -726,6 +727,124 @@ window.forceEquipItem = function(templateId) {
   }
 };
 
+// Improved ammunition initialization - ensures ammunition objects have proper values
+window.initializeAmmunition = function() {
+  console.log("Initializing ammunition system...");
+  
+  // Make sure all ammunition items have proper values
+  if (window.itemTemplates) {
+    Object.values(window.itemTemplates).forEach(template => {
+      if (template.category === window.ITEM_CATEGORIES.AMMUNITION) {
+        // Ensure these values are set
+        if (template.capacity === undefined) template.capacity = 20;
+        if (template.ammoType === undefined) template.ammoType = "arrow";
+        console.log(`Verified ammunition template: ${template.name}, capacity: ${template.capacity}`);
+      }
+    });
+  }
+  
+  // Fix existing ammunition in inventory
+  if (window.player && window.player.inventory) {
+    window.player.inventory.forEach(item => {
+      if (item.getTemplate && item.getTemplate().category === window.ITEM_CATEGORIES.AMMUNITION) {
+        // Fix null values
+        if (item.capacity === null) item.capacity = item.getTemplate().capacity || 20;
+        if (item.currentAmount === null) item.currentAmount = item.capacity;
+        console.log(`Fixed ammunition item: ${item.getName()}, amount: ${item.currentAmount}/${item.capacity}`);
+      }
+    });
+  }
+  
+  // Fix equipped ammunition
+  if (window.player && window.player.equipment && window.player.equipment.ammunition) {
+    const ammo = window.player.equipment.ammunition;
+    if (ammo && ammo !== "occupied" && ammo.getTemplate) {
+      // Fix null values
+      if (ammo.capacity === null) ammo.capacity = ammo.getTemplate().capacity || 20;
+      if (ammo.currentAmount === null) ammo.currentAmount = ammo.capacity;
+      console.log(`Fixed equipped ammunition: ${ammo.getName()}, amount: ${ammo.currentAmount}/${ammo.capacity}`);
+    }
+  }
+};
+
+// Enhanced ammunition compatibility check
+window.checkWeaponAmmoCompatibility = function() {
+  // Get equipped weapon and ammo
+  const weapon = window.player.equipment?.mainHand;
+  const ammo = window.player.equipment?.ammunition;
+  
+  if (!weapon || !ammo || ammo === "occupied") return false;
+  
+  const weaponTemplate = weapon.getTemplate();
+  const ammoTemplate = ammo.getTemplate();
+  
+  // Get weapon type and ammo type
+  const weaponType = weaponTemplate.weaponType?.name;
+  const ammoType = ammoTemplate.ammoType;
+  
+  // If ammo has explicit compatibility list, use that
+  if (ammo.compatibleWeapons && ammo.compatibleWeapons.length > 0) {
+    return ammo.compatibleWeapons.includes(weaponTemplate.id);
+  }
+  
+  // Default compatibility rules
+  if (weaponType === "Bow" && ammoType === "arrow") return true;
+  if (weaponType === "Crossbow" && ammoType === "bolt") return true;
+  if (weaponType === "Rifle" && ammoType === "shot") return true;
+  if (weaponType === "Thrown" && ammoType === "javelin") return true;
+  
+  return false;
+};
+
+// Fix thrown weapons functionality
+window.initializeThrownWeapons = function() {
+  console.log("Initializing thrown weapons system...");
+  
+  // Check if we have throwing javelins defined
+  if (!window.itemTemplates.throwingJavelin) {
+    // Create throwing javelin template if missing
+    window.itemTemplates.throwingJavelin = window.createWeapon({
+      id: 'throwing_javelin',
+      name: 'Throwing Javelin',
+      description: 'A lightweight spear designed to be thrown at enemies from a distance.',
+      weaponType: window.WEAPON_TYPES.THROWN,
+      rarity: window.ITEM_RARITIES.COMMON,
+      damage: 10,
+      value: 15,
+      stats: {
+        damage: 10,
+        range: 2,
+        armorPenetration: 10
+      },
+      maxDurability: 50
+    });
+    
+    console.log("Created throwing javelin template");
+  }
+  
+  // Check if javelin pack exists
+  if (!window.itemTemplates.javelinPack) {
+    window.itemTemplates.javelinPack = window.createAmmunition({
+      id: 'javelin_pack',
+      name: 'Javelin Pack',
+      description: 'A harness designed to carry up to 6 throwing javelins.',
+      ammoType: 'javelin',
+      capacity: 6,
+      symbol: '🔱',
+      value: 30,
+      compatibleWeapons: ['throwing_javelin']
+    });
+    
+    console.log("Created javelin pack template");
+  }
+  
+  // Make sure WEAPON_TYPES.THROWN has proper range
+  if (window.WEAPON_TYPES.THROWN && !window.WEAPON_TYPES.THROWN.range) {
+    window.WEAPON_TYPES.THROWN.range = 2;
+    console.log("Fixed THROWN weapon type range");
+  }
+};
+
 // Create a global initialization function for the entire inventory system
 window.initializeFullInventorySystem = function() {
   console.log("Initializing full inventory system...");
@@ -737,6 +856,10 @@ window.initializeFullInventorySystem = function() {
   
   // Initialize the inventory system
   window.initializeInventorySystem();
+  
+  // Initialize ammunition and thrown weapons systems
+  window.initializeAmmunition();
+  window.initializeThrownWeapons();
   
   // Initialize the UI
   if (typeof window.initializeInventoryUI === 'function') {

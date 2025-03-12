@@ -66,11 +66,11 @@ window.initializeInventoryUI = function() {
             <div class="slot-name">Off Hand</div>
           </div>
           <div class="equipment-slot" data-slot="${window.EQUIPMENT_SLOTS.ACCESSORY}" id="accessory-slot">
-            <div class="slot-icon">📿</div>
+            <div class="slot-icon">💍</div>
             <div class="slot-name">Accessory</div>
           </div>
-            <div class="equipment-slot" data-slot="${window.EQUIPMENT_SLOTS.AMMUNITION}" id="ammunition-slot">
-            <div class="slot-icon">🎯</div>
+          <div class="equipment-slot" data-slot="${window.EQUIPMENT_SLOTS.AMMUNITION}" id="ammunition-slot">
+            <div class="slot-icon">🏹</div>
             <div class="slot-name">Ammunition</div>
           </div>
           ${isCavalry ? `
@@ -127,6 +127,7 @@ window.initializeInventoryUI = function() {
         ". head ."
         "mainHand body offHand"
         ". accessory ."
+        ". ammunition ."
         ". mount .";
       grid-template-columns: 1fr 1fr 1fr;
       gap: 10px;
@@ -152,6 +153,7 @@ window.initializeInventoryUI = function() {
     .equipment-slot[data-slot="mainHand"] { grid-area: mainHand; }
     .equipment-slot[data-slot="offHand"] { grid-area: offHand; }
     .equipment-slot[data-slot="accessory"] { grid-area: accessory; }
+    .equipment-slot[data-slot="ammunition"] { grid-area: ammunition; }
     .equipment-slot[data-slot="mount"] { grid-area: mount; }
   `;
   document.head.appendChild(mountStyle);
@@ -273,7 +275,8 @@ window.initializeInventoryUI = function() {
       grid-template-areas:
         ". head ."
         "mainHand body offHand"
-        ". accessory .";
+        ". accessory ."
+        ". ammunition .";
       grid-template-columns: 1fr 1fr 1fr;
       gap: 10px;
       margin-bottom: 20px;
@@ -636,6 +639,26 @@ window.initializeInventoryUI = function() {
     
     .item-action-animation {
       animation: item-action 0.5s ease;
+    }
+    
+    /* Ammunition status styles */
+    .ammo-counter {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      font-size: 0.7em;
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+    
+    .ammo-empty .ammo-counter {
+      background: rgba(255,0,0,0.7);
+    }
+    
+    .ammo-low .ammo-counter {
+      background: rgba(255,165,0,0.7);
     }
     
     /* Responsive adjustments */
@@ -1044,6 +1067,12 @@ window.updateEquipmentDisplay = function() {
 
     const item = window.player.equipment[slot];
 
+    // Special handling for ammunition slot
+    if (slot === 'ammunition') {
+      window.renderAmmunitionSlot(slotElement, item, slotName);
+      continue;
+    }
+
     if (item && item !== "occupied") {
       // Check if item has getTemplate method
       if (typeof item.getTemplate !== 'function') {
@@ -1070,17 +1099,6 @@ window.updateEquipmentDisplay = function() {
           <div class="item-icon ${rarityClass} ${categoryClass}">${template.symbol}</div>
           <div class="slot-name">${slotName}</div>
         `;
-
-        // Add special handling for ammunition slot
-        if (slot === 'ammunition' && item) {
-          const template = item.getTemplate();
-          slotElement.innerHTML = `
-            <div class="item-icon ${rarityClass} ${categoryClass}">${template.symbol}</div>
-            <div class="slot-name">${slotName}</div>
-            <div class="ammo-counter">${item.currentAmount}/${item.capacity}</div>
-          `;
-          continue;
-        }
 
         // Add durability bar for equipment with durability
         if (item.durability !== null && item.durability !== undefined) {
@@ -1203,6 +1221,55 @@ window.fixEquipmentSlotInteraction = function() {
   });
 };
 
+// Improved ammunition display in inventory UI
+window.renderAmmunitionSlot = function(slotElement, item, slotName) {
+  if (!item || item === "occupied") {
+    // Empty slot
+    slotElement.innerHTML = `
+      <div class="slot-icon">⬚</div>
+      <div class="slot-name">${slotName}</div>
+    `;
+    return;
+  }
+  
+  try {
+    const template = item.getTemplate();
+    if (!template) throw new Error("Template not found");
+    
+    const rarityClass = `rarity-${template.rarity.name.toLowerCase()}`;
+    const categoryClass = `category-${template.category}`;
+    
+    // Make sure capacity and currentAmount are valid
+    const capacity = item.capacity !== null ? item.capacity : (template.capacity || 0);
+    const currentAmount = item.currentAmount !== null ? item.currentAmount : capacity;
+    
+    // Set values in item object
+    item.capacity = capacity;
+    item.currentAmount = currentAmount;
+    
+    slotElement.innerHTML = `
+      <div class="item-icon ${rarityClass} ${categoryClass}">${template.symbol}</div>
+      <div class="slot-name">${slotName}</div>
+      <div class="ammo-counter">${currentAmount}/${capacity}</div>
+    `;
+    
+    // Add visual indicator for ammo status
+    if (currentAmount <= 0) {
+      slotElement.classList.add('ammo-empty');
+    } else if (currentAmount < capacity * 0.3) {
+      slotElement.classList.add('ammo-low');
+    } else {
+      slotElement.classList.remove('ammo-empty', 'ammo-low');
+    }
+  } catch (e) {
+    console.error("Error rendering ammunition slot:", e);
+    slotElement.innerHTML = `
+      <div class="slot-icon" style="color: red;">❓</div>
+      <div class="slot-name">${slotName}</div>
+    `;
+  }
+};
+
 // Handle drag and drop functionality
 window.implementDragAndDrop = function() {
   // Track dragged item
@@ -1320,7 +1387,13 @@ window.implementDragAndDrop = function() {
   });
 };
 
-// Document ready event handler
+// Initialize ammunition and thrown weapons systems when the DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
   console.log("DOM loaded, inventory UI module ready");
+  
+  // Initialize ammunition system
+  initializeAmmunition();
+  
+  // Initialize thrown weapons system
+  initializeThrownWeapons();
 });

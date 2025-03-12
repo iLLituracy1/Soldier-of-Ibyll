@@ -561,9 +561,13 @@ window.combatSystem.updateCombatInterface = function() {
     const weaponTemplate = weapon.getTemplate();
     const isRanged = weaponTemplate.weaponType?.name === "Bow" || 
                      weaponTemplate.weaponType?.name === "Crossbow" ||
-                     weaponTemplate.weaponType?.name === "Rifle";
+                     weaponTemplate.weaponType?.name === "Rifle" ||
+                     weaponTemplate.weaponType?.name === "Thrown";
     
-    if (isRanged) {
+    // Check if weapon is compatible with ammunition
+    const isCompatible = window.checkWeaponAmmoCompatibility();
+    
+    if (isRanged && isCompatible) {
       // Create or update ammo indicator
       let ammoIndicator = document.getElementById('ammo-indicator');
       
