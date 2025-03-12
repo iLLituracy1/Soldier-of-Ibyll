@@ -84,33 +84,40 @@ window.startGameAdventure = function() {
   // Phase 2: Initialize game state
   window.initializeGameState();
   
-  // Phase 3: Initialize inventory system (this handles UI, equipment, etc.)
+  // Phase 3: Initialize item templates if needed
+  if (!window.itemTemplates || Object.keys(window.itemTemplates).length === 0) {
+    console.log("Initializing item templates");
+    window.initializeItemTemplates();
+  }
+  
+  // Phase 4: Initialize full inventory system
   if (window.initializeFullInventorySystem) {
-    console.log("Initializing inventory system");
+    console.log("Initializing full inventory system");
     window.initializeFullInventorySystem();
   } else {
-    console.error("Inventory system not found - falling back to basic initialization");
+    console.error("Full inventory system not found - falling back to basic initialization");
     if (window.initializeInventorySystem) window.initializeInventorySystem();
     if (window.initializeInventoryUI) window.initializeInventoryUI();
   }
-
-  // Phase 3.5: Explicitly add and equip starting items
+  
+  // Phase 5: Initialize ammunition system
+  if (window.initializeAmmunition) {
+    console.log("Initializing ammunition system");
+    window.initializeAmmunition();
+  }
+  
+  // Phase 6: Add and equip starting items
   if (window.addStartingItems) {
     console.log("Adding starting items based on career");
     window.addStartingItems();
   }
   
-  if (window.autoEquipStartingItems) {
-    console.log("Auto-equipping starting items");
-    window.autoEquipStartingItems();
-  }
-  
-  // Phase 4: Update UI
+  // Phase 7: Update UI
   window.updateStatusBars();
   window.updateTimeAndDay(0); // Start at the initial time
   window.updateActionButtons();
   
-  // Phase 5: Set initial narrative
+  // Phase 8: Set initial narrative
   window.setNarrative(`${window.player.name}, a ${window.player.career.title} of ${window.player.origin} heritage, the road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.<br><br>
   Now, you stand at the edge of your Kasvaari's Camp, the flickering lanterns and distant clang of the forges marking the heartbeat of an army in preparation. Here, amidst the hardened warriors and the banners of noble Charters, you are no longer a traveler—you are a soldier, bound to duty, drawn by the call of empire.<br><br>
   The Western Hierarchate is a land of towering fortresses and ancient battlefields, a realm where the scars of past campaigns linger in the earth itself. The Arrasi Peninsula lies beyond the western horizon, its crystalline plains an enigma even to those who have fought there before. Soon, you will march upon those lands, crossing the vast Wall of Nesia, where the empire's dominion falters against the unknown.<br><br>

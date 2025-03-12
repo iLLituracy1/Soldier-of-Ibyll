@@ -18,7 +18,7 @@ window.initializeInventorySystem = function() {
       mainHand: null,
       offHand: null,
       accessory: null,
-      ammunition: null
+      ammunition: null // Explicitly initialize ammunition slot
     };
     
     // Add mount slot only for Castellan Cavalry
@@ -26,6 +26,12 @@ window.initializeInventorySystem = function() {
       window.player.equipment.mount = null;
       console.log("Added mount slot for Castellan Cavalry");
     }
+  }
+  
+  // Ensure ammunition slot exists
+  if (window.player.equipment && !window.player.equipment.hasOwnProperty('ammunition')) {
+    window.player.equipment.ammunition = null;
+    console.log("Added missing ammunition slot");
   }
   
   // Initialize currency if it doesn't exist
@@ -55,6 +61,11 @@ window.initializeInventorySystem = function() {
   
   // Update equipment stats
   window.recalculateEquipmentStats();
+  
+  // Initialize ammunition system if needed
+  if (typeof window.initializeAmmunition === 'function') {
+    window.initializeAmmunition();
+  }
   
   console.log("Inventory system initialized");
 };
@@ -486,25 +497,72 @@ window.addStartingItems = function() {
       }, 100);
       break;
     
+    case "Scout":
     case "Nesian Scout":
       // Add appropriate equipment for a scout with ranged weapon
-      window.addItemToInventory(window.itemTemplates.matchlockRifle);
-      window.addItemToInventory(window.itemTemplates.scoutArmor);
-      window.addItemToInventory(window.itemTemplates.cartridgePouch); // Add ammunition
+      console.log("Adding Nesian Scout starting equipment...");
       
-      // Auto-equip items
+      // Verify templates exist
+      if (!window.itemTemplates.matchlockRifle) {
+        console.error("Matchlock rifle template missing!");
+        return;
+      }
+      if (!window.itemTemplates.scoutArmor) {
+        console.error("Scout armor template missing!");
+        return;
+      }
+      if (!window.itemTemplates.cartridgePouch) {
+        console.error("Cartridge pouch template missing!");
+        return;
+      }
+      
+      // Add items with error checking
+      if (!window.addItemToInventory(window.itemTemplates.matchlockRifle)) {
+        console.error("Failed to add matchlock rifle");
+        return;
+      }
+      if (!window.addItemToInventory(window.itemTemplates.scoutArmor)) {
+        console.error("Failed to add scout armor");
+        return;
+      }
+      if (!window.addItemToInventory(window.itemTemplates.cartridgePouch)) {
+        console.error("Failed to add cartridge pouch");
+        return;
+      }
+      
+      console.log("Successfully added all Nesian Scout items to inventory");
+      
+      // Auto-equip items with better error handling
       setTimeout(() => {
         try {
           const matchlockRifle = window.player.inventory.find(i => i.templateId === 'matchlock_rifle');
-          if (matchlockRifle) window.equipItem(matchlockRifle.instanceId);
+          if (matchlockRifle) {
+            console.log("Found matchlock rifle, attempting to equip...");
+            window.equipItem(matchlockRifle.instanceId);
+          } else {
+            console.error("Could not find matchlock rifle in inventory");
+          }
           
           const scoutArmor = window.player.inventory.find(i => i.templateId === 'scout_armor');
-          if (scoutArmor) window.equipItem(scoutArmor.instanceId);
+          if (scoutArmor) {
+            console.log("Found scout armor, attempting to equip...");
+            window.equipItem(scoutArmor.instanceId);
+          } else {
+            console.error("Could not find scout armor in inventory");
+          }
           
           const cartridgePouch = window.player.inventory.find(i => i.templateId === 'cartridge_pouch');
-          if (cartridgePouch) window.equipItem(cartridgePouch.instanceId);
+          if (cartridgePouch) {
+            console.log("Found cartridge pouch, attempting to equip...");
+            window.equipItem(cartridgePouch.instanceId);
+          } else {
+            console.error("Could not find cartridge pouch in inventory");
+          }
+          
+          // Verify equipment after equipping
+          console.log("Final equipment state:", window.player.equipment);
         } catch (err) {
-          console.error("Error equipping Scout items:", err);
+          console.error("Error equipping Nesian Scout items:", err);
         }
       }, 100);
       break;

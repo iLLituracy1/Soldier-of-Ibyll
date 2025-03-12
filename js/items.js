@@ -654,7 +654,7 @@ window.itemTemplates.quiver = window.createAmmunition({
   name: 'Arrow Quiver',
   description: 'A sturdy quiver that holds up to 20 arrows for bows.',
   ammoType: 'arrow',
-  capacity: 20,
+  capacity: 32,
   symbol: '🏹',
   value: 15,
   compatibleWeapons: ['hunter_bow']
@@ -677,7 +677,7 @@ window.itemTemplates.cartridgePouch = window.createAmmunition({
   name: 'Powder & Shot Pouch',
   description: 'A leather pouch containing powder, shot, and supplies for up to 12 firearm loads.',
   ammoType: 'shot',
-  capacity: 12,
+  capacity: 60,
   symbol: '💼',
   value: 40,
   compatibleWeapons: ['matchlock_rifle']
