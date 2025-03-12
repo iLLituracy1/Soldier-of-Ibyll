@@ -1,11 +1,12 @@
 // IMPROVED CHARACTER CREATION MODULE
-// Functions related to character creation with type safety and validation
+// Functions related to character creation with enhanced type safety and skill consistency
 
 /**
  * This file improves the character creation process by:
  * - Ensuring numeric types for attributes and skills
  * - Adding validation to prevent type conversion issues
  * - Properly handling skill caps and calculations
+ * - Ensuring consistent career-based skill initialization
  */
 
 // Function to select origin (heritage)
@@ -48,6 +49,8 @@ window.backToIntro = function() {
 };
 
 window.selectCareer = function(career) {
+  console.log("Career selected:", career);
+  
   // Set the selected career - force career title as string
   window.player.career = {
     title: String(career),
@@ -77,8 +80,19 @@ window.selectCareer = function(career) {
     window.player.men = 2;
   }
   
-  // Set initial skills based on career
+  // Reset all skills to zero before initialization
+  for (const skill in window.player.skills) {
+    window.player.skills[skill] = 0;
+  }
+  
+  // Set initial skills based on career - with full career name
   window.setInitialSkills(career);
+  
+  // Ensure skill caps are properly applied
+  window.applyCapsToSkills();
+  
+  // Log final skills after initialization
+  console.log("Career skills initialized:", window.player.skills);
   
   // Move to the name entry screen
   document.getElementById('originSection').classList.add('hidden');
@@ -200,78 +214,148 @@ window.generateCharacterSummary = function() {
   return summary;
 };
 
+// IMPROVED: Enhanced skill initialization with better career detection
 window.setInitialSkills = function(career) {
+  console.log("Setting initial skills for career:", career);
+  
   // Reset all skills to base values
   for (const skill in window.player.skills) {
     window.player.skills[skill] = 0;
   }
   
-  // Set skills based on career - ensuring we use numbers
-  if (career.includes("Regular") || career.includes("Infantry")) {
+  // Handle career variations (with or without origin prefix)
+  let careerBase = career;
+  
+  // Extract the base career name without origin if present (e.g., "Paanic Regular" -> "Regular")
+  const careerParts = career.split(' ');
+  if (careerParts.length > 1 && ["Paanic", "Nesian", "Lunarine", "Wyrdman"].includes(careerParts[0])) {
+    careerBase = careerParts.slice(1).join(' ');
+  }
+  
+  console.log("Base career detected as:", careerBase);
+  
+  // Set skills based on career - ensuring we use Numbers
+  // Regular/Infantry careers
+  if (careerBase.includes("Regular") || careerBase.includes("Infantry")) {
     window.player.skills.melee = Number(2);
     window.player.skills.discipline = Number(1.5);
     window.player.skills.survival = Number(1);
-  } else if (career.includes("Scout") || career.includes("Harrier")) {
+    console.log("Applied Regular/Infantry skills");
+  } 
+  // Scout/Harrier careers
+  else if (careerBase.includes("Scout") || careerBase.includes("Harrier")) {
     window.player.skills.marksmanship = Number(2);
     window.player.skills.survival = Number(1.5);
     window.player.skills.tactics = Number(1);
-  } else if (career.includes("Geister")) {
+    console.log("Applied Scout/Harrier skills");
+  } 
+  // Geister careers
+  else if (careerBase.includes("Geister")) {
     window.player.skills.melee = Number(1);
     window.player.skills.arcana = Number(2);
     window.player.skills.discipline = Number(1.5);
     window.player.skills.tactics = Number(1);
-  } else if (career.includes("Berserker") || career.includes("Primal")) {
+    console.log("Applied Geister skills");
+  } 
+  // Berserker/Primal careers
+  else if (careerBase.includes("Berserker") || careerBase.includes("Primal")) {
     window.player.skills.melee = Number(2.5);
     window.player.skills.survival = Number(1.5);
-  } else if (career.includes("Sellsword") || career.includes("Marine")) {
+    console.log("Applied Berserker/Primal skills");
+  } 
+  // Sellsword/Marine careers
+  else if (careerBase.includes("Sellsword") || careerBase.includes("Marine")) {
     window.player.skills.melee = Number(1.5);
     window.player.skills.marksmanship = Number(1.5);
     window.player.skills.survival = Number(1);
-  } else if (career.includes("Cavalry")) {
+    console.log("Applied Sellsword/Marine skills");
+  } 
+  // Cavalry careers
+  else if (careerBase.includes("Cavalry")) {
     window.player.skills.melee = Number(2);
     window.player.skills.command = Number(1.5);
     window.player.skills.tactics = Number(1);
     window.player.skills.survival = Number(1);
-  } else if (career.includes("Marauder")) {
+    console.log("Applied Cavalry skills");
+  } 
+  // Marauder careers
+  else if (careerBase.includes("Marauder")) {
     window.player.skills.melee = Number(1.5);
     window.player.skills.command = Number(0.5);
     window.player.skills.tactics = Number(1);
-  } else if (career.includes("Corsair")) {
+    console.log("Applied Marauder skills");
+  } 
+  // Corsair careers
+  else if (careerBase.includes("Corsair")) {
     window.player.skills.melee = Number(1);
     window.player.skills.survival = Number(1);
     window.player.skills.tactics = Number(1);
     window.player.skills.organization = Number(1);
-  } else if (career.includes("Squire")) {
+    console.log("Applied Corsair skills");
+  } 
+  // Squire careers
+  else if (careerBase.includes("Squire")) {
     window.player.skills.melee = Number(0.5);
     window.player.skills.discipline = Number(0.5);
     window.player.skills.organization = Number(1);
     window.player.skills.survival = Number(0.5);
-  } else {
+    console.log("Applied Squire skills");
+  } 
+  // Noble Youth careers
+  else if (careerBase.includes("Noble Youth")) {
+    window.player.skills.melee = Number(1.5);
+    window.player.skills.command = Number(1);
+    window.player.skills.organization = Number(1.5);
+    window.player.skills.discipline = Number(1);
+    console.log("Applied Noble Youth skills");
+  }
+  // Plains Huntsman careers
+  else if (careerBase.includes("Plains Huntsman") || careerBase.includes("Huntsman")) {
+    window.player.skills.marksmanship = Number(2);
+    window.player.skills.survival = Number(2);
+    window.player.skills.tactics = Number(0.5);
+    console.log("Applied Plains Huntsman skills");
+  }
+  else {
     // Default skills for unknown careers
+    console.warn("Unknown career type:", career, "- applying default skills");
     window.player.skills.melee = Number(1);
     window.player.skills.survival = Number(1);
   }
   
-  // Add a bit of randomness to initial skill values - ensure we use numbers
+  // Add a bit of randomness to initial skill values - ensuring we use numbers
   for (const skill in window.player.skills) {
     if (window.player.skills[skill] > 0) {
-      const randomBonus = Number((Math.random() * 0.5).toFixed(1));
+      // Generate a random bonus between 0.0 and 0.3 (less variance than before)
+      const randomBonus = Number((Math.random() * 0.3).toFixed(1));
+      
+      // Add the bonus
       window.player.skills[skill] = Number(window.player.skills[skill]) + Number(randomBonus);
       
-      // Ensure each skill is explicitly a number
-      window.player.skills[skill] = Number(window.player.skills[skill].toFixed(1));
+      // Ensure each skill is explicitly a number and rounded to 1 decimal place
+      window.player.skills[skill] = Math.round(window.player.skills[skill] * 10) / 10;
     }
   }
+  
+  // Log the pre-capped skills
+  console.log("Skills before applying caps:", {...window.player.skills});
   
   // Apply skill caps by attribute
   window.applyCapsToSkills();
   
-  console.log("Skills initialized:", window.player.skills);
+  console.log("Final skills after initialization and caps:", {...window.player.skills});
 };
 
-// New function to enforce skill caps based on attributes
+// Enhanced function to enforce skill caps based on attributes
 window.applyCapsToSkills = function() {
-  if (!window.player || !window.player.skills) return;
+  if (!window.player || !window.player.skills) {
+    console.error("Cannot apply caps - player or skills not initialized");
+    return;
+  }
+  
+  // Ensure PHY and MEN are numeric
+  window.player.phy = Number(window.player.phy);
+  window.player.men = Number(window.player.men);
   
   // Calculate caps
   const meleeCap = Math.floor(window.player.phy / 1.5);
@@ -280,19 +364,27 @@ window.applyCapsToSkills = function() {
   const commandCap = Math.floor((window.player.men * 0.8 + window.player.phy * 0.2) / 1.5);
   const mentalSkillCap = Math.floor(window.player.men / 1.5);
   
-  // Apply caps
-  window.player.skills.melee = Math.min(window.player.skills.melee, meleeCap);
-  window.player.skills.marksmanship = Math.min(window.player.skills.marksmanship, marksmanshipCap);
-  window.player.skills.survival = Math.min(window.player.skills.survival, survivalCap);
-  window.player.skills.command = Math.min(window.player.skills.command, commandCap);
-  window.player.skills.discipline = Math.min(window.player.skills.discipline, mentalSkillCap);
-  window.player.skills.tactics = Math.min(window.player.skills.tactics, mentalSkillCap);
-  window.player.skills.organization = Math.min(window.player.skills.organization, mentalSkillCap);
-  window.player.skills.arcana = Math.min(window.player.skills.arcana, mentalSkillCap);
+  console.log("Calculated skill caps:", {
+    meleeCap,
+    marksmanshipCap,
+    survivalCap,
+    commandCap,
+    mentalSkillCap
+  });
+  
+  // Apply caps - using variables instead of recalculating for consistency
+  window.player.skills.melee = Math.min(Number(window.player.skills.melee), meleeCap);
+  window.player.skills.marksmanship = Math.min(Number(window.player.skills.marksmanship), marksmanshipCap);
+  window.player.skills.survival = Math.min(Number(window.player.skills.survival), survivalCap);
+  window.player.skills.command = Math.min(Number(window.player.skills.command), commandCap);
+  window.player.skills.discipline = Math.min(Number(window.player.skills.discipline), mentalSkillCap);
+  window.player.skills.tactics = Math.min(Number(window.player.skills.tactics), mentalSkillCap);
+  window.player.skills.organization = Math.min(Number(window.player.skills.organization), mentalSkillCap);
+  window.player.skills.arcana = Math.min(Number(window.player.skills.arcana), mentalSkillCap);
   
   // Round all skills to 1 decimal place
   for (const skill in window.player.skills) {
-    window.player.skills[skill] = Number(window.player.skills[skill].toFixed(1));
+    window.player.skills[skill] = Math.round(Number(window.player.skills[skill]) * 10) / 10;
   }
 };
 

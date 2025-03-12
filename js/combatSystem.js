@@ -15,7 +15,6 @@ window.combatSystem = {
     counterWindowOpen: false,
     targetArea: "body", // head, body, legs
     combatLog: [],
-    combatEnding: false, // Flag to prevent further action processing
     
     // Counter system properties
     counterChain: 0,          // Tracks how many counters in a row
@@ -66,7 +65,6 @@ window.combatSystem = {
       counterWindowOpen: false,
       targetArea: "body",
       combatLog: [],
-      combatEnding: false,
       
       // Counter system properties
       counterChain: 0,
@@ -117,12 +115,6 @@ window.combatSystem = {
   
   // Enter a specific combat phase
   enterPhase: function(phase) {
-    // Don't change phases if combat is ending
-    if (this.state.combatEnding) {
-      console.log("Combat is ending, ignoring phase change to:", phase);
-      return;
-    }
-    
     const previousPhase = this.state.phase;
     this.state.phase = phase;
     
@@ -174,11 +166,6 @@ window.combatSystem = {
   
   // Process enemy's turn
   processEnemyTurn: function() {
-    // Don't process enemy turn if combat is ending or enemy is defeated
-    if (this.state.combatEnding || this.state.enemy.health <= 0) {
-      console.log("Combat ending or enemy defeated, skipping enemy turn");
-      return;
-    }
 
     // If already processed an action this turn, don't process again
     if (this._processingEnemyTurn) return;
@@ -211,9 +198,7 @@ window.combatSystem = {
     // Move to resolution phase
     setTimeout(() => {
       this._processingEnemyTurn = false;
-      if (!this.state.combatEnding) {
-        this.enterPhase("resolution");
-      }
+      this.enterPhase("resolution");
     }, 1500);
   },
   
@@ -295,8 +280,8 @@ window.combatSystem = {
   
   // Process a player action during combat
   handleCombatAction: function(action, params = {}) {
-    if (!this.state.active || this.state.phase !== "player" || this.state.combatEnding) {
-      console.warn("Cannot handle combat action - not in player phase or combat ending");
+    if (!this.state.active || this.state.phase !== "player") {
+      console.warn("Cannot handle combat action - not in player phase");
       return;
     }
     
@@ -331,7 +316,7 @@ window.combatSystem = {
     }
     
     // Move to enemy phase unless combat has ended
-    if (this.state.active && !this.state.counterWindowOpen && !this.state.combatEnding) {
+    if (this.state.active && !this.state.counterWindowOpen) {
       this.enterPhase("enemy");
     }
   },
@@ -402,6 +387,16 @@ window.combatSystem = {
     // Generate attack narrative
     this.addCombatMessage(this.generateAttackNarrative(weaponTemplate, attackType));
     
+    // Check for shield block first (before determining hit success)
+    if (this.checkEnemyShieldBlock()) {
+      // Attack was blocked by enemy shield
+      this.addCombatMessage(`Your attack is blocked by the ${this.state.enemy.name}'s shield with a resounding clang!`);
+      
+      // No counter chance on shield block
+      setTimeout(() => this.enterPhase("enemy"), 1000);
+      return;
+    }
+    
     // Determine hit success based on skills and stats
     const hitSuccess = this.resolveAttackSuccess(weaponTemplate, attackType);
     
@@ -415,9 +410,6 @@ window.combatSystem = {
       // Generate hit narrative
       this.addCombatMessage(this.generateHitNarrative(weaponTemplate, attackType, damage));
       
-      // Apply weapon durability loss
-      this.applyWeaponDurabilityLoss(weapon);
-      
       // Reset counter chain after successful hit
       this.state.counterChain = 0;
       this.state.counterWindowOpen = false;
@@ -427,10 +419,7 @@ window.combatSystem = {
       if (this.state.enemy.health <= 0) {
         this.addCombatMessage(this.generateVictoryNarrative());
         
-        // Set combat ending flag
-        this.state.combatEnding = true;
-        
-        // End combat with delay
+        // End combat
         setTimeout(() => this.endCombat(true), 1500);
         return;
       }
@@ -453,8 +442,8 @@ window.combatSystem = {
     // Update UI
     this.updateCombatInterface();
     
-    // Move to enemy phase if no counter and combat not ending
-    if (!this.state.counterWindowOpen && !this.state.combatEnding) {
+    // Move to enemy phase if no counter
+    if (!this.state.counterWindowOpen) {
       setTimeout(() => this.enterPhase("enemy"), 1000);
     }
   },
@@ -483,16 +472,26 @@ window.combatSystem = {
       return;
     }
     
+    // Check for shield block
+    if (this.checkEnemyShieldBlock()) {
+      // Attack was blocked by enemy shield
+      this.addCombatMessage(`Your counter-attack is blocked by the ${this.state.enemy.name}'s shield!`);
+      
+      // End the counter exchange
+      this.state.counterChain = 0;
+      this.state.counterWindowOpen = false;
+      this.state.lastCounterActor = null;
+      
+      // Move to enemy phase
+      setTimeout(() => this.enterPhase("enemy"), 1000);
+      return;
+    }
+    
     // Counter attacks have higher hit chance
     const hitBonus = 20; // +20% hit chance on counters
     const hitSuccess = this.resolveAttackSuccess(weaponTemplate, attackType, hitBonus);
     
     if (hitSuccess) {
-      // Apply weapon durability loss
-      if (weapon) {
-        this.applyWeaponDurabilityLoss(weapon);
-      }
-      
       // Calculate damage with bonus for counters
       const damage = this.calculateDamage(weaponTemplate, attackType) * 1.5;
       
@@ -511,18 +510,13 @@ window.combatSystem = {
       if (this.state.enemy.health <= 0) {
         this.addCombatMessage(this.generateVictoryNarrative());
         
-        // Set combat ending flag
-        this.state.combatEnding = true;
-        
         // End combat
         setTimeout(() => this.endCombat(true), 1500);
         return;
       }
       
-      // Continue to next phase if combat not ending
-      if (!this.state.combatEnding) {
-        setTimeout(() => this.enterPhase("enemy"), 1000);
-      }
+      // Continue to next phase
+      setTimeout(() => this.enterPhase("enemy"), 1000);
     } else {
       // Counter missed
       this.addCombatMessage(`Your counter-riposte misses as the ${this.state.enemy.name} deftly evades!`);
@@ -578,13 +572,19 @@ window.combatSystem = {
   
   // Handle enemy attack
   handleEnemyAttack: function(attackType, targetArea) {
-    // Don't process attack if combat is ending
-    if (this.state.combatEnding) return;
-    
     const enemy = this.state.enemy;
     
     // Generate attack narrative
     this.addCombatMessage(`The ${enemy.name} attacks your ${this.targetLabels[targetArea]}!`);
+    
+    // Check for player shield block
+    if (this.checkPlayerShieldBlock()) {
+      // Attack was blocked by player's shield
+      this.addCombatMessage(`You raise your shield just in time, deflecting the attack completely!`);
+      
+      // No counter opportunity after successful block
+      return;
+    }
     
     // Determine hit success
     const defenseBonus = this.state.playerStance === "defensive" ? 20 : 0;
@@ -599,9 +599,6 @@ window.combatSystem = {
       // Apply damage to player
       window.gameState.health = Math.max(0, window.gameState.health - damage);
       
-      // Apply durability damage to armor
-      this.applyArmorDurabilityLoss(targetArea);
-      
       // Generate hit narrative
       this.addCombatMessage(`The attack lands, dealing ${damage} damage!`);
       
@@ -613,9 +610,6 @@ window.combatSystem = {
       // Check if player is defeated
       if (window.gameState.health <= 0) {
         this.addCombatMessage(`You've been critically wounded and can no longer fight.`);
-        
-        // Set combat ending flag
-        this.state.combatEnding = true;
         
         // End combat
         setTimeout(() => this.endCombat(false), 1500);
@@ -644,9 +638,6 @@ window.combatSystem = {
   
   // Handle enemy counterattack
   handleEnemyCounter: function() {
-    // Don't process if combat is ending
-    if (this.state.combatEnding) return;
-    
     const enemy = this.state.enemy;
     this.state.counterChain++;
     this.state.lastCounterActor = "enemy";
@@ -656,6 +647,21 @@ window.combatSystem = {
     // Check if we've reached maximum counter chain
     if (this.state.counterChain >= this.state.maxCounterChain) {
       this.addCombatMessage(`After a frenzied exchange of missed attacks and counters, both you and the ${enemy.name} back off to reassess.`);
+      this.state.counterChain = 0;
+      this.state.counterWindowOpen = false;
+      this.state.lastCounterActor = null;
+      
+      // Continue to resolution phase
+      setTimeout(() => this.enterPhase("resolution"), 1000);
+      return;
+    }
+    
+    // Check for player shield block
+    if (this.checkPlayerShieldBlock()) {
+      // Attack was blocked by player's shield
+      this.addCombatMessage(`You quickly raise your shield and block the counterattack completely!`);
+      
+      // End the counter exchange
       this.state.counterChain = 0;
       this.state.counterWindowOpen = false;
       this.state.lastCounterActor = null;
@@ -674,9 +680,6 @@ window.combatSystem = {
       const damage = this.calculateEnemyDamage() * 1.5; // Counters do more damage
       window.gameState.health = Math.max(0, window.gameState.health - damage);
       
-      // Apply durability damage to a random piece of armor
-      this.applyArmorDurabilityLoss(this.getRandomTargetArea());
-      
       this.addCombatMessage(`The counterattack connects with devastating effect, dealing ${Math.round(damage)} damage!`);
       
       // Reset counter chain after successful hit
@@ -687,9 +690,6 @@ window.combatSystem = {
       // Check if player is defeated
       if (window.gameState.health <= 0) {
         this.addCombatMessage(`You've been critically wounded and can no longer fight.`);
-        
-        // Set combat ending flag
-        this.state.combatEnding = true;
         
         // End combat
         setTimeout(() => this.endCombat(false), 1500);
@@ -709,94 +709,96 @@ window.combatSystem = {
     }
   },
   
-  // Apply durability loss to weapon from use
-  applyWeaponDurabilityLoss: function(weapon) {
-    if (!weapon || !weapon.getTemplate || typeof weapon.getTemplate !== 'function') {
-      return;
+  // Check if player's shield blocks an attack
+  checkPlayerShieldBlock: function() {
+    // Get player's shield if equipped
+    const shield = window.player.equipment?.offHand;
+    if (!shield || shield === "occupied") return false;
+    
+    const shieldTemplate = shield.getTemplate();
+    
+    // Check if it's actually a shield
+    if (shieldTemplate.weaponType?.name !== "Shield") return false;
+    
+    // Get block chance
+    let blockChance = shieldTemplate.blockChance || 0;
+    
+    // Add bonus for defensive stance
+    if (this.state.playerStance === "defensive") {
+      blockChance += 15; // +15% block chance in defensive stance
     }
     
-    // Only apply durability loss if weapon has durability
-    if (weapon.durability !== null && weapon.durability !== undefined) {
-      // Weapons lose 1-2 durability points when used
-      const durabilityLoss = Math.floor(Math.random() * 2) + 1;
-      const oldDurability = weapon.durability;
-      
-      // Apply durability loss with minimum of 0
-      weapon.durability = Math.max(0, weapon.durability - durabilityLoss);
-      
-      console.log(`Weapon durability reduced: ${oldDurability} -> ${weapon.durability}`);
-      
-      // Check if weapon broke
-      if (oldDurability > 0 && weapon.durability <= 0) {
-        this.addCombatMessage(`Your ${weapon.getTemplate().name} has broken from repeated use!`);
-        
-        // Remove weapon from equipment
-        window.player.equipment.mainHand = null;
-        
-        // If two-handed, clear off-hand slot as well
-        if (weapon.getTemplate().hands === 2) {
-          window.player.equipment.offHand = null;
-        }
-      }
-    }
+    // Roll for block
+    return Math.random() * 100 < blockChance;
   },
   
-  // Apply durability loss to armor
-  applyArmorDurabilityLoss: function(targetArea) {
-    // Map target area to equipment slot
-    let slot = null;
+  // Check if enemy's shield blocks an attack
+  checkEnemyShieldBlock: function() {
+    const enemy = this.state.enemy;
     
-    if (targetArea === "head") {
-      slot = "head";
-    } else if (targetArea === "body" || targetArea === "legs") {
-      slot = "body"; // Body armor covers both body and legs
-    } else {
-      // Random slot if target area not specified
-      slot = Math.random() < 0.2 ? "head" : "body";
+    // Check if enemy has a shield
+    if (!enemy.hasShield) return false;
+    
+    // Get base block chance
+    let blockChance = enemy.blockChance || 15; // Default 15% if not specified
+    
+    // Add bonus for defensive stance
+    if (this.state.enemyStance === "defensive") {
+      blockChance += 15; // +15% block chance in defensive stance
     }
     
-    // Get armor piece in slot
-    const armor = window.player.equipment[slot];
-    if (!armor || !armor.getTemplate || typeof armor.getTemplate !== 'function') {
-      return;
-    }
-    
-    // Only apply durability loss if armor has durability
-    if (armor.durability !== null && armor.durability !== undefined) {
-      // Armor loses 1-3 durability points when hit
-      const durabilityLoss = Math.floor(Math.random() * 3) + 1;
-      const oldDurability = armor.durability;
-      
-      // Apply durability loss with minimum of 0
-      armor.durability = Math.max(0, armor.durability - durabilityLoss);
-      
-      console.log(`Armor durability reduced: ${oldDurability} -> ${armor.durability}`);
-      
-      // Check if armor broke
-      if (oldDurability > 0 && armor.durability <= 0) {
-        this.addCombatMessage(`Your ${armor.getTemplate().name} has been damaged beyond repair!`);
-        
-        // Remove armor from equipment
-        window.player.equipment[slot] = null;
-        
-        // Recalculate equipment stats
-        window.recalculateEquipmentStats();
-      }
-    }
+    // Roll for block
+    return Math.random() * 100 < blockChance;
   },
   
   // Calculate enemy damage
   calculateEnemyDamage: function() {
     const enemy = this.state.enemy;
     const baseDamage = enemy.power || 5;
-    const playerDefense = window.player.equipment?.body ? 
-      (window.player.equipment.body.getTemplate().stats.defense || 0) : 0;
+    
+    // Get player defense stats
+    const bodyArmor = window.player.equipment?.body ? 
+      window.player.equipment.body.getTemplate() : null;
+    
+    const helmet = window.player.equipment?.head ?
+      window.player.equipment.head.getTemplate() : null;
+    
+    // Calculate defense reduction
+    let defenseValue = 0;
+    let armorDurabilityReduction = 0;
+    
+    // Body armor defense & durability reduction
+    if (bodyArmor) {
+      defenseValue += bodyArmor.stats.defense || 0;
+      
+      // Add durability-based damage reduction (max 40%)
+      const durabilityPercent = Math.min(50, bodyArmor.durability || 0); // Cap at 50%
+      armorDurabilityReduction += durabilityPercent;
+    }
+    
+    // Helmet defense & durability reduction (if hit area is head)
+    if (helmet && this.state.targetArea === "head") {
+      defenseValue += helmet.stats.defense || 0;
+      
+      // Add durability-based damage reduction (max 40%)
+      const durabilityPercent = Math.min(50, helmet.durability || 0); // Cap at 50%
+      armorDurabilityReduction += (durabilityPercent * 0.5); // Helmet contributes half as much
+    }
     
     // Calculate damage with randomness
     let damage = baseDamage * (1 + Math.random() * 0.4 - 0.2);
     
+    // Apply armor penetration if enemy has it
+    const enemyArmorPen = enemy.armorPenetration || 0;
+    const effectiveDefense = Math.max(0, defenseValue - enemyArmorPen);
+    
     // Reduce by defense, minimum 1 damage
-    damage = Math.max(1, damage - playerDefense * 0.5);
+    damage = Math.max(1, damage - effectiveDefense * 0.5);
+    
+    // Apply durability damage reduction (percentage-based)
+    if (armorDurabilityReduction > 0) {
+      damage = damage * (1 - (armorDurabilityReduction / 100));
+    }
     
     // Adjust based on stance
     if (this.state.enemyStance === "aggressive") {
@@ -838,6 +840,16 @@ window.combatSystem = {
       damage *= 1.5; // Headshots do more damage
     } else if (this.state.targetArea === "legs") {
       damage *= 0.8; // Leg hits do less damage
+    }
+    
+    // Apply armor penetration against enemy defense
+    const armorPenetration = weaponTemplate.stats.armorPenetration || 0;
+    const enemyDefense = this.state.enemy.defense || 0;
+    const effectiveDefense = Math.max(0, enemyDefense - armorPenetration);
+    
+    // Reduce damage based on enemy defense
+    if (effectiveDefense > 0) {
+      damage = Math.max(1, damage - (effectiveDefense * 0.3));
     }
     
     // Apply enemy stance defense
@@ -932,9 +944,6 @@ window.combatSystem = {
       // Success
       this.addCombatMessage("You manage to break away from the fight!");
       
-      // Set combat ending flag
-      this.state.combatEnding = true;
-      
       // End combat with special retreat outcome
       setTimeout(() => this.endCombat("retreat"), 1500);
     } else {
@@ -950,7 +959,6 @@ window.combatSystem = {
   endCombat: function(outcome) {
     // Set combat as inactive
     this.state.active = false;
-    this.state.combatEnding = false;
     
     if (outcome === true) {
       // Player victory
@@ -967,9 +975,15 @@ window.combatSystem = {
         window.gameState.combatVictoryAchieved = true;
         window.showAchievement('first_blood');
       }
+      
+      // Slightly damage player's armor during combat
+      this.applyArmorDurabilityDamage();
     } else if (outcome === "retreat") {
       // Player retreated
       window.showNotification("You managed to escape combat.", 'info');
+      
+      // Minor armor durability damage on retreat
+      this.applyArmorDurabilityDamage(0.5); // Half damage on retreat
     } else {
       // Player defeat
       window.gameState.health = Math.max(1, window.gameState.health); // Ensure player doesn't die
@@ -977,6 +991,9 @@ window.combatSystem = {
       
       // Apply stamina penalty for defeat
       window.gameState.stamina = Math.max(0, window.gameState.stamina - 50);
+      
+      // More significant armor durability damage on defeat
+      this.applyArmorDurabilityDamage(2); // Double damage on defeat
     }
     
     // Hide combat interface
@@ -995,6 +1012,40 @@ window.combatSystem = {
     
     // Check for level up
     window.checkLevelUp();
+  },
+  
+  // Apply durability damage to armor after combat
+  applyArmorDurabilityDamage: function(modifier = 1) {
+    // Get player's armor pieces
+    const bodyArmor = window.player.equipment?.body;
+    const helmet = window.player.equipment?.head;
+    
+    // Apply damage to body armor
+    if (bodyArmor) {
+      const template = bodyArmor.getTemplate();
+      if (template.durability !== undefined) {
+        // Reduce durability by 1-3 points (modified by combat outcome)
+        const damage = Math.round((1 + Math.floor(Math.random() * 3)) * modifier);
+        template.durability = Math.max(0, template.durability - damage);
+        
+        // Notify if armor is getting damaged
+        if (template.durability < template.maxDurability * 0.25) {
+          window.showNotification("Your armor is severely damaged and needs repair!", 'warning');
+        } else if (template.durability === 0) {
+          window.showNotification("Your armor is completely broken and provides minimal protection!", 'warning');
+        }
+      }
+    }
+    
+    // Apply damage to helmet (less damage than body armor)
+    if (helmet) {
+      const template = helmet.getTemplate();
+      if (template.durability !== undefined) {
+        // Reduce durability by 0-2 points (modified by combat outcome)
+        const damage = Math.round((Math.floor(Math.random() * 2)) * modifier);
+        template.durability = Math.max(0, template.durability - damage);
+      }
+    }
   },
   
   // Generate loot based on enemy
@@ -1026,6 +1077,12 @@ window.combatSystem = {
       const coins = Math.floor(Math.random() * 20) + 5;
       window.player.taelors += coins;
       this.addCombatMessage(`You found ${coins} taelors!`);
+      
+      // Small chance to also find repair kit
+      if (Math.random() < 0.15 && window.itemTemplates.armorRepairKit) {
+        window.addItemToInventory(window.itemTemplates.armorRepairKit);
+        this.addCombatMessage(`You also found an armor repair kit!`);
+      }
     }
   },
   
@@ -1144,9 +1201,6 @@ window.combatSystem = {
     const actionsContainer = document.getElementById('combatActions');
     actionsContainer.innerHTML = '';
     
-    // Don't show options if combat is ending
-    if (this.state.combatEnding) return;
-    
     // Get equipped weapon
     const weapon = window.player.equipment?.mainHand;
     const weaponTemplate = weapon ? weapon.getTemplate() : null;
@@ -1175,6 +1229,19 @@ window.combatSystem = {
     this.addCombatButton("Target Body", () => this.handleCombatAction("change_target", {target: "body"}), actionsContainer);
     this.addCombatButton("Target Legs", () => this.handleCombatAction("change_target", {target: "legs"}), actionsContainer);
     
+    // Add shield status if player has shield
+    const shield = window.player.equipment?.offHand;
+    if (shield && shield !== "occupied") {
+      const shieldTemplate = shield.getTemplate();
+      if (shieldTemplate.weaponType?.name === "Shield") {
+        let blockChance = shieldTemplate.blockChance || 0;
+        if (this.state.playerStance === "defensive") {
+          blockChance += 15; // +15% in defensive stance
+        }
+        this.addCombatButton(`Shield Block: ${blockChance}%`, () => {}, actionsContainer, true);
+      }
+    }
+    
     // Add attack buttons if weapon equipped and in range
     if (weaponTemplate) {
       const weaponRange = weaponTemplate.range || 1;
@@ -1199,9 +1266,6 @@ window.combatSystem = {
     const actionsContainer = document.getElementById('combatActions');
     actionsContainer.innerHTML = '';
     
-    // Don't show options if combat is ending
-    if (this.state.combatEnding) return;
-    
     // Get equipped weapon
     const weapon = window.player.equipment?.mainHand;
     const weaponTemplate = weapon ? weapon.getTemplate() : null;
@@ -1222,11 +1286,12 @@ window.combatSystem = {
   },
   
   // Add a button to the combat interface
-  addCombatButton: function(label, onClick, container) {
+  addCombatButton: function(label, onClick, container, disabled = false) {
     const btn = document.createElement('button');
     btn.className = 'action-btn';
+    if (disabled) btn.className += ' disabled';
     btn.textContent = label;
-    btn.onclick = onClick;
+    if (!disabled) btn.onclick = onClick;
     container.appendChild(btn);
   },
   
@@ -1598,6 +1663,9 @@ window.ENEMY_TEMPLATES = {
     speed: 8,
     defense: 12,
     counterSkill: 2,
+    hasShield: true,
+    blockChance: 20,
+    armorPenetration: 5,
     
     // Preferred tactics
     preferredDistance: 2, // Starts at medium for javelin throws, then closes in
@@ -1624,6 +1692,9 @@ window.ENEMY_TEMPLATES = {
     speed: 7,
     defense: 10,
     counterSkill: 1,
+    hasShield: true,
+    blockChance: 15,
+    armorPenetration: 0,
     
     // Preferred tactics
     preferredDistance: 1,
@@ -1650,6 +1721,8 @@ window.ENEMY_TEMPLATES = {
     speed: 6,
     defense: 8,
     counterSkill: 3,
+    hasShield: false,
+    armorPenetration: 20,
     
     // Preferred tactics
     preferredDistance: 1,
