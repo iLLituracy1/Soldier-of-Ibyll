@@ -368,32 +368,35 @@ window.combatSystem = {
   
   // Handle player attack
   handlePlayerAttack: function(attackType) {
+    // Special case for javelin throws
+    if (attackType === "Throw Javelin") {
+      return this.handleJavelinThrow();
+    }
+    
     // Get player weapon
     const weapon = window.player.equipment?.mainHand;
-    if (!weapon) {
+    if (!weapon && attackType !== "Punch") {
       this.addCombatMessage("You have no weapon equipped!");
       return;
     }
     
     // Get weapon template
-    const weaponTemplate = weapon.getTemplate();
+    const weaponTemplate = weapon ? weapon.getTemplate() : { name: "fist", category: "weapon" };
     
-    // Check if weapon is ranged
-    const isRanged = weaponTemplate.weaponType?.name === "Bow" || 
-                     weaponTemplate.weaponType?.name === "Crossbow" ||
-                     weaponTemplate.weaponType?.name === "Rifle";
+    // Handle ranged weapons
+    const isRanged = attackType === "Shoot" || attackType === "Aimed Shot" || 
+                   weaponTemplate.weaponType?.name === "Bow" ||
+                   weaponTemplate.weaponType?.name === "Crossbow" ||
+                   weaponTemplate.weaponType?.name === "Rifle";
     
-    // If ranged, check for ammunition
     if (isRanged) {
       const ammo = window.player.equipment?.ammunition;
       
-      // If no ammunition equipped
       if (!ammo) {
         this.addCombatMessage("You need ammunition to use this weapon!");
         return;
       }
       
-      // Check if ammunition is compatible
       if (!window.checkWeaponAmmoCompatibility()) {
         this.addCombatMessage(`${ammo.getName()} is not compatible with your ${weaponTemplate.name}!`);
         return;
@@ -413,8 +416,8 @@ window.combatSystem = {
     // Generate attack narrative
     this.addCombatMessage(this.generateAttackNarrative(weaponTemplate, attackType));
     
-    // Reduce weapon durability with each use (NEW)
-    if (weapon.durability !== undefined) {
+    // Reduce weapon durability with each use
+    if (weapon && weapon.durability !== undefined) {
       // Random durability reduction between 1-2 points
       const durabilityLoss = Math.floor(Math.random() * 2) + 1;
       weapon.durability = Math.max(0, weapon.durability - durabilityLoss);
@@ -449,15 +452,6 @@ window.combatSystem = {
       // Generate hit narrative
       this.addCombatMessage(this.generateHitNarrative(weaponTemplate, attackType, damage));
       
-      // After a successful hit with a ranged weapon, consume ammunition
-      if (hitSuccess && isRanged) {
-        const ammo = window.player.equipment?.ammunition;
-        if (ammo && ammo.useAmmo()) {
-          // Show remaining ammo in message
-          this.addCombatMessage(`Ammunition remaining: ${ammo.currentAmount}/${ammo.capacity}`);
-        }
-      }
-
       // Reset counter chain after successful hit
       this.state.counterChain = 0;
       this.state.counterWindowOpen = false;
@@ -494,6 +488,67 @@ window.combatSystem = {
     if (!this.state.counterWindowOpen) {
       setTimeout(() => this.enterPhase("enemy"), 1000);
     }
+  },
+  
+  // Implementation of javelin throwing as a specialized attack
+  handleJavelinThrow: function() {
+    // Get ammunition
+    const ammo = window.player.equipment?.ammunition;
+    
+    // Verify we have javelins
+    if (!ammo || ammo === "occupied" || ammo.ammoType !== "javelin" || ammo.currentAmount <= 0) {
+      this.addCombatMessage("You have no javelins to throw!");
+      return;
+    }
+    
+    // Use 1 javelin
+    const oldCount = ammo.currentAmount;
+    ammo.useAmmo(1);
+    
+    // Verify the javelin was consumed
+    if (oldCount === ammo.currentAmount) {
+      console.error("Failed to consume javelin ammunition!");
+      // Force decrement as fallback
+      ammo.currentAmount = Math.max(0, ammo.currentAmount - 1);
+    }
+    
+    this.addCombatMessage(`You throw a javelin at the ${this.state.enemy.name}. (${ammo.currentAmount}/${ammo.capacity} javelins remaining)`);
+    
+    // Javelins have good hit chance but moderate damage
+    const hitBonus = 10;
+    const hitSuccess = this.resolveAttackSuccess({
+      name: "javelin",
+      stats: { damage: 12, armorPenetration: 5 }
+    }, "Throw", hitBonus);
+    
+    if (hitSuccess) {
+      // Calculate damage - javelins do good damage and have armor penetration
+      const damage = Math.round(10 + Math.random() * 5);
+      
+      // Apply damage to enemy
+      this.state.enemy.health = Math.max(0, this.state.enemy.health - damage);
+      
+      // Generate hit narrative
+      this.addCombatMessage(`Your javelin strikes true, piercing the ${this.state.enemy.name} for ${damage} damage!`);
+      
+      // Check if enemy is defeated
+      if (this.state.enemy.health <= 0) {
+        this.addCombatMessage(this.generateVictoryNarrative());
+        
+        // End combat
+        setTimeout(() => this.endCombat(true), 1500);
+        return;
+      }
+    } else {
+      // Generate miss narrative
+      this.addCombatMessage(`Your javelin flies wide, missing the ${this.state.enemy.name}!`);
+    }
+    
+    // Update UI
+    this.updateCombatInterface();
+    
+    // Move to enemy phase - no counter opportunity on javelin misses
+    setTimeout(() => this.enterPhase("enemy"), 1000);
   },
   
   // Handle player counter attack
@@ -547,7 +602,7 @@ window.combatSystem = {
       setTimeout(() => this.enterPhase("enemy"), 1000);
       return;
     }
-    
+  
     // Counter attacks have higher hit chance
     const hitBonus = 20; // +20% hit chance on counters
     const hitSuccess = this.resolveAttackSuccess(weaponTemplate, attackType, hitBonus);
@@ -1363,47 +1418,74 @@ window.combatSystem = {
       }
     }
     
-    // Add attack buttons if weapon equipped and in range
-    if (weaponTemplate) {
-      const weaponRange = weaponTemplate.range || 1;
+    // Show weapon durability if it has it
+    if (weapon && weapon.durability !== undefined) {
+      // Calculate durability percentage
+      const durabilityPercent = Math.round((weapon.durability / weaponTemplate.maxDurability) * 100);
+      let durabilityStatus = ""; 
       
-      // Show weapon durability if it has it
-      if (weapon.durability !== undefined) {
-        // Calculate durability percentage
-        const durabilityPercent = Math.round((weapon.durability / weaponTemplate.maxDurability) * 100);
-        let durabilityStatus = ""; 
-        
-        // Add status text based on percentage
-        if (durabilityPercent <= 0) durabilityStatus = " (Broken)";
-        else if (durabilityPercent < 20) durabilityStatus = " (Very Poor)";
-        else if (durabilityPercent < 40) durabilityStatus = " (Poor)";
-        else if (durabilityPercent < 60) durabilityStatus = " (Worn)";
-        
-        // Only show status if not in excellent condition
-        if (durabilityStatus) {
-          this.addCombatButton(`Weapon: ${durabilityPercent}%${durabilityStatus}`, () => {}, actionsContainer, true);
-        }
-        
-        // Disable attacks if weapon is broken
-        if (weapon.durability <= 0) {
-          this.addCombatButton("Weapon Broken!", () => {}, actionsContainer, true);
-          // Don't add attack buttons for broken weapons
-          weaponRange = -1; // Ensure no attacks are added
-        }
+      // Add status text based on percentage
+      if (durabilityPercent <= 0) durabilityStatus = " (Broken)";
+      else if (durabilityPercent < 20) durabilityStatus = " (Very Poor)";
+      else if (durabilityPercent < 40) durabilityStatus = " (Poor)";
+      else if (durabilityPercent < 60) durabilityStatus = " (Worn)";
+      
+      // Only show status if not in excellent condition
+      if (durabilityStatus) {
+        this.addCombatButton(`Weapon: ${durabilityPercent}%${durabilityStatus}`, () => {}, actionsContainer, true);
       }
       
-      if (this.state.distance <= weaponRange) {
-        // Get available attacks for weapon
-        const attacks = this.getWeaponAttacks(weaponTemplate);
-        
-        // Add button for each attack
-        for (const attack of attacks) {
-          this.addCombatButton(attack, () => this.handleCombatAction("attack", {attackType: attack}), actionsContainer);
+      // Disable attacks if weapon is broken
+      if (weapon.durability <= 0) {
+        this.addCombatButton("Weapon Broken!", () => {}, actionsContainer, true);
+        // Early return to skip attack options
+        this.addCombatButton("Attempt to Flee", () => this.handleCombatAction("flee"), actionsContainer);
+        return;
+      }
+    }
+    
+    // Get the effective weapon range
+    const weaponRange = weaponTemplate ? this.getWeaponRange(weaponTemplate) : 1;
+    
+    console.log(`Weapon: ${weaponTemplate?.name || 'none'}, Range: ${weaponRange}, Distance: ${this.state.distance}`);
+    
+    // Get all available attacks considering current weapon, ammo, and distance
+    let attacks = [];
+    
+    // If within weapon range, add weapon attacks
+    if (weaponTemplate && this.state.distance <= weaponRange) {
+      attacks = attacks.concat(this.getWeaponAttacks(weaponTemplate));
+    } else if (weaponTemplate) {
+      // Weapon out of range
+      this.addCombatButton(`Too far for ${weaponTemplate.name}`, () => {}, actionsContainer, true);
+    }
+    
+    // Always check for javelin attacks separately from main weapon
+    if (this.hasCompatibleAmmo(null, "javelin") && this.state.distance >= 1 && this.state.distance <= 2) {
+      // If no weapon or weapon is one-handed
+      if (!weaponTemplate || (weaponTemplate.hands && weaponTemplate.hands === 1)) {
+        if (!attacks.includes("Throw Javelin")) {
+          attacks.push("Throw Javelin");
         }
       }
     }
     
-    // Add flee button
+    // Default to punch if no weapon and at melee range
+    if (attacks.length === 0 && this.state.distance === 0) {
+      attacks = ["Punch"];
+    }
+    
+    // Add buttons for each available attack
+    for (const attack of attacks) {
+      // Skip "No Arrows" etc. which are just informational
+      if (attack.startsWith("No ")) {
+        this.addCombatButton(attack, () => {}, actionsContainer, true);
+      } else {
+        this.addCombatButton(attack, () => this.handleCombatAction("attack", {attackType: attack}), actionsContainer);
+      }
+    }
+    
+    // Always add flee button
     this.addCombatButton("Attempt to Flee", () => this.handleCombatAction("flee"), actionsContainer);
   },
   
@@ -1462,32 +1544,83 @@ window.combatSystem = {
   getWeaponAttacks: function(weaponTemplate) {
     if (!weaponTemplate) return ["Punch"];
     
-    // Default attacks based on weapon category
-    switch(weaponTemplate.weaponType?.name) {
-      case "Sword":
-        return ["Slash", "Stab"];
-      case "Greatsword":
-        return ["Slash", "Cleave"];
-      case "Spear":
-        return ["Stab", "Sweep"];
-      case "Axe":
-      case "Battle Axe":
-        return ["Cleave", "Hook"];
-      case "Dagger":
-        return ["Stab", "Slash"];
-      case "Bow":
-      case "Crossbow":
-      case "Rifle":
-        return ["Shoot", "Aimed Shot"];
-      case "Shield":
-        return ["Bash"];
-      default:
-        // Check for custom attacks on the template
-        if (weaponTemplate.availableAttacks && weaponTemplate.availableAttacks.length > 0) {
-          return weaponTemplate.availableAttacks;
-        }
-        return ["Strike"];
+    // Get current combat state info
+    const distance = this.state.distance;
+    const ammo = window.player.equipment?.ammunition;
+    
+    // Initialize attacks array
+    let availableAttacks = [];
+    
+    // Get attacks based on weapon type
+    if (weaponTemplate.weaponType) {
+      switch(weaponTemplate.weaponType.name) {
+        case "Sword":
+          availableAttacks = ["Slash", "Stab"];
+          break;
+        case "Greatsword":
+          availableAttacks = ["Slash", "Cleave"];
+          break;
+        case "Spear":
+          availableAttacks = ["Stab", "Sweep"];
+          break;
+        case "Axe":
+        case "Battle Axe":
+          availableAttacks = ["Cleave", "Hook"];
+          break;
+        case "Dagger":
+          availableAttacks = ["Stab", "Slash"];
+          break;
+        case "Bow":
+          // Check for arrows
+          if (this.hasCompatibleAmmo(weaponTemplate, "arrow")) {
+            availableAttacks = ["Shoot", "Aimed Shot"];
+          } else {
+            availableAttacks = ["No Arrows"];
+          }
+          break;
+        case "Crossbow":
+          // Check for bolts
+          if (this.hasCompatibleAmmo(weaponTemplate, "bolt")) {
+            availableAttacks = ["Shoot", "Aimed Shot"];
+          } else {
+            availableAttacks = ["No Bolts"];
+          }
+          break;
+        case "Rifle":
+          // Check for shot/bullets
+          if (this.hasCompatibleAmmo(weaponTemplate, "shot")) {
+            availableAttacks = ["Shoot", "Aimed Shot"];
+          } else {
+            availableAttacks = ["No Ammunition"];
+          }
+          break;
+        case "Shield":
+          availableAttacks = ["Bash"];
+          break;
+        case "Thrown":
+          availableAttacks = ["Throw", "Jab"];
+          break;
+        default:
+          // Fallback to custom attacks or basic strike
+          availableAttacks = weaponTemplate.availableAttacks || ["Strike"];
+      }
+    } else {
+      // Weapon with no type defaults to strike
+      availableAttacks = ["Strike"];
     }
+    
+    // Special case: Add javelin throw option if:
+    // 1. We have javelin ammunition
+    // 2. Current distance is appropriate (medium)
+    // 3. Main hand weapon isn't two-handed
+    if (this.hasCompatibleAmmo(null, "javelin") && 
+        distance >= 1 && distance <= 2 &&
+        (!weaponTemplate || weaponTemplate.hands !== 2)) {
+      availableAttacks.push("Throw Javelin");
+    }
+    
+    console.log("Available attacks:", availableAttacks, "Distance:", distance);
+    return availableAttacks;
   },
   
   // Get random enemy attack
@@ -1789,6 +1922,54 @@ window.combatSystem = {
     ];
     
     return templates[Math.floor(Math.random() * templates.length)];
+  },
+  
+  // Add getWeaponRange method to properly determine weapon range
+  getWeaponRange: function(weaponTemplate) {
+    // Default to melee range if no weapon
+    if (!weaponTemplate) return 1;
+    
+    // First check explicit range property on weapon template
+    if (typeof weaponTemplate.range === 'number') {
+      return weaponTemplate.range;
+    }
+    
+    // Then check range from weapon type
+    if (weaponTemplate.weaponType && typeof weaponTemplate.weaponType.range === 'number') {
+      return weaponTemplate.weaponType.range;
+    }
+    
+    // Default to melee range (1)
+    return 1;
+  },
+  
+  // Add helper function to check ammunition compatibility
+  hasCompatibleAmmo: function(weapon, ammoType) {
+    const ammo = window.player.equipment?.ammunition;
+    
+    // No ammo equipped
+    if (!ammo || ammo === "occupied" || !ammo.getTemplate) {
+      return false;
+    }
+    
+    // Ammo is empty
+    if (ammo.currentAmount <= 0) {
+      return false;
+    }
+    
+    // If asking for specific ammo type
+    if (ammoType) {
+      return ammo.ammoType === ammoType || 
+             ammo.getTemplate().ammoType === ammoType;
+    }
+    
+    // If checking for compatibility with a weapon
+    if (weapon) {
+      return window.checkWeaponAmmoCompatibility();
+    }
+    
+    // Default: ammo exists and isn't empty
+    return true;
   }
 };
 
@@ -1888,3 +2069,62 @@ window.addEventListener('DOMContentLoaded', function() {
 });
 
 // Combat styles are defined in combatUI.js
+
+// Function to update weapon ranges
+const updateWeaponRanges = function() {
+  // Only update if not already set
+  if (!window.WEAPON_TYPES.BOW.range) {
+    window.WEAPON_TYPES.SWORD.range = 1;
+    window.WEAPON_TYPES.GREATSWORD.range = 1;
+    window.WEAPON_TYPES.SPEAR.range = 2;
+    window.WEAPON_TYPES.AXE.range = 1;
+    window.WEAPON_TYPES.BATTLEAXE.range = 1;
+    window.WEAPON_TYPES.BOW.range = 3;
+    window.WEAPON_TYPES.CROSSBOW.range = 3;
+    window.WEAPON_TYPES.DAGGER.range = 1;
+    window.WEAPON_TYPES.SHIELD.range = 1;
+    window.WEAPON_TYPES.RIFLE.range = 3;
+    window.WEAPON_TYPES.THROWN.range = 2;
+    
+    console.log("Weapon ranges updated.");
+  }
+};
+
+// Fix initialization of ammunition to ensure correct capacity
+const fixJavelinCapacity = function() {
+  // Get equipped javelin pack if any
+  const ammo = window.player.equipment?.ammunition;
+  if (ammo && ammo.ammoType === 'javelin') {
+    // Make sure capacity is correct
+    const template = ammo.getTemplate();
+    if (template && template.capacity === 6) {
+      // Fix capacity if wrong
+      if (ammo.capacity !== 6) {
+        console.log(`Fixing javelin capacity from ${ammo.capacity} to 6`);
+        ammo.capacity = 6;
+      }
+      
+      // Initialize currentAmount if needed
+      if (ammo.currentAmount > 6 || ammo.currentAmount === null) {
+        console.log(`Fixing javelin count from ${ammo.currentAmount} to 6`);
+        ammo.currentAmount = 6;
+      }
+    }
+  }
+};
+
+// Function to apply all fixes
+window.applyRangedCombatFixes = function() {
+  console.log("Applying ranged combat fixes...");
+  
+  // Update weapon ranges
+  updateWeaponRanges();
+  
+  // Fix javelin capacity
+  fixJavelinCapacity();
+  
+  console.log("Ranged combat fixes applied successfully!");
+};
+
+// Automatically apply the fixes when this code runs
+window.applyRangedCombatFixes();

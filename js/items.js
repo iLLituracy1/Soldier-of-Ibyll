@@ -88,14 +88,14 @@ window.MOUNT_TYPES = {
 window.WEAPON_TYPES = {
   SWORD: { name: 'Sword', symbol: window.ITEM_SYMBOLS.SWORD, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1 },
   GREATSWORD: { name: 'Greatsword', symbol: window.ITEM_SYMBOLS.SWORD, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2 },
-  SPEAR: { name: 'Spear', symbol: window.ITEM_SYMBOLS.SPEAR, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2 },
+  SPEAR: { name: 'Spear', symbol: window.ITEM_SYMBOLS.SPEAR, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2, range: 2 },
   AXE: { name: 'Axe', symbol: window.ITEM_SYMBOLS.AXE, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1 },
   BATTLEAXE: { name: 'Battle Axe', symbol: window.ITEM_SYMBOLS.AXE, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2 },
-  BOW: { name: 'Bow', symbol: window.ITEM_SYMBOLS.BOW, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2 },
-  CROSSBOW: { name: 'Crossbow', symbol: window.ITEM_SYMBOLS.CROSSBOW, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2 },
+  BOW: { name: 'Bow', symbol: window.ITEM_SYMBOLS.BOW, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2, range: 3 },
+  CROSSBOW: { name: 'Crossbow', symbol: window.ITEM_SYMBOLS.CROSSBOW, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2, range: 3 },
   DAGGER: { name: 'Dagger', symbol: window.ITEM_SYMBOLS.DAGGER, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1 },
   SHIELD: { name: 'Shield', symbol: window.ITEM_SYMBOLS.SHIELD, slot: window.EQUIPMENT_SLOTS.OFF_HAND, hands: 1 },
-  RIFLE: { name: 'Rifle', symbol: window.ITEM_SYMBOLS.RIFLE, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2 },
+  RIFLE: { name: 'Rifle', symbol: window.ITEM_SYMBOLS.RIFLE, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2, range: 3 },
   THROWN: { name: 'Thrown Weapon', symbol: window.ITEM_SYMBOLS.SPEAR, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1, range: 2 }
 };
 
@@ -499,7 +499,7 @@ window.compareItems = function(itemA, itemB) {
 
   // Item Factory - Create ammunition
   window.createAmmunition = function(config) {
-    return window.createItemTemplate({
+    const template = window.createItemTemplate({
       name: config.name || "Ammunition",
       description: config.description || "Ammunition for ranged weapons.",
       category: window.ITEM_CATEGORIES.AMMUNITION,
@@ -511,10 +511,15 @@ window.compareItems = function(itemA, itemB) {
       stackable: false,
       ammoType: config.ammoType || "arrow",
       capacity: config.capacity || 20,
-      currentAmount: config.capacity || 20,
       compatibleWeapons: config.compatibleWeapons || [],
       ...config
     });
+    
+    // Ensure capacity and ammoType are accessible at the top level
+    template.capacity = config.capacity || 20;
+    template.ammoType = config.ammoType || "arrow";
+    
+    return template;
   };
 
 // Create a predefined set of item templates
@@ -611,13 +616,15 @@ window.initializeItemTemplates = function() {
     id: 'throwing_javelin',
     name: 'Throwing Javelin',
     description: 'A lightweight spear designed to be thrown at enemies from a distance.',
-    weaponType: window.WEAPON_TYPES.SPEAR,
+    weaponType: window.WEAPON_TYPES.THROWN,
     rarity: window.ITEM_RARITIES.COMMON,
     damage: 10,
     value: 15,
+    weight: 1.5,
+    range: 2,
     stats: {
       damage: 10,
-      range: 2, // Can attack at medium range
+      range: 2,
       armorPenetration: 10
     },
     maxDurability: 50
@@ -656,11 +663,12 @@ window.itemTemplates.quiver = window.createAmmunition({
 window.itemTemplates.javelinPack = window.createAmmunition({
   id: 'javelin_pack',
   name: 'Javelin Pack',
-  description: 'A harness designed to carry up to 6 throwing javelins.',
+  description: 'A harness designed to carry up to 6 throwing javelins. These lightweight spears are perfect for engaging enemies from a distance before closing to melee combat.',
   ammoType: 'javelin',
   capacity: 6,
   symbol: '🔱',
   value: 30,
+  weight: 3.0,
   compatibleWeapons: ['throwing_javelin']
 });
 
@@ -1023,6 +1031,37 @@ window.itemTemplates.cartridgePouch = window.createAmmunition({
       intimidation: 30,
       defense: 15
     }
+  });
+  
+  // Create an imperial pilum - better javelin for legion troops
+  window.itemTemplates.imperialPilum = window.createWeapon({
+    id: 'imperial_pilum',
+    name: 'Imperial Pilum',
+    description: 'A heavy javelin used by Paanic legions, designed to pierce armor and then bend, preventing it from being thrown back.',
+    weaponType: window.WEAPON_TYPES.THROWN,
+    rarity: window.ITEM_RARITIES.UNCOMMON,
+    damage: 15,
+    value: 25,
+    weight: 2.0,
+    stats: {
+      damage: 15,
+      range: 2,
+      armorPenetration: 20
+    },
+    maxDurability: 40 // Designed to bend after one use
+  });
+
+  // Add a pilum bundle for legion units
+  window.itemTemplates.pilumBundle = window.createAmmunition({
+    id: 'pilum_bundle',
+    name: 'Pilum Bundle',
+    description: 'A set of 4 heavy Imperial pilums, standard issue for legionnaires. Each pilum is designed to penetrate armor and shield, then bend on impact to prevent reuse.',
+    ammoType: 'javelin',
+    capacity: 4,
+    symbol: '🔱',
+    value: 45,
+    weight: 4.0,
+    compatibleWeapons: ['imperial_pilum', 'throwing_javelin']
   });
   
   console.log("Item templates initialized:", Object.keys(window.itemTemplates).length);
