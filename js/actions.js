@@ -52,6 +52,18 @@ window.handleAction = function(action) {
     return;
   }
   
+  // Add campaign map handler
+  if (action === 'campaign_map') {
+    // Check if campaign system is initialized first
+    if (!window.campaignSystem.initialize) {
+      console.error("Campaign system not initialized!");
+      return;
+    }
+    
+    window.campaignSystem.showCampaignMap();
+    return;
+  }
+  
   // Handle specific training types
   if (action === 'physical_training' || action === 'mental_training' || 
       action === 'melee_drill' || action === 'ranged_drill' || action === 'squad_exercises') {

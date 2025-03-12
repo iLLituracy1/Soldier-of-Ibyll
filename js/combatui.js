@@ -1,5 +1,4 @@
-// Complete combatUI.js with enhanced status indicators but without equipment status display
-// All elements made more compact to fit more content
+// Complete combatUI.js with enhanced status indicators
 
 // Combat modal and layout styles
 const combatStyles = `
@@ -22,66 +21,103 @@ const combatStyles = `
   background: #1a1a1a;
   border: 2px solid #444;
   border-radius: 8px;
-  padding: 12px; /* Reduced padding */
+  padding: 20px;
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
 }
 
 .combat-title {
   text-align: center;
-  margin-bottom: 6px; /* Reduced margin */
+  margin-bottom: 10px;
   color: #c9aa71;
-  font-size: 1.2em; /* Smaller font */
-}
-
-#combatHeader {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px; /* Reduced margin */
-}
-
-.combat-health-container {
-  width: 45%;
-  display: flex;
-  flex-direction: column;
-}
-
-.combat-health-bar {
-  height: 12px; /* Smaller height */
-  background: #333;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 2px; /* Reduced margin */
-}
-
-#playerCombatHealth, #enemyCombatHealth {
-  height: 100%;
-  width: 100%;
-  transition: width 0.5s;
-}
-
-#playerCombatHealth {
-  background: linear-gradient(to right, #ff5f6d, #ffc371);
-}
-
-#enemyCombatHealth {
-  background: linear-gradient(to right, #8E0E00, #1F1C18);
+  font-size: 1.4em;
 }
 
 .combat-actions {
   display: grid;
-  grid-template-columns: repeat(4, 1fr); /* 4 columns instead of 3 */
-  gap: 5px; /* Smaller gap */
-  margin-top: 10px; /* Reduced margin */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 15px;
 }
 
-/* Status indicators styles - more compact */
+/* Enhanced equipment status section */
+.combat-equipment-status {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+  padding: 8px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+}
+
+.equipment-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px;
+  border-radius: 4px;
+  background: #232c3f;
+  min-width: 100px;
+}
+
+.equipment-name {
+  font-size: 0.8em;
+  color: #c9aa71;
+  margin-bottom: 3px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+
+.equipment-stat {
+  font-size: 0.75em;
+  color: #aaa;
+}
+
+.durability-bar-mini {
+  width: 100%;
+  height: 3px;
+  background: #444;
+  border-radius: 1px;
+  margin-top: 3px;
+  overflow: hidden;
+}
+
+.durability-fill {
+  height: 100%;
+  background: linear-gradient(to right, #ff5f6d, #ffc371);
+}
+
+.durability-good { background: linear-gradient(to right, #56ab2f, #a8e063); }
+.durability-ok { background: linear-gradient(to right, #a8e063, #ffc371); }
+.durability-worn { background: linear-gradient(to right, #ffc371, #ff9966); }
+.durability-poor { background: linear-gradient(to right, #ff9966, #ff5f6d); }
+.durability-critical { background: #ff5f6d; }
+
+@media (max-width: 600px) {
+  .combat-actions {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .combat-equipment-status {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+  }
+  
+  .equipment-item {
+    min-width: 80px;
+  }
+}
+
+/* Status indicators styles */
 .combat-status-indicators {
   display: flex;
   justify-content: center;
-  flex-wrap: wrap; /* Allow wrapping */
-  gap: 10px; /* Reduced gap */
-  margin: 8px 0; /* Reduced margin */
-  padding: 6px; /* Reduced padding */
+  gap: 20px;
+  margin: 15px 0;
+  padding: 10px;
   background: rgba(0,0,0,0.2);
   border-radius: 6px;
 }
@@ -90,30 +126,29 @@ const combatStyles = `
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 70px; /* Smaller min-width */
+  min-width: 80px;
 }
 
 .status-label {
-  font-size: 0.7em; /* Smaller font */
+  font-size: 0.8em;
   color: #888;
-  margin-bottom: 2px; /* Reduced margin */
+  margin-bottom: 5px;
 }
 
 .status-value {
   font-weight: bold;
   color: #c9aa71;
-  font-size: 0.9em; /* Smaller font */
 }
 
 .distance-indicator {
   display: flex;
   align-items: center;
-  gap: 3px; /* Reduced gap */
+  gap: 5px;
 }
 
 .distance-dot {
-  width: 8px; /* Smaller dots */
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: #333;
 }
@@ -123,8 +158,8 @@ const combatStyles = `
 }
 
 .stance-indicator {
-  font-size: 1em; /* Smaller font */
-  padding: 2px 6px; /* Reduced padding */
+  font-size: 1.2em;
+  padding: 3px 8px;
   border-radius: 4px;
 }
 
@@ -143,11 +178,11 @@ const combatStyles = `
 /* Ammunition status styles */
 #ammo-indicator {
   border-left: 2px solid #c9aa71;
-  padding-left: 5px; /* Reduced padding */
+  padding-left: 10px;
 }
 
 #ammo-indicator .status-value {
-  font-size: 1em; /* Smaller font */
+  font-size: 1.2em;
 }
 
 .ammo-counter {
@@ -161,22 +196,21 @@ const combatStyles = `
   border-radius: 3px;
 }
 
-/* Enhanced combat log - Much taller */
+/* Enhanced combat log */
 #combatLog {
   background: #1a1a1a;
   border: 1px solid #333;
-  padding: 8px; /* Reduced padding */
-  height: 350px; /* Fixed height instead of max-height for more consistent display */
+  padding: 10px;
+  max-height: 150px;
   overflow-y: auto;
-  margin: 10px 0; /* Reduced margin */
+  margin: 15px 0;
   border-radius: 4px;
-  line-height: 1.3; /* Tighter line height */
-  font-size: 0.9em; /* Slightly smaller text */
+  line-height: 1.4;
 }
 
 #combatLog p {
-  margin: 3px 0; /* Reduced margin */
-  padding-left: 8px; /* Reduced padding */
+  margin: 4px 0;
+  padding-left: 10px;
   border-left: 2px solid #333;
 }
 
@@ -196,23 +230,21 @@ const combatStyles = `
   border-left-color: #a8e063;
 }
 
-/* Enhanced action buttons - smaller and more compact */
+/* Enhanced action buttons */
 .action-btn {
   background: #2a2a2a;
   color: #e0e0e0;
   border: none;
-  padding: 6px 8px; /* Reduced padding */
+  padding: 8px 10px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
-  font-size: 0.85em; /* Smaller font */
+  font-size: 0.9em;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 40px; /* Reduced height */
-  text-align: center;
-  line-height: 1.2; /* Tighter line height */
+  min-height: 50px;
 }
 
 .action-btn:hover {
@@ -234,9 +266,9 @@ const combatStyles = `
 }
 
 .action-btn .stat-indicator {
-  font-size: 0.7em; /* Smaller font */
+  font-size: 0.75em;
   color: #888;
-  margin-top: 2px; /* Reduced margin */
+  margin-top: 3px;
 }
 
 .action-btn.stance-aggressive {
@@ -249,18 +281,6 @@ const combatStyles = `
 
 .action-btn.targeting {
   border-left: 2px solid #c9aa71;
-}
-
-@media (max-width: 700px) {
-  .combat-actions {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 500px) {
-  .combat-actions {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 `;
 
@@ -295,6 +315,9 @@ window.combatSystem.renderCombatInterface = function() {
     // Adjust the actions container class for better styling
     const actionsContainer = document.getElementById('combatActions');
     actionsContainer.className = 'combat-actions';
+    
+    // Add equipment status section
+    this.addEquipmentStatusSection(combatInterface);
   }
   
   // Show the combat interface
@@ -302,8 +325,147 @@ window.combatSystem.renderCombatInterface = function() {
   combatInterface.classList.remove('hidden');
   modalContainer.style.display = 'flex';
   
-  // Update initial UI elements
+  // Call original function to handle the rest
+  // Not calling original function directly as we've replaced some of its functionality
   this.updateCombatInterface();
+};
+
+// Add equipment status section
+window.combatSystem.addEquipmentStatusSection = function(combatInterface) {
+  // Create equipment status section if it doesn't exist
+  if (!document.querySelector('.combat-equipment-status')) {
+    const equipmentStatus = document.createElement('div');
+    equipmentStatus.className = 'combat-equipment-status';
+    equipmentStatus.id = 'equipmentStatus';
+    
+    // Insert after combat header
+    const combatHeader = document.getElementById('combatHeader');
+    if (combatHeader) {
+      combatHeader.parentNode.insertBefore(equipmentStatus, combatHeader.nextSibling);
+    }
+  }
+  
+  // Update equipment status
+  this.updateEquipmentStatus();
+};
+
+// Update equipment status display
+window.combatSystem.updateEquipmentStatus = function() {
+  const equipmentStatus = document.getElementById('equipmentStatus');
+  if (!equipmentStatus) return;
+  
+  equipmentStatus.innerHTML = '';
+  
+  // Get all equipped items
+  const equippedItems = [];
+  
+  for (const slot in window.player.equipment) {
+    const item = window.player.equipment[slot];
+    if (item && item !== 'occupied') {
+      equippedItems.push({
+        slot: slot,
+        item: item
+      });
+    }
+  }
+  
+  // If no items, show message
+  if (equippedItems.length === 0) {
+    equipmentStatus.innerHTML = '<div class="equipment-item">No equipment</div>';
+    return;
+  }
+  
+  // Add each item
+  equippedItems.forEach(equipped => {
+    const item = equipped.item;
+    const template = item.getTemplate();
+    const slot = equipped.slot;
+    
+    // Create item element
+    const itemElement = document.createElement('div');
+    itemElement.className = 'equipment-item';
+    
+    // Item name
+    const nameElement = document.createElement('div');
+    nameElement.className = 'equipment-name';
+    nameElement.textContent = template.name;
+    itemElement.appendChild(nameElement);
+    
+    // Add appropriate stats based on item type
+    if (template.category === window.ITEM_CATEGORIES.WEAPON) {
+      // For weapons, show damage and armor penetration
+      const damage = template.stats.damage || 0;
+      const armorPen = template.stats.armorPenetration || 0;
+      
+      // Show damage
+      const damageElement = document.createElement('div');
+      damageElement.className = 'equipment-stat';
+      damageElement.textContent = `DMG: ${damage}`;
+      if (armorPen > 0) {
+        damageElement.textContent += ` (AP: ${armorPen})`;
+      }
+      itemElement.appendChild(damageElement);
+      
+      // For shields, show block chance
+      if (template.weaponType?.name === 'Shield') {
+        const blockChance = template.blockChance || 0;
+        const defStanceBonus = this.state.playerStance === 'defensive' ? 15 : 0;
+        
+        const blockElement = document.createElement('div');
+        blockElement.className = 'equipment-stat';
+        blockElement.textContent = `Block: ${blockChance + defStanceBonus}%`;
+        itemElement.appendChild(blockElement);
+      }
+    } 
+    else if (template.category === window.ITEM_CATEGORIES.ARMOR) {
+      // For armor, show defense
+      const defense = template.stats.defense || 0;
+      
+      const defenseElement = document.createElement('div');
+      defenseElement.className = 'equipment-stat';
+      defenseElement.textContent = `DEF: ${defense}`;
+      itemElement.appendChild(defenseElement);
+    }
+    
+    // Show durability if applicable
+    if (item.durability !== undefined) {
+      const durability = item.durability;
+      const maxDurability = template.maxDurability || 100;
+      const durabilityPercent = Math.round((durability / maxDurability) * 100);
+      
+      // Durability text
+      const durabilityElement = document.createElement('div');
+      durabilityElement.className = 'equipment-stat';
+      durabilityElement.textContent = `Dur: ${durabilityPercent}%`;
+      itemElement.appendChild(durabilityElement);
+      
+      // Durability bar
+      const durabilityBarElement = document.createElement('div');
+      durabilityBarElement.className = 'durability-bar-mini';
+      
+      const durabilityFillElement = document.createElement('div');
+      durabilityFillElement.className = 'durability-fill';
+      
+      // Add class based on durability percentage
+      if (durabilityPercent >= 80) {
+        durabilityFillElement.classList.add('durability-good');
+      } else if (durabilityPercent >= 60) {
+        durabilityFillElement.classList.add('durability-ok');
+      } else if (durabilityPercent >= 40) {
+        durabilityFillElement.classList.add('durability-worn');
+      } else if (durabilityPercent >= 20) {
+        durabilityFillElement.classList.add('durability-poor');
+      } else {
+        durabilityFillElement.classList.add('durability-critical');
+      }
+      
+      durabilityFillElement.style.width = `${durabilityPercent}%`;
+      durabilityBarElement.appendChild(durabilityFillElement);
+      itemElement.appendChild(durabilityBarElement);
+    }
+    
+    equipmentStatus.appendChild(itemElement);
+  });
 };
 
 // Also modify the endCombat function to handle modal closing
@@ -325,6 +487,9 @@ window.combatSystem.updateCombatInterface = function() {
   // Call the original function first
   originalUpdateCombatInterface.call(this);
   
+  // Update equipment status
+  this.updateEquipmentStatus();
+  
   // Add or update status indicators
   let statusContainer = document.querySelector('.combat-status-indicators');
   
@@ -332,14 +497,19 @@ window.combatSystem.updateCombatInterface = function() {
     statusContainer = document.createElement('div');
     statusContainer.className = 'combat-status-indicators';
     
-    // Insert after the combat header
-    const combatHeader = document.getElementById('combatHeader');
-    if (combatHeader && combatHeader.nextSibling) {
-      combatHeader.parentNode.insertBefore(statusContainer, combatHeader.nextSibling);
+    // Insert after the equipment status or combat header
+    const equipmentStatus = document.getElementById('equipmentStatus');
+    if (equipmentStatus) {
+      equipmentStatus.parentNode.insertBefore(statusContainer, equipmentStatus.nextSibling);
     } else {
-      const combatInterface = document.getElementById('combatInterface');
-      if (combatInterface) {
-        combatInterface.insertBefore(statusContainer, combatInterface.querySelector('#combatLog'));
+      const combatHeader = document.getElementById('combatHeader');
+      if (combatHeader && combatHeader.nextSibling) {
+        combatHeader.parentNode.insertBefore(statusContainer, combatHeader.nextSibling);
+      } else {
+        const combatInterface = document.getElementById('combatInterface');
+        if (combatInterface) {
+          combatInterface.insertBefore(statusContainer, combatInterface.querySelector('#combatLog'));
+        }
       }
     }
   }
