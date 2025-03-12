@@ -102,11 +102,6 @@ window.updateActionButtons = function() {
         window.addActionButton('Brawler Pits', 'brawler_pits', actionsContainer);
       }
     }
-    
-    // Add campaign button after a few days in game
-    if (window.gameDay >= 3 && !window.gameState.inBattle && !window.gameState.inMission) {
-      window.addActionButton('View Campaign Map', 'campaign_map', actionsContainer);
-    }
   }
 };
 

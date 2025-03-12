@@ -441,21 +441,8 @@ function handleGuardAction() {
 
 // ================= GAME INITIALIZATION BOOTSTRAP =================
 
-// Initialize campaign system
-function initializeCampaignSystem() {
-  if (window.campaignSystem && window.campaignSystem.initialize) {
-    window.campaignSystem.initialize();
-    console.log("Campaign system initialized");
-  } else {
-    console.error("Campaign system not found!");
-  }
-}
-
 // Run initialization when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
   console.log("DOM loaded, initializing game");
   window.initializeGame();
-  
-  // Then initialize campaign system
-  initializeCampaignSystem();
 });
