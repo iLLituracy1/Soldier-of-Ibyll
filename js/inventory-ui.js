@@ -1016,7 +1016,8 @@ window.updateEquipmentDisplay = function() {
       body: null,
       mainHand: null,
       offHand: null,
-      accessory: null
+      accessory: null,
+      ammunition: null // Explicitly initialize ammunition slot to null
     };
     
     // Add mount for cavalry
@@ -1106,7 +1107,7 @@ window.updateEquipmentDisplay = function() {
         <div class="slot-name">${slotName}</div>
       `;
     } else {
-      // Empty slot
+      // Empty slot - SIMPLIFIED AND IDENTICAL FOR ALL EMPTY SLOTS INCLUDING AMMUNITION
       slotElement.innerHTML = `
         <div class="slot-icon">⬚</div>
         <div class="slot-name">${slotName}</div>

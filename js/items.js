@@ -95,7 +95,8 @@ window.WEAPON_TYPES = {
   CROSSBOW: { name: 'Crossbow', symbol: window.ITEM_SYMBOLS.CROSSBOW, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2 },
   DAGGER: { name: 'Dagger', symbol: window.ITEM_SYMBOLS.DAGGER, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1 },
   SHIELD: { name: 'Shield', symbol: window.ITEM_SYMBOLS.SHIELD, slot: window.EQUIPMENT_SLOTS.OFF_HAND, hands: 1 },
-  RIFLE: { name: 'Rifle', symbol: window.ITEM_SYMBOLS.RIFLE, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2 }
+  RIFLE: { name: 'Rifle', symbol: window.ITEM_SYMBOLS.RIFLE, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2 },
+  THROWN: { name: 'Thrown Weapon', symbol: window.ITEM_SYMBOLS.SPEAR, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1, range: 2 }
 };
 
 // Armor Types
@@ -622,6 +623,24 @@ window.initializeItemTemplates = function() {
     maxDurability: 50
   });
 
+  // One-handed axe for Marauders
+  window.itemTemplates.oneHandedAxe = window.createWeapon({
+    id: 'one_handed_axe',
+    name: 'Wyrd Raider Axe',
+    description: 'A vicious single-handed axe favored by Wyrdman raiders. Balanced for both combat and throwing.',
+    weaponType: window.WEAPON_TYPES.AXE, // One-handed axe type
+    rarity: window.ITEM_RARITIES.COMMON,
+    damage: 12,
+    value: 35,
+    stats: {
+      damage: 12,
+      speed: 0,
+      critChance: 7,
+      armorPenetration: 5
+    },
+    maxDurability: 85
+  });
+
   // Ammunition items
 window.itemTemplates.quiver = window.createAmmunition({
   id: 'quiver',
@@ -642,7 +661,7 @@ window.itemTemplates.javelinPack = window.createAmmunition({
   capacity: 6,
   symbol: '🔱',
   value: 30,
-  compatibleWeapons: []
+  compatibleWeapons: ['throwing_javelin']
 });
 
 window.itemTemplates.cartridgePouch = window.createAmmunition({

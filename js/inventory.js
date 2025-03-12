@@ -416,7 +416,7 @@ window.getItemTemplateById = function(templateId) {
   return window.itemTemplates[templateId] || null;
 };
 
-// FIXED: Moved career-specific equipment to a proper function
+// FIX 2: Improved career-specific starting equipment with ammunition
 window.addStartingItems = function() {
   console.log("Adding starting items function called");
   
@@ -486,8 +486,10 @@ window.addStartingItems = function() {
       break;
     
     case "Nesian Scout":
+      // Add appropriate equipment for a scout with ranged weapon
       window.addItemToInventory(window.itemTemplates.matchlockRifle);
       window.addItemToInventory(window.itemTemplates.scoutArmor);
+      window.addItemToInventory(window.itemTemplates.cartridgePouch); // Add ammunition
       
       // Auto-equip items
       setTimeout(() => {
@@ -497,6 +499,9 @@ window.addStartingItems = function() {
           
           const scoutArmor = window.player.inventory.find(i => i.templateId === 'scout_armor');
           if (scoutArmor) window.equipItem(scoutArmor.instanceId);
+          
+          const cartridgePouch = window.player.inventory.find(i => i.templateId === 'cartridge_pouch');
+          if (cartridgePouch) window.equipItem(cartridgePouch.instanceId);
         } catch (err) {
           console.error("Error equipping Scout items:", err);
         }
@@ -523,11 +528,11 @@ window.addStartingItems = function() {
       }, 100);
       break;
       
-    case "Wyrdman":
     case "Plains Huntsman":
-    case "Berserker":
+      // Hunter with a bow - makes thematic sense
       window.addItemToInventory(window.itemTemplates.hunterBow);
       window.addItemToInventory(window.itemTemplates.scoutArmor);
+      window.addItemToInventory(window.itemTemplates.quiver); // Add ammunition
       
       // Auto-equip items
       setTimeout(() => {
@@ -537,8 +542,143 @@ window.addStartingItems = function() {
           
           const scoutArmor = window.player.inventory.find(i => i.templateId === 'scout_armor');
           if (scoutArmor) window.equipItem(scoutArmor.instanceId);
+          
+          const quiver = window.player.inventory.find(i => i.templateId === 'quiver');
+          if (quiver) window.equipItem(quiver.instanceId);
         } catch (err) {
           console.error("Error equipping Huntsman items:", err);
+        }
+      }, 100);
+      break;
+      
+    case "Berserker":
+      // Berserker should have an axe, not a bow!
+      // Using basic_axe template if available, or could fall back to sword
+      if (window.itemTemplates.battleaxe) {
+        window.addItemToInventory(window.itemTemplates.battleaxe);
+      } else {
+        // Create a basic axe if it doesn't exist
+        window.itemTemplates.basicAxe = window.createWeapon({
+          id: 'basic_axe',
+          name: 'Wyrd Battleaxe',
+          description: 'A brutal axe favored by Wyrdman berserkers. Ideal for cleaving through enemies in a rage.',
+          weaponType: window.WEAPON_TYPES.BATTLEAXE,
+          damage: 15,
+          value: 40,
+          stats: {
+            damage: 15,
+            speed: -5,
+            critChance: 10
+          },
+          maxDurability: 80
+        });
+        window.addItemToInventory(window.itemTemplates.basicAxe);
+      }
+      window.addItemToInventory(window.itemTemplates.scoutArmor);
+      
+      // Auto-equip items
+      setTimeout(() => {
+        try {
+          const axe = window.player.inventory.find(i => 
+            i.templateId === 'basic_axe' || i.templateId === 'battleaxe');
+          if (axe) window.equipItem(axe.instanceId);
+          
+          const scoutArmor = window.player.inventory.find(i => i.templateId === 'scout_armor');
+          if (scoutArmor) window.equipItem(scoutArmor.instanceId);
+        } catch (err) {
+          console.error("Error equipping Berserker items:", err);
+        }
+      }, 100);
+      break;
+      
+    case "Wyrdman":
+      // Default Wyrdman gets simpler equipment
+      window.addItemToInventory(window.itemTemplates.basicSword);
+      window.addItemToInventory(window.itemTemplates.scoutArmor);
+      
+      // Auto-equip items
+      setTimeout(() => {
+        try {
+          const basicSword = window.player.inventory.find(i => i.templateId === 'basic_sword');
+          if (basicSword) window.equipItem(basicSword.instanceId);
+          
+          const scoutArmor = window.player.inventory.find(i => i.templateId === 'scout_armor');
+          if (scoutArmor) window.equipItem(scoutArmor.instanceId);
+        } catch (err) {
+          console.error("Error equipping Wyrdman items:", err);
+        }
+      }, 100);
+      break;
+      
+    case "Marauder":
+      // Create a one-handed axe if it doesn't exist
+      if (!window.itemTemplates.oneHandedAxe) {
+        window.itemTemplates.oneHandedAxe = window.createWeapon({
+          id: 'one_handed_axe',
+          name: 'Wyrd Raider Axe',
+          description: 'A vicious single-handed axe favored by Wyrdman raiders. Balanced for both combat and throwing.',
+          weaponType: window.WEAPON_TYPES.AXE, // One-handed axe
+          damage: 12,
+          value: 35,
+          stats: {
+            damage: 12,
+            speed: 0,
+            critChance: 7
+          },
+          maxDurability: 85
+        });
+      }
+      
+      // Add equipment for Marauder: One-handed axe, shield, javelin pack
+      window.addItemToInventory(window.itemTemplates.oneHandedAxe);
+      window.addItemToInventory(window.itemTemplates.legionShield); // Using legion shield or create a specific one
+      window.addItemToInventory(window.itemTemplates.scoutArmor); // Light armor fitting for a raider
+      window.addItemToInventory(window.itemTemplates.javelinPack); // Throwing javelins
+      
+      // Auto-equip items
+      setTimeout(() => {
+        try {
+          const oneHandedAxe = window.player.inventory.find(i => i.templateId === 'one_handed_axe');
+          if (oneHandedAxe) window.equipItem(oneHandedAxe.instanceId);
+          
+          const legionShield = window.player.inventory.find(i => i.templateId === 'legion_shield');
+          if (legionShield) window.equipItem(legionShield.instanceId);
+          
+          const scoutArmor = window.player.inventory.find(i => i.templateId === 'scout_armor');
+          if (scoutArmor) window.equipItem(scoutArmor.instanceId);
+          
+          const javelinPack = window.player.inventory.find(i => i.templateId === 'javelin_pack');
+          if (javelinPack) window.equipItem(javelinPack.instanceId);
+        } catch (err) {
+          console.error("Error equipping Marauder items:", err);
+        }
+      }, 100);
+      break;
+
+    case "Lunarine Marine":
+    case "Marine":
+      // Add equipment for Marine: Paanic Sword, Shield, and javelin pack
+      window.addItemToInventory(window.itemTemplates.basicSword); // Paanic Military Sword
+      window.addItemToInventory(window.itemTemplates.legionShield);
+      window.addItemToInventory(window.itemTemplates.legionArmor); // Standard armor
+      window.addItemToInventory(window.itemTemplates.javelinPack); // Throwing javelins
+      
+      // Auto-equip items
+      setTimeout(() => {
+        try {
+          const basicSword = window.player.inventory.find(i => i.templateId === 'basic_sword');
+          if (basicSword) window.equipItem(basicSword.instanceId);
+          
+          const legionShield = window.player.inventory.find(i => i.templateId === 'legion_shield');
+          if (legionShield) window.equipItem(legionShield.instanceId);
+          
+          const legionArmor = window.player.inventory.find(i => i.templateId === 'legion_armor');
+          if (legionArmor) window.equipItem(legionArmor.instanceId);
+          
+          const javelinPack = window.player.inventory.find(i => i.templateId === 'javelin_pack');
+          if (javelinPack) window.equipItem(javelinPack.instanceId);
+        } catch (err) {
+          console.error("Error equipping Marine items:", err);
         }
       }, 100);
       break;
@@ -567,6 +707,23 @@ window.addStartingItems = function() {
   window.addItemToInventory(window.itemTemplates.healthPotion);
 
   console.log("Starting items added. Player inventory:", window.player.inventory);
+};
+
+// Helper function to ensure proper item equipping
+window.forceEquipItem = function(templateId) {
+  try {
+    const item = window.player.inventory.find(i => i.templateId === templateId);
+    if (item) {
+      console.log(`Force equipping ${templateId}:`, item);
+      return window.equipItem(item.instanceId);
+    } else {
+      console.warn(`Cannot find item ${templateId} in inventory`);
+      return false;
+    }
+  } catch (err) {
+    console.error(`Error force equipping ${templateId}:`, err);
+    return false;
+  }
 };
 
 // Create a global initialization function for the entire inventory system
