@@ -1,0 +1,455 @@
+/* Shieldwall System Styles */
+.shieldwall-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.shieldwall-interface {
+  width: 95%;
+  max-width: 1200px;
+  height: 95vh;
+  max-height: 900px;
+  background: #1a1a1a;
+  border: 2px solid #444;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  grid-template-columns: 1fr 300px;
+  grid-template-areas:
+    "title title"
+    "formation status"
+    "log log"
+    "controls controls"
+    "unit-status unit-status"
+    "actions actions";
+  gap: 15px;
+  color: #e0e0e0;
+  overflow: hidden;
+}
+
+.battle-title {
+  grid-area: title;
+  text-align: center;
+  margin: 0 0 10px 0;
+  color: #c9aa71;
+  font-size: 1.4em;
+}
+
+/* Formation overview */
+.formation-overview {
+  grid-area: formation;
+  background: #1e293b;
+  padding: 15px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.formation-label {
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #aaa;
+  font-size: 0.85em;
+}
+
+.enemy-line, .player-line {
+  margin: 10px 0;
+  position: relative;
+}
+
+.formation-units {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+}
+
+.unit-marker {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7em;
+  font-weight: bold;
+  color: white;
+}
+
+.unit-marker.r {
+  background-color: #8E0E00;
+}
+
+.unit-marker.b {
+  background-color: #4682B4;
+}
+
+.spacing-line {
+  border-top: 1px dotted #666;
+  margin: 10px 0;
+}
+
+.gap-indicator {
+  position: absolute;
+  top: -10px;
+  left: 40%;
+  color: #ff5f6d;
+  font-size: 0.8em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: blink 1s infinite;
+}
+
+.arrow-down {
+  width: 0; 
+  height: 0; 
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid #ff5f6d;
+}
+
+.player-position-marker {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  font-weight: bold;
+  color: #c9aa71;
+}
+
+/* Battle status panel */
+.battle-status-panel {
+  grid-area: status;
+  background: #1e293b;
+  padding: 15px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.battle-phase {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.status-label {
+  font-weight: bold;
+  color: #888;
+  font-size: 0.8em;
+}
+
+.status-label-small {
+  font-size: 0.7em;
+  color: #aaa;
+}
+
+.status-value {
+  font-weight: bold;
+  color: #c9aa71;
+  font-size: 1.1em;
+}
+
+.time-display {
+  font-size: 0.8em;
+  color: #aaa;
+}
+
+.strength-bar-container, .momentum-bar-container {
+  width: 100%;
+  height: 10px;
+  background: #333;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-top: 5px;
+}
+
+.strength-bar {
+  height: 100%;
+  width: 85%;
+  background-color: #a8e063;
+  border-radius: 5px;
+}
+
+.momentum-bar-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.momentum-bar {
+  height: 100%;
+  width: 0%;
+  transition: width 0.3s ease-out;
+}
+
+.momentum-bar.positive {
+  background-color: #a8e063;
+  margin-left: 50%;
+}
+
+.momentum-bar.negative {
+  background-color: #ff5f6d;
+  margin-right: 50%;
+}
+
+.advantage-indicator {
+  text-align: center;
+  font-size: 0.8em;
+  color: #aaa;
+  margin-top: 5px;
+}
+
+.order-display {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.order-value {
+  font-weight: bold;
+  color: #c9aa71;
+  font-size: 1.1em;
+  text-align: center;
+}
+
+.order-progress-bar {
+  width: 100%;
+  height: 5px;
+  background: #a8e063;
+  border-radius: 5px;
+  margin-top: 5px;
+}
+
+/* Battle log */
+.battle-log-container {
+  grid-area: log;
+  width: 100%;
+  max-height: 200px;
+}
+
+.shieldwall-log {
+  height: 100%;
+  overflow-y: auto;
+  padding: 10px;
+  background: #1e293b;
+  border-radius: 8px;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+.shieldwall-log p {
+  margin: 5px 0;
+  padding-left: 10px;
+  border-left: 2px solid #444;
+}
+
+/* Battle controls */
+.battle-controls {
+  grid-area: controls;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 15px;
+}
+
+.player-stance, .reaction-container, .shield-position {
+  background: #1e293b;
+  padding: 10px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.control-label {
+  font-weight: bold;
+  color: #888;
+  font-size: 0.8em;
+  text-align: center;
+}
+
+.stance-display {
+  text-align: center;
+  padding: 10px;
+  border-radius: 5px;
+  font-weight: bold;
+  margin: 0 auto;
+  width: 80%;
+}
+
+.stance-display.balanced {
+  background: rgba(160, 160, 255, 0.2);
+  color: #a0a0ff;
+}
+
+.stance-display.aggressive {
+  background: rgba(255, 95, 109, 0.2);
+  color: #ff5f6d;
+}
+
+.stance-display.defensive {
+  background: rgba(168, 224, 99, 0.2);
+  color: #a8e063;
+}
+
+.stance-buttons, .reaction-options, .shield-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.shieldwall-btn {
+  background: #2a2a2a;
+  color: #e0e0e0;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.shieldwall-btn:hover {
+  background: #3a3a3a;
+  transform: translateY(-2px);
+}
+
+.shieldwall-btn:active {
+  transform: translateY(1px);
+}
+
+.shieldwall-btn.active {
+  background: #3a3a3a;
+  border: 1px solid #c9aa71;
+}
+
+.stance-btn {
+  flex: 1;
+}
+
+.shield-btn {
+  flex: 1;
+}
+
+.reaction-btn {
+  margin: 5px;
+  min-width: 100px;
+}
+
+/* Unit status bars */
+.unit-status-bars {
+  grid-area: unit-status;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  background: #1e293b;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.status-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.unit-bar-container {
+  width: 100%;
+  height: 10px;
+  background: #333;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.unit-bar {
+  height: 100%;
+  width: 85%;
+  border-radius: 5px;
+  transition: width 0.3s ease-out;
+}
+
+.cohesion-bar {
+  background-color: #a8e063;
+}
+
+.health-bar {
+  background-color: #ff5f6d;
+}
+
+.stamina-bar {
+  background-color: #a8e063;
+}
+
+.morale-bar {
+  background-color: #4776E6;
+}
+
+/* Actions section */
+.shieldwall-actions {
+  grid-area: actions;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.action-btn {
+  font-size: 0.9em;
+  padding: 10px 15px;
+}
+
+.large-btn {
+  font-size: 1.1em;
+  padding: 12px 24px;
+  background: #2a623d;
+}
+
+/* Animations */
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1000px) {
+  .battle-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .unit-status-bars {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .shieldwall-interface {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "title"
+      "formation"
+      "status"
+      "log"
+      "controls"
+      "unit-status"
+      "actions";
+  }
+  
+  .battle-controls {
+    grid-template-columns: 1fr;
+  }
+}

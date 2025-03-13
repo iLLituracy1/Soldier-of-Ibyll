@@ -110,8 +110,8 @@ window.initializeQuestTemplates = function() {
       items: ['healthPotion']
     },
     requiredPreparationDays: 1,
-    chanceTrigger: 0.15, // 15% chance per day when eligible
-    minDayToTrigger: 5, // Only available after day 5
+    chanceTrigger: 0.99, // 15% chance per day when eligible
+    minDayToTrigger: 1, // Only available after day 5
     cooldownDays: 5 // Must wait 5 days between assignments of this quest
   };
   
