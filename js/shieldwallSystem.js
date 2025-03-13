@@ -331,6 +331,16 @@ window.shieldwallSystem = {
     // Update UI
     this.updateBattleInterface();
     
+    // ADD THESE LINES:
+    // Update formation display
+    this.updateFormationDisplay();
+    
+    // Add battle effects periodically
+    if (this.state.timePassed % 10 === 0 || 
+        (this.state.currentThreat && !this.state.reactionNeeded)) {
+      this.addBattleEffects();
+    }
+    
     // Handle threat cooldown if active
     if (this.state.threatCooldown > 0) {
       this.state.threatCooldown -= 0.1;
@@ -726,6 +736,10 @@ window.shieldwallSystem = {
     
     // Update UI
     this.updateBattleInterface();
+    
+    // ADD THIS LINE:
+    // Update player marker to reflect stance
+    this.updatePlayerPositionMarker();
   },
   
   // Change stance
@@ -763,6 +777,10 @@ window.shieldwallSystem = {
     
     // Update UI
     this.updateBattleInterface();
+    
+    // ADD THIS LINE:
+    // Update player marker to reflect stance
+    this.updatePlayerPositionMarker();
   },
   
   // Adjust formation cohesion
@@ -1562,6 +1580,10 @@ window.shieldwallSystem = {
     
     // Update UI
     this.updateBattleInterface();
+    
+    // ADD THIS LINE:
+    // Update player position marker
+    this.updatePlayerPositionMarker();
   },
   
   // Add CSS styles for shieldwall system
@@ -2120,6 +2142,161 @@ window.shieldwallSystem = {
         font-weight: bold;
         font-size: 0.8em;
       }
+
+      /* Formation units dynamics */
+      .formation-units {
+        transition: all 0.5s ease;
+        position: relative;
+      }
+
+      .formation-breaking {
+        animation: formation-breaking 2s infinite;
+      }
+
+      @keyframes formation-breaking {
+        0% { transform: translateX(0); }
+        25% { transform: translateX(-3px); }
+        50% { transform: translateX(5px); }
+        75% { transform: translateX(-5px); }
+        100% { transform: translateX(0); }
+      }
+
+      .unit-marker {
+        transition: all 0.3s ease;
+      }
+
+      /* Enhanced gap indicator */
+      .gap-indicator {
+        transition: left 0.5s ease;
+      }
+
+      .critical-gap {
+        animation: critical-gap 1s infinite;
+      }
+
+      @keyframes critical-gap {
+        0% { transform: scale(1); color: #ff5f6d; }
+        50% { transform: scale(1.2); color: #ff0000; }
+        100% { transform: scale(1); color: #ff5f6d; }
+      }
+
+      /* Enhanced player position marker */
+      .player-position-marker {
+        transition: left 0.3s ease;
+        font-size: 1.2em;
+        background-color: rgba(25, 25, 112, 0.6);
+        padding: 2px 5px;
+        border-radius: 50%;
+        font-weight: bold;
+      }
+
+      .player-position-marker.aggressive-stance {
+        color: #ff5f6d;
+        background-color: rgba(139, 0, 0, 0.6);
+      }
+
+      .player-position-marker.defensive-stance {
+        color: #a8e063;
+        background-color: rgba(34, 139, 34, 0.6);
+      }
+
+      /* Battle effects */
+      .battle-effect {
+        position: absolute;
+        z-index: 10;
+        pointer-events: none;
+      }
+
+      .arrow-effect {
+        width: 15px;
+        height: 2px;
+        background-color: #333;
+        position: absolute;
+        animation: arrow-fall 1s forwards;
+      }
+
+      .arrow-effect:before {
+        content: '';
+        position: absolute;
+        top: -3px;
+        right: 0;
+        border-left: 5px solid #333;
+        border-top: 4px solid transparent;
+        border-bottom: 4px solid transparent;
+      }
+
+      @keyframes arrow-fall {
+        0% { transform: translateY(-20px) rotate(110deg); opacity: 1; }
+        80% { opacity: 1; }
+        100% { transform: translateY(100px) rotate(110deg); opacity: 0; }
+      }
+
+      .charge-effect {
+        width: 100%;
+        height: 30px;
+        background: linear-gradient(90deg, transparent, rgba(255, 69, 0, 0.4), transparent);
+        top: 40%;
+        animation: charge-effect 1.5s forwards;
+      }
+
+      @keyframes charge-effect {
+        0% { transform: translateY(-50px); opacity: 0; }
+        20% { opacity: 0.7; }
+        80% { opacity: 0.7; }
+        100% { transform: translateY(50px); opacity: 0; }
+      }
+
+      .flanking-effect {
+        width: 40px;
+        height: 40px;
+        top: 50%;
+        background: radial-gradient(circle, rgba(255, 69, 0, 0.6) 0%, transparent 70%);
+        animation: flanking-effect 2s forwards;
+      }
+
+      @keyframes flanking-effect {
+        0% { transform: translateY(-30px) scale(0.5); opacity: 0; }
+        20% { opacity: 0.8; }
+        80% { opacity: 0.8; transform: scale(1.2); }
+        100% { transform: translateY(30px) scale(0.8); opacity: 0; }
+      }
+
+      .breakthrough-effect {
+        width: 30px;
+        height: 60px;
+        background: radial-gradient(ellipse, rgba(255, 0, 0, 0.6) 0%, transparent 70%);
+        top: 30%;
+        animation: breakthrough-effect 2s forwards;
+      }
+
+      @keyframes breakthrough-effect {
+        0% { transform: scale(0.5); opacity: 0; }
+        20% { opacity: 0.8; }
+        50% { transform: scale(1.5); }
+        100% { transform: translateY(70px) scale(0.8); opacity: 0; }
+      }
+
+      .breaking-effect {
+        width: 100%;
+        height: 40px;
+        background: linear-gradient(180deg, transparent, rgba(255, 0, 0, 0.3), transparent);
+        animation: breaking-effect 2.5s forwards;
+      }
+
+      .breaking-effect.enemy-breaking {
+        top: 20%;
+      }
+
+      .breaking-effect.player-breaking {
+        top: 60%;
+      }
+
+      @keyframes breaking-effect {
+        0% { opacity: 0; }
+        20% { opacity: 0.7; }
+        80% { opacity: 0.7; }
+        100% { opacity: 0; }
+      }
     `;
     
     document.head.appendChild(styleElement);
@@ -2365,6 +2542,276 @@ window.shieldwallSystem = {
     if (button) {
       button.classList.add('button-pulse');
     }
+  },
+  
+  // Update the formation units based on casualties and battle state
+  updateFormationDisplay: function() {
+    // Update enemy formation based on momentum and casualties
+    const enemyUnitsContainer = document.querySelector('.enemy-units');
+    if (enemyUnitsContainer) {
+      const enemyInitialStrength = Math.floor(this.state.unitStrength.max * 1.2); // Assume enemy starts with ~20% more
+      const enemyCurrentStrength = this.calculateEnemyStrength();
+      
+      // Clear and rebuild enemy formation
+      enemyUnitsContainer.innerHTML = this.renderFormationUnits('r', enemyCurrentStrength);
+      
+      // Add visual indicators for breaking enemy formation when momentum is high
+      if (this.state.momentum.value > 60) {
+        enemyUnitsContainer.classList.add('formation-breaking');
+      } else {
+        enemyUnitsContainer.classList.remove('formation-breaking');
+      }
+    }
+    
+    // Update player formation based on current unit strength
+    const playerUnitsContainer = document.querySelector('.player-units');
+    if (playerUnitsContainer) {
+      // Clear and rebuild player formation
+      playerUnitsContainer.innerHTML = this.renderFormationUnits('b', this.state.unitStrength.current);
+      
+      // Add visual indicators for breaking player formation when cohesion is low
+      if (this.state.cohesion.current < 30) {
+        playerUnitsContainer.classList.add('formation-breaking');
+      } else {
+        playerUnitsContainer.classList.remove('formation-breaking');
+      }
+    }
+    
+    // Update player position marker
+    this.updatePlayerPositionMarker();
+    
+    // Update gap indicator
+    this.updateGapIndicator();
+  },
+  
+  // Calculate current enemy strength based on battle progress and momentum
+  calculateEnemyStrength: function() {
+    const enemyInitialStrength = Math.floor(this.state.unitStrength.max * 1.2);
+    
+    // Calculate losses based on momentum (higher momentum = more enemy casualties)
+    const momentumFactor = (this.state.momentum.value + 100) / 200; // Convert -100 to 100 scale to 0-1 scale
+    const casualtyPercentage = momentumFactor * 0.6; // At max momentum, enemy could lose up to 60% strength
+    
+    // Also factor in battle phase
+    let phaseMultiplier = 1.0;
+    switch (this.state.battlePhase) {
+      case "skirmish": phaseMultiplier = 0.1; break; // Few casualties in skirmish
+      case "engagement": phaseMultiplier = 0.4; break; // Some casualties in engagement
+      case "main": phaseMultiplier = 0.8; break; // Many casualties in main phase
+      case "breaking": phaseMultiplier = 1.0; break; // Most casualties in breaking phase
+      case "resolution": phaseMultiplier = 1.0; break; // Most casualties in resolution
+      default: phaseMultiplier = 0.5;
+    }
+    
+    // Calculate adjusted casualties
+    const adjustedCasualties = Math.floor(enemyInitialStrength * casualtyPercentage * phaseMultiplier);
+    
+    // Ensure we don't go below 1 enemy
+    return Math.max(1, enemyInitialStrength - adjustedCasualties);
+  },
+  
+  // Update player position marker
+  updatePlayerPositionMarker: function() {
+    const playerMarker = document.getElementById('playerPosition');
+    if (!playerMarker) return;
+    
+    // Adjust position based on player's file position
+    let leftPosition = 50; // Default center position
+    
+    if (this.state.position.file === 'left') {
+      leftPosition = 20;
+    } else if (this.state.position.file === 'right') {
+      leftPosition = 80;
+    }
+    
+    playerMarker.style.left = `${leftPosition}%`;
+    
+    // Add a visual indicator of the player's stance
+    let markerClass = '';
+    switch (this.state.playerStance) {
+      case 'aggressive': markerClass = 'aggressive-stance'; break;
+      case 'defensive': markerClass = 'defensive-stance'; break;
+      default: markerClass = '';
+    }
+    
+    // Update classes
+    playerMarker.className = 'player-position-marker';
+    if (markerClass) {
+      playerMarker.classList.add(markerClass);
+    }
+  },
+  
+  // Update gap indicator
+  updateGapIndicator: function() {
+    const gapIndicator = document.getElementById('gapIndicator');
+    if (!gapIndicator) return;
+    
+    // Show gap indicator when cohesion is low or specific threats occurred
+    const showGap = this.state.cohesion.current < 40 || 
+                   (this.state.lastThreatType === 'gap' && !this.state.reactionSuccess);
+    
+    if (showGap) {
+      gapIndicator.style.display = 'flex';
+      
+      // Position the gap based on recent threats or randomness
+      let gapPosition = 40; // Default position
+      
+      if (this.state.lastThreatType === 'flanking') {
+        gapPosition = 80; // Gap on the flank
+      } else if (this.state.reactionSuccess === false) {
+        // Position gap away from player when reaction failed
+        gapPosition = this.state.position.file === 'left' ? 60 : 20;
+      } else {
+        // Some randomness in gap position
+        gapPosition = 20 + Math.floor(Math.random() * 60);
+      }
+      
+      gapIndicator.style.left = `${gapPosition}%`;
+      
+      // Critical gap indicator when cohesion is very low
+      if (this.state.cohesion.current < 20) {
+        gapIndicator.classList.add('critical-gap');
+      } else {
+        gapIndicator.classList.remove('critical-gap');
+      }
+    } else {
+      gapIndicator.style.display = 'none';
+    }
+  },
+  
+  // Add battle-specific visual effects to the formation display
+  addBattleEffects: function() {
+    const formationOverview = document.querySelector('.formation-overview');
+    if (!formationOverview) return;
+    
+    // Clear previous battle effects
+    const existingEffects = formationOverview.querySelectorAll('.battle-effect');
+    existingEffects.forEach(effect => effect.remove());
+    
+    // Add effects based on battle phase
+    switch (this.state.battlePhase) {
+      case "skirmish":
+        // Add arrow effects during skirmish
+        this.addArrowEffects(formationOverview);
+        break;
+      case "engagement":
+        // Add charge effects during engagement
+        this.addChargeEffect(formationOverview);
+        break;
+      case "breaking":
+        // Add breaking effects
+        this.addBreakingEffect(formationOverview);
+        break;
+    }
+    
+    // Add effects based on current threat
+    if (this.state.currentThreat) {
+      switch (this.state.currentThreat.type) {
+        case "projectiles":
+          this.addArrowEffects(formationOverview);
+          break;
+        case "flanking":
+          this.addFlankingEffect(formationOverview);
+          break;
+        case "breakthrough":
+          this.addBreakthroughEffect(formationOverview);
+          break;
+      }
+    }
+  },
+  
+  // Add arrow volley effects
+  addArrowEffects: function(container) {
+    // Create 8-12 arrows at random positions
+    const arrowCount = 8 + Math.floor(Math.random() * 5);
+    
+    for (let i = 0; i < arrowCount; i++) {
+      const arrow = document.createElement('div');
+      arrow.className = 'battle-effect arrow-effect';
+      
+      // Random position
+      arrow.style.left = `${10 + Math.random() * 80}%`;
+      arrow.style.top = `${20 + Math.random() * 20}%`;
+      
+      // Random rotation
+      const rotation = 100 + Math.random() * 30;
+      arrow.style.transform = `rotate(${rotation}deg)`;
+      
+      container.appendChild(arrow);
+      
+      // Remove after animation completes
+      setTimeout(() => {
+        arrow.remove();
+      }, 1000 + Math.random() * 500);
+    }
+  },
+  
+  // Add charge effect
+  addChargeEffect: function(container) {
+    const charge = document.createElement('div');
+    charge.className = 'battle-effect charge-effect';
+    
+    container.appendChild(charge);
+    
+    // Remove after animation completes
+    setTimeout(() => {
+      charge.remove();
+    }, 1500);
+  },
+  
+  // Add flanking effect
+  addFlankingEffect: function(container) {
+    const flank = document.createElement('div');
+    flank.className = 'battle-effect flanking-effect';
+    
+    // Position on right or left flank
+    const onRight = Math.random() > 0.5;
+    flank.style.left = onRight ? '80%' : '10%';
+    
+    container.appendChild(flank);
+    
+    // Remove after animation completes
+    setTimeout(() => {
+      flank.remove();
+    }, 2000);
+  },
+  
+  // Add breakthrough effect
+  addBreakthroughEffect: function(container) {
+    const breakthrough = document.createElement('div');
+    breakthrough.className = 'battle-effect breakthrough-effect';
+    
+    // Random position along the line
+    breakthrough.style.left = `${20 + Math.random() * 60}%`;
+    
+    container.appendChild(breakthrough);
+    
+    // Remove after animation completes
+    setTimeout(() => {
+      breakthrough.remove();
+    }, 2000);
+  },
+  
+  // Add breaking effect
+  addBreakingEffect: function(container) {
+    // Determine which side is breaking based on momentum
+    const playerBreaking = this.state.momentum.value < -30;
+    
+    const breaking = document.createElement('div');
+    breaking.className = 'battle-effect breaking-effect';
+    
+    if (playerBreaking) {
+      breaking.classList.add('player-breaking');
+    } else {
+      breaking.classList.add('enemy-breaking');
+    }
+    
+    container.appendChild(breaking);
+    
+    // Remove after animation completes
+    setTimeout(() => {
+      breaking.remove();
+    }, 2500);
   }
 };
 

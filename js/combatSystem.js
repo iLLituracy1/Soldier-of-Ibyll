@@ -110,6 +110,11 @@ window.combatSystem = {
       nextAction: null
     };
     
+    // Properly clone ammunition data if present
+    if (template.ammunition) {
+      enemy.ammunition = JSON.parse(JSON.stringify(template.ammunition));
+    }
+    
     return enemy;
   },
   
@@ -121,8 +126,15 @@ window.combatSystem = {
     // If we're in a counter window, don't change phases normally
     if (this.state.counterWindowOpen && phase !== "initial" && phase !== "resolution") {
       if (this.state.lastCounterActor === "player") {
+        // NEW: Check if enemy is defeated before counter
+        if (this.isEnemyDefeated()) {
+          this.state.counterWindowOpen = false;
+          this.enterPhase("resolution");
+          return;
+        }
+        
         // Enemy should counter
-        setTimeout(() => this.handleEnemyCounter(), 1000);
+        this.scheduleEnemyAction(() => this.handleEnemyCounter(), 1000);
         return;
       } else if (this.state.lastCounterActor === "enemy") {
         // Show player counter options
@@ -134,7 +146,7 @@ window.combatSystem = {
     switch(phase) {
       case "initial":
         // Handle intro narrative and setup
-        setTimeout(() => this.enterPhase("player"), 1000);
+        this.scheduleEnemyAction(() => this.enterPhase("player"), 1000);
         break;
         
       case "player":
@@ -143,8 +155,14 @@ window.combatSystem = {
         break;
         
       case "enemy":
+        // NEW: Check if enemy is already defeated before processing turn
+        if (this.isEnemyDefeated()) {
+          console.log("Enemy already defeated, skipping to resolution");
+          this.enterPhase("resolution");
+          return;
+        }
         // Process enemy turn
-        setTimeout(() => this.processEnemyTurn(), 1000);
+        this.scheduleEnemyAction(() => this.processEnemyTurn(), 1000);
         break;
         
       case "resolution":
@@ -235,6 +253,14 @@ window.combatSystem = {
       actionProbabilities.attack = 0.3;
     }
     
+    // NEW: Prioritize javelin throws at medium range if ammo available
+    if (this.state.distance === 2 && this.enemyHasAmmo('javelin')) {
+      // At medium range with javelins, more likely to attack
+      actionProbabilities.attack = 0.8;
+      actionProbabilities.distance = 0.1;
+      actionProbabilities.stance = 0.1;
+    }
+    
     // Roll for action type
     const roll = Math.random();
     let actionType = "attack"; // Default
@@ -268,6 +294,15 @@ window.combatSystem = {
         };
       
       case "attack":
+        // NEW: Check for javelin throw opportunity at medium range
+        if (this.state.distance === 2 && this.enemyHasAmmo('javelin')) {
+          return {
+            type: "attack",
+            attackType: "ThrowJavelin",
+            targetArea: this.getRandomTargetArea()
+          };
+        }
+        
         // Can only attack if in range
         if (this.state.distance > (enemy.weaponRange || 1)) {
           // Too far, adjust distance instead
@@ -698,9 +733,71 @@ window.combatSystem = {
   handleEnemyAttack: function(attackType, targetArea) {
     const enemy = this.state.enemy;
     
-    // Generate attack narrative
+    // NEW: Special handling for javelin throws
+    if (attackType === "ThrowJavelin") {
+      // Check if enemy has javelins and is at a valid range
+      if (!this.enemyHasAmmo('javelin') || this.state.distance !== 2) {
+        // Fallback to standard attack if can't throw javelin
+        this.addCombatMessage(`The ${enemy.name} reaches for a javelin but has none left.`);
+        attackType = this.getRandomEnemyAttack();
+      } else {
+        // Use a javelin
+        this.useEnemyAmmo('javelin');
+        
+        const javelinName = enemy.ammunition.javelin.name || "javelin";
+        this.addCombatMessage(`The ${enemy.name} hurls a ${javelinName} at you!`);
+        
+        // Check for player shield block
+        if (this.checkPlayerShieldBlock()) {
+          // Attack was blocked by player's shield
+          this.addCombatMessage(`You raise your shield just in time, deflecting the javelin completely!`);
+          // No counter opportunity after successful block
+          return;
+        }
+        
+        // Calculate hit chance (javelins slightly less accurate than melee)
+        const hitChance = 45 + (enemy.accuracy || 0) - (window.player.skills?.melee * 4 || 0);
+        const hitRoll = Math.random() * 100;
+        
+        if (hitRoll < hitChance) {
+          // Javelin hits - calculate damage
+          const damageBonus = enemy.ammunition.javelin.damageBonus || 0;
+          const baseDamage = (enemy.power || 5) + damageBonus;
+          const damage = Math.round(baseDamage * (1 + Math.random() * 0.4 - 0.2));
+          
+          // Apply damage to player
+          window.gameState.health = Math.max(0, window.gameState.health - damage);
+          
+          // Generate hit narrative
+          this.addCombatMessage(`The javelin strikes you in the ${this.targetLabels[targetArea]}, dealing ${damage} damage!`);
+          
+          // Reduce armor durability if hit
+          this.reducePlayerArmorDurability(targetArea, 2); // Javelins cause more armor damage
+          
+          // Check if player is defeated
+          if (window.gameState.health <= 0) {
+            this.addCombatMessage(`You've been critically wounded and can no longer fight.`);
+            // End combat
+            setTimeout(() => this.endCombat(false), 1500);
+            return;
+          }
+        } else {
+          // Javelin misses
+          this.addCombatMessage(`You dodge to the side as the javelin flies past you!`);
+          
+          // No counter chance for ranged attacks
+        }
+        
+        // Update UI and return - don't process normal attacks after javelin
+        this.updateCombatInterface();
+        return;
+      }
+    }
+    
+    // Normal attack handling if not a javelin or javelin failed
     this.addCombatMessage(`The ${enemy.name} attacks your ${this.targetLabels[targetArea]}!`);
     
+    // Rest of original handleEnemyAttack code remains the same...
     // Check for player shield block
     if (this.checkPlayerShieldBlock()) {
       // Attack was blocked by player's shield
@@ -726,7 +823,7 @@ window.combatSystem = {
       // Generate hit narrative
       this.addCombatMessage(`The attack lands, dealing ${damage} damage!`);
       
-      // Reduce armor durability if hit (NEW)
+      // Reduce armor durability if hit
       this.reducePlayerArmorDurability(targetArea, 1);
       
       // Reset counter chain after successful hit
@@ -1376,6 +1473,25 @@ window.combatSystem = {
       document.getElementById('enemyName').textContent = this.state.enemy.name;
       document.getElementById('enemyHealthDisplay').textContent = `${Math.round(this.state.enemy.health)} HP`;
       document.getElementById('enemyCombatHealth').style.width = `${(this.state.enemy.health / this.state.enemy.maxHealth) * 100}%`;
+      
+      // NEW: Add javelin count display if enemy has javelins
+      const enemyStatsElement = document.getElementById('enemyStats');
+      if (enemyStatsElement && this.state.enemy.ammunition && this.state.enemy.ammunition.javelin) {
+        const javelinCount = this.state.enemy.ammunition.javelin.current;
+        
+        // Check if javelin element already exists
+        let javelinElement = document.getElementById('enemyJavelinCount');
+        if (!javelinElement) {
+          // Create javelin count display
+          javelinElement = document.createElement('div');
+          javelinElement.id = 'enemyJavelinCount';
+          javelinElement.className = 'enemy-equipment';
+          enemyStatsElement.appendChild(javelinElement);
+        }
+        
+        // Update javelin count text
+        javelinElement.textContent = `Javelins: ${javelinCount}`;
+      }
     }
     
     // Combat log is updated via addCombatMessage
@@ -1643,9 +1759,21 @@ window.combatSystem = {
   
   // Get random enemy attack
   getRandomEnemyAttack: function() {
-    // For now, just return a basic attack type
-    const attacks = ["Strike", "Slash", "Stab"];
-    return attacks[Math.floor(Math.random() * attacks.length)];
+    const enemy = this.state.enemy;
+    
+    // Different attack options based on distance
+    if (this.state.distance <= 1) {
+      // Melee range attacks
+      const meleeAttacks = ["Strike", "Slash", "Stab"];
+      return meleeAttacks[Math.floor(Math.random() * meleeAttacks.length)];
+    } else if (this.state.distance === 2 && this.enemyHasAmmo('javelin')) {
+      // Medium range with javelins available
+      return "ThrowJavelin";
+    } else {
+      // Default attacks
+      const basicAttacks = ["Strike", "Slash", "Stab"];
+      return basicAttacks[Math.floor(Math.random() * basicAttacks.length)];
+    }
   },
   
   // Get random target area
@@ -1993,6 +2121,57 @@ window.combatSystem = {
   // Add the isEnemyDefeated helper method
   isEnemyDefeated: function() {
     return this.state.enemy && this.state.enemy.health <= 0;
+  },
+  
+  // Add a helper that stores and manages enemy action timeouts
+  _enemyActionTimeout: null,
+  
+  // Override setTimeout for enemy actions with a wrapper that tracks the timeout ID
+  scheduleEnemyAction: function(callback, delay) {
+    // Clear any existing timeout
+    if (this._enemyActionTimeout) {
+      clearTimeout(this._enemyActionTimeout);
+    }
+    
+    // Create a new timeout and store its ID
+    this._enemyActionTimeout = setTimeout(() => {
+      // Check if enemy is defeated before executing the action
+      if (this.isEnemyDefeated()) {
+        console.log("Enemy already defeated, cancelling scheduled action");
+        this.enterPhase("resolution");
+      } else {
+        callback();
+      }
+      this._enemyActionTimeout = null;
+    }, delay);
+    
+    return this._enemyActionTimeout;
+  },
+  
+  // Add a function to check enemy ammunition
+  enemyHasAmmo: function(ammoType) {
+    const enemy = this.state.enemy;
+    if (!enemy || !enemy.ammunition || !enemy.ammunition[ammoType]) {
+      return false;
+    }
+    
+    return enemy.ammunition[ammoType].current > 0;
+  },
+  
+  // Add a function to use enemy ammunition
+  useEnemyAmmo: function(ammoType) {
+    const enemy = this.state.enemy;
+    if (!this.enemyHasAmmo(ammoType)) {
+      return false;
+    }
+    
+    // Reduce ammo count
+    enemy.ammunition[ammoType].current--;
+    
+    // Log for debugging
+    console.log(`Enemy used 1 ${ammoType}. Remaining: ${enemy.ammunition[ammoType].current}`);
+    
+    return true;
   }
 };
 
@@ -2024,7 +2203,15 @@ window.ENEMY_TEMPLATES = {
     
     // Equipment reference (for narrative purposes)
     weapon: "War Axe and Javelin",
-    armor: "Chainmail and Shield"
+    armor: "Chainmail and Shield",
+    ammunition: {
+      javelin: {
+        current: 3,
+        max: 3,
+        name: "Arrasi Javelin",
+        damageBonus: 2
+      }
+    }
   },
   
   IMPERIAL_DESERTER: {
@@ -2053,7 +2240,15 @@ window.ENEMY_TEMPLATES = {
     
     // Equipment reference
     weapon: "Military Sword",
-    armor: "Legion Armor"
+    armor: "Legion Armor",
+    ammunition: {
+      javelin: {
+        current: 1,
+        max: 1,
+        name: "Light Javelin",
+        damageBonus: 0
+      }
+    }
   },
   
   ARRASI_DRUSKARI: {
