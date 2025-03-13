@@ -1,5 +1,5 @@
-// shieldwallSystem.js - Formation-based combat system for large-scale battles
-// Fixes critical bugs and improves functionality
+// shieldwallSystem.js - Enhanced formation-based combat system for large-scale battles
+// Incorporates visual indicators, improved timing, and balanced combat flow
 
 // Main shieldwall system object - contains all state and methods
 window.shieldwallSystem = {
@@ -7,7 +7,7 @@ window.shieldwallSystem = {
   initialized: false,
   state: {
     active: false,
-    battlePhase: "preparation", // preparation, skirmish, engagement, main, breaking, pursuit
+    battlePhase: "preparation", // preparation, skirmish, engagement, main, breaking, resolution
     timePassed: 0, // Time elapsed in battle (seconds)
     enemyName: "Arrasi Forces", // Name of enemy force
     
@@ -48,12 +48,88 @@ window.shieldwallSystem = {
     reactionTimeRemaining: 0, // Time to react to current threat
     reactionNeeded: false,
     reactionSuccess: false,
+    lastThreatType: null, // Track last threat to avoid repetition
+    threatCooldown: 0, // Cooldown between threats
     
     // Battle log for narrative
     battleLog: [],
     
     // Callback for when battle ends
     onBattleEnd: null
+  },
+  
+  // Enhanced threat definitions with visual indicators and longer reaction times
+  threatTypes: {
+    projectiles: {
+      emoji: "🏹", // Bow and arrow
+      color: "#FFD700", // Gold
+      description: "A volley of arrows darkens the sky, arcing toward your position!",
+      target: "formation",
+      bestReaction: "brace",
+      bestShieldPosition: "high",
+      timeToReact: 12, // Extended from 5s to 12s
+      criticalThreat: false
+    },
+    charge: {
+      emoji: "⚔️", // Crossed swords
+      color: "#FF4500", // OrangeRed
+      description: "Enemy warriors charge toward your section of the line!",
+      target: "player",
+      bestReaction: "brace",
+      bestShieldPosition: "center",
+      timeToReact: 10, // Extended from 4s to 10s
+      criticalThreat: false
+    },
+    gap: {
+      emoji: "⚠️", // Warning sign
+      color: "#FF6347", // Tomato
+      description: "A gap is forming in the line as soldiers to your left fall!",
+      target: "formation",
+      bestReaction: "step to gap",
+      bestShieldPosition: "center",
+      timeToReact: 10, // Extended from 3s to 10s
+      criticalThreat: false
+    },
+    flanking: {
+      emoji: "↪️", // Right arrow curving up
+      color: "#9370DB", // MediumPurple
+      description: "Enemy soldiers are attempting to flank your unit!",
+      target: "formation",
+      bestReaction: "adjust position",
+      bestShieldPosition: "center",
+      timeToReact: 12, // Extended from 4s to 12s
+      criticalThreat: false
+    },
+    spears: {
+      emoji: "🔱", // Trident
+      color: "#4682B4", // SteelBlue
+      description: "Enemy spearmen thrust forward toward your shield!",
+      target: "player",
+      bestReaction: "brace",
+      bestShieldPosition: "low",
+      timeToReact: 8, // Still relatively quick but more reasonable
+      criticalThreat: true
+    },
+    officer: {
+      emoji: "👑", // Crown
+      color: "#DC143C", // Crimson
+      description: "An enemy officer is issuing a rallying cry to his troops!",
+      target: "formation",
+      bestReaction: "attack",
+      bestShieldPosition: "center",
+      timeToReact: 12, // Extended from 4s to 12s
+      criticalThreat: false
+    },
+    breakthrough: {
+      emoji: "💥", // Collision
+      color: "#B22222", // FireBrick
+      description: "Enemy soldiers have broken through nearby! Immediate action required!",
+      target: "player",
+      bestReaction: "attack",
+      bestShieldPosition: "center",
+      timeToReact: 6, // One of the few threats that needs quick reaction
+      criticalThreat: true
+    }
   },
   
   // Initialize the system
@@ -68,7 +144,16 @@ window.shieldwallSystem = {
       this.addShieldwallStyles();
     }
     
+    // Add enhanced styles for visual feedback
+    this.addEnhancedStyles();
+    
+    // Initialize shieldwall outcome queue
+    if (!window.shieldwallOutcomeQueue) {
+      window.shieldwallOutcomeQueue = [];
+    }
+    
     console.log("Shieldwall system initialized");
+    return true;
   },
   
   // Start a shieldwall battle
@@ -184,6 +269,8 @@ window.shieldwallSystem = {
       reactionTimeRemaining: 0,
       reactionNeeded: false,
       reactionSuccess: false,
+      lastThreatType: null,
+      threatCooldown: 0,
       
       battleLog: [],
       
@@ -244,20 +331,38 @@ window.shieldwallSystem = {
     // Update UI
     this.updateBattleInterface();
     
-    // Generate threat if no current threat and no reaction needed
-    if (!this.state.currentThreat && !this.state.reactionNeeded) {
-      if (Math.random() < 0.2) { // 20% chance of new threat each second
-        this.generateThreat();
-      }
+    // Handle threat cooldown if active
+    if (this.state.threatCooldown > 0) {
+      this.state.threatCooldown -= 0.1;
     }
     
-    // Handle reaction timing
+    // Update reaction timer if active
     if (this.state.reactionNeeded) {
-      this.state.reactionTimeRemaining -= 0.1; // Decrease time (if called every 100ms)
+      this.state.reactionTimeRemaining -= 0.1;
+      
+      // Update timer display
+      const label = document.querySelector('.reaction-container .control-label');
+      if (label && label.querySelector('.threat-timer')) {
+        label.querySelector('.threat-timer').textContent = `(${Math.ceil(this.state.reactionTimeRemaining)}s)`;
+      }
       
       // Out of time to react
       if (this.state.reactionTimeRemaining <= 0) {
         this.handleReactionTimeout();
+      }
+    }
+    
+    // Generate threat if no current threat, no reaction needed, and no cooldown
+    if (!this.state.currentThreat && !this.state.reactionNeeded && (!this.state.threatCooldown || this.state.threatCooldown <= 0)) {
+      // Adjust threat chance based on battle phase
+      let threatChance = 0.07; // Lower base chance for more pacing (7% per second)
+      
+      if (this.state.battlePhase === "main" || this.state.battlePhase === "breaking") {
+        threatChance = 0.1; // 10% chance in intense phases
+      }
+      
+      if (Math.random() < threatChance) {
+        this.generateThreat();
       }
     }
     
@@ -275,65 +380,69 @@ window.shieldwallSystem = {
   
   // Generate a new threat that requires player reaction
   generateThreat: function() {
-    const threats = [
-      {
-        type: "projectiles",
-        description: "A volley of arrows darkens the sky, arcing toward your position!",
-        target: "formation",
-        bestReaction: "brace",
-        bestShieldPosition: "high",
-        timeToReact: 5
-      },
-      {
-        type: "charge",
-        description: "Enemy warriors charge toward your section of the line!",
-        target: "player",
-        bestReaction: "brace",
-        bestShieldPosition: "center",
-        timeToReact: 4
-      },
-      {
-        type: "gap",
-        description: "A gap is forming in the line as soldiers to your left fall!",
-        target: "formation",
-        bestReaction: "step to gap",
-        bestShieldPosition: "center",
-        timeToReact: 3
-      },
-      {
-        type: "flanking",
-        description: "Enemy soldiers are attempting to flank your unit!",
-        target: "formation",
-        bestReaction: "adjust position",
-        bestShieldPosition: "center",
-        timeToReact: 4
-      }
-    ];
+    // Get all threat types as an array
+    const threatsList = Object.entries(this.threatTypes).map(([type, threat]) => {
+      return { type, ...threat };
+    });
     
-    // Select a random threat based on battle phase
-    const availableThreats = threats.filter(threat => {
-      if (this.state.battlePhase === "skirmish" && threat.type === "projectiles") return true;
-      if (this.state.battlePhase === "engagement" && (threat.type === "charge" || threat.type === "gap")) return true;
-      if (this.state.battlePhase === "main" || this.state.battlePhase === "breaking") return true;
+    // Filter threats based on battle phase
+    const availableThreats = threatsList.filter(threat => {
+      if (this.state.battlePhase === "skirmish" && ["projectiles"].includes(threat.type)) return true;
+      if (this.state.battlePhase === "engagement" && ["charge", "projectiles", "spears"].includes(threat.type)) return true;
+      if (this.state.battlePhase === "main") return true; // All threats possible in main phase
+      if (this.state.battlePhase === "breaking" && ["gap", "flanking", "charge", "breakthrough"].includes(threat.type)) return true;
       return false;
     });
     
     // If no applicable threats, don't generate one
     if (availableThreats.length === 0) return;
     
+    // Avoid repeating the same threat type twice in a row
+    const filteredThreats = this.state.lastThreatType ? 
+      availableThreats.filter(t => t.type !== this.state.lastThreatType) : 
+      availableThreats;
+    
+    // If we filtered out all threats, use the original list
+    const threatsToUse = filteredThreats.length > 0 ? filteredThreats : availableThreats;
+    
     // Select a random threat from the filtered list
-    const threat = availableThreats[Math.floor(Math.random() * availableThreats.length)];
+    const threat = threatsToUse[Math.floor(Math.random() * threatsToUse.length)];
+    
+    // Store the last threat type to avoid repetition
+    this.state.lastThreatType = threat.type;
+    
+    // Set the current threat
     this.state.currentThreat = threat;
     this.state.reactionNeeded = true;
     this.state.reactionTimeRemaining = threat.timeToReact;
     
-    // Show the threat in the battle log
-    this.addBattleMessage(threat.description);
+    // Get emoji for threat (fallback to ⚠️ if none defined)
+    const emoji = threat.emoji || "⚠️";
     
-    // Show reaction options
+    // Show the threat in the battle log with emoji
+    this.addBattleMessage(`${emoji} ${threat.description}`);
+    
+    // Flash the battle log to draw attention
+    this.flashBattleLog();
+    
+    // Show reaction options with enhanced visual cues
     this.updateReactionOptions();
     
     console.log("Generated threat:", threat);
+  },
+  
+  // Flash the battle log to draw attention to new threats
+  flashBattleLog: function() {
+    const battleLog = document.getElementById('shieldwallLog');
+    if (!battleLog) return;
+    
+    // Add flash class
+    battleLog.classList.add('battle-log-flash');
+    
+    // Remove after animation completes
+    setTimeout(() => {
+      battleLog.classList.remove('battle-log-flash');
+    }, 1000);
   },
   
   // Handle player reaction to threat
@@ -356,9 +465,26 @@ window.shieldwallSystem = {
     if (correctReaction) successChance += 0.3; // +30% for correct reaction
     if (correctShieldPosition) successChance += 0.2; // +20% for correct shield position
     
+    // Modify based on player stance
+    if (this.state.playerStance === "aggressive" && reactionType === "attack") {
+      successChance += 0.1; // Aggressive stance helps with attacks
+    } else if (this.state.playerStance === "defensive" && reactionType === "brace") {
+      successChance += 0.1; // Defensive stance helps with bracing
+    }
+    
     // Modify based on player skills (if available in game state)
     if (window.player && window.player.skills) {
-      successChance += (window.player.skills.discipline || 0) * 0.02; // +2% per discipline point
+      // Discipline helps with all reactions
+      successChance += (window.player.skills.discipline || 0) * 0.01; // +1% per discipline point
+      
+      // Specific skills help with specific reactions
+      if (reactionType === "attack" && window.player.skills.melee) {
+        successChance += window.player.skills.melee * 0.01; // +1% per melee skill point
+      }
+      
+      if (reactionType === "step to gap" && window.player.skills.tactics) {
+        successChance += window.player.skills.tactics * 0.01; // +1% per tactics skill point
+      }
     }
     
     // Cap success chance
@@ -372,39 +498,79 @@ window.shieldwallSystem = {
     let responseMessage = "";
     
     if (success) {
+      // Handle successful reactions
       switch (reactionType) {
         case "brace":
-          responseMessage = `You brace firmly, your shield positioned perfectly against the ${threat.type === "projectiles" ? "incoming volley" : "enemy charge"}. Your section of the line holds strong!`;
+          if (threat.type === "projectiles") {
+            responseMessage = "You raise your shield high, angling it perfectly to deflect the incoming arrows. The deadly rain hammers against your shield, but you stand firm.";
+          } else if (threat.type === "charge") {
+            responseMessage = "You plant your feet and brace your shield firmly as the enemy charges. The impact is jarring, but your stance holds and you push back against the attacker.";
+          } else if (threat.type === "spears") {
+            responseMessage = "You angle your shield downward, deflecting the thrusting spears. The spearheads scrape harmlessly off your shield's surface.";
+          } else {
+            responseMessage = `You brace firmly, your shield positioned perfectly against the ${threat.type}. Your section of the line holds strong!`;
+          }
           break;
         case "step to gap":
-          responseMessage = "You quickly step to fill the gap in the formation. Your swift action prevents the enemy from exploiting the weakness!";
+          responseMessage = "You quickly step into the gap forming in your line, shield raised to protect both yourself and your exposed flank. Your swift action prevents the enemy from exploiting the weakness!";
           break;
         case "adjust position":
-          responseMessage = "You adjust your position, helping your unit maintain formation against the flanking maneuver!";
+          responseMessage = "Reading the enemy movement, you shift your position and signal to your comrades. The unit adjusts formation just in time to counter the flanking maneuver!";
           break;
         case "attack":
-          responseMessage = "You strike at the perfect moment, catching an enemy soldier off-guard! Your counterattack drives them back.";
+          if (threat.type === "officer") {
+            responseMessage = "You spot an opening and lunge forward, striking at the enemy officer. Your attack disrupts his leadership, throwing the enemy advance into momentary confusion!";
+          } else {
+            responseMessage = "You find the perfect opening and strike with precision, catching an enemy soldier off-guard! Your counterattack drives them back, giving your line breathing room.";
+          }
+          break;
+        case "shield cover":
+          responseMessage = "You extend your shield to cover not just yourself but also your comrade's exposed flank. Together, you form an impenetrable barrier against the incoming threat.";
           break;
         default:
           responseMessage = "Your quick reaction succeeds!";
       }
       
       // Update cohesion and momentum
-      this.adjustCohesion(+5);
+      const cohesionBonus = correctReaction && correctShieldPosition ? 7 : 5;
+      this.adjustCohesion(cohesionBonus);
       this.adjustMomentum(+10);
+      
+      // Boost stamina loss but at a much lower rate than damage
+      if (this.playerStats) {
+        const staminaLoss = Math.floor(Math.random() * 3) + 2; // 2-4 stamina loss
+        this.playerStats.stamina = Math.max(1, this.playerStats.stamina - staminaLoss);
+        
+        // Sync with main game state
+        if (window.gameState) {
+          window.gameState.stamina = this.playerStats.stamina;
+        }
+      }
     } else {
+      // Handle failed reactions
       switch (reactionType) {
         case "brace":
-          responseMessage = `Your bracing is too late or poorly positioned. The ${threat.type === "projectiles" ? "volley strikes hard" : "enemy charge impacts"}, causing your section to falter!`;
+          if (threat.type === "projectiles") {
+            responseMessage = "Your shield position is too low, leaving you exposed to the arrow volley. Several shafts find gaps in your defense, striking nearby soldiers and grazing your shoulder.";
+          } else if (threat.type === "charge") {
+            responseMessage = "Your footing slips as you attempt to brace, leaving you vulnerable to the enemy charge. The impact knocks you back into your comrades, disrupting your unit's line.";
+          } else if (threat.type === "spears") {
+            responseMessage = "You fail to angle your shield correctly, allowing an enemy spear to slip past your guard. The thrust catches you painfully along the arm.";
+          } else {
+            responseMessage = `Your bracing is too late or poorly positioned. The ${threat.type} breaks through your defense, causing your section to falter!`;
+          }
           break;
         case "step to gap":
-          responseMessage = "You move to fill the gap, but stumble against a fellow soldier. The gap widens as enemy soldiers press the advantage!";
+          responseMessage = "You attempt to fill the gap but misjudge the timing. You stumble against a fellow soldier, creating further confusion. The gap widens as enemy soldiers press the advantage!";
           break;
         case "adjust position":
-          responseMessage = "Your adjustment is too slow, leaving a vulnerable point that the enemy quickly exploits!";
+          responseMessage = "Your adjustment is too slow and poorly communicated to your comrades. The enemy exploits the confusion, driving a wedge into your formation!";
           break;
         case "attack":
-          responseMessage = "Your attack is poorly timed, leaving you exposed. An enemy soldier counters, forcing you back into the line!";
+          responseMessage = "Your attack is poorly timed and overextended. An enemy soldier parries your strike and counters, forcing you back into the line!";
+          break;
+        case "shield cover":
+          responseMessage = "You try to extend your shield to protect your comrade but leave yourself exposed. The enemy targets your vulnerability, striking before you can recover your position.";
           break;
         default:
           responseMessage = "Your reaction fails!";
@@ -416,7 +582,7 @@ window.shieldwallSystem = {
       
       // If it's a personal attack, reduce health
       if (threat.target === "player" && this.playerStats) {
-        const damageTaken = Math.floor(Math.random() * 8) + 5; // 5-12 damage
+        const damageTaken = Math.floor(Math.random() * 6) + 3; // 3-8 damage (reduced from previous)
         this.playerStats.health = Math.max(1, this.playerStats.health - damageTaken);
         
         // Sync with main game state
@@ -432,9 +598,20 @@ window.shieldwallSystem = {
         }
       }
       
+      // Lose stamina on failed reactions
+      if (this.playerStats) {
+        const staminaLoss = Math.floor(Math.random() * 5) + 3; // 3-7 stamina loss
+        this.playerStats.stamina = Math.max(1, this.playerStats.stamina - staminaLoss);
+        
+        // Sync with main game state
+        if (window.gameState) {
+          window.gameState.stamina = this.playerStats.stamina;
+        }
+      }
+      
       // Unit may take casualties on failed reactions
-      if (Math.random() < 0.3) {
-        const casualtiesLost = Math.floor(Math.random() * 3) + 1;
+      if (Math.random() < 0.2) { // Reduced from 0.3
+        const casualtiesLost = Math.floor(Math.random() * 2) + 1; // 1-2 casualties (reduced from 1-3)
         this.state.unitStrength.current = Math.max(1, this.state.unitStrength.current - casualtiesLost);
         this.state.unitStrength.casualties += casualtiesLost;
         responseMessage += ` Your unit loses ${casualtiesLost} ${casualtiesLost === 1 ? 'soldier' : 'soldiers'} in the chaos!`;
@@ -449,6 +626,9 @@ window.shieldwallSystem = {
     this.state.reactionNeeded = false;
     this.state.reactionTimeRemaining = 0;
     
+    // Apply cooldown before next threat
+    this.state.threatCooldown = Math.random() * 3 + 2; // 2-5 second cooldown
+    
     // Update UI
     this.updateBattleInterface();
     this.clearReactionOptions();
@@ -461,22 +641,25 @@ window.shieldwallSystem = {
     
     const threat = this.state.currentThreat;
     
-    // Generate timeout message
-    let timeoutMessage = `You hesitate, failing to react in time to the ${threat.type || "threat"}!`;
+    // Get emoji for threat (fallback to ⚠️ if none defined)
+    const emoji = threat.emoji || "⚠️";
     
-    // Harsh consequences for inaction
-    this.adjustCohesion(-15);
-    this.adjustMomentum(-20);
+    // Generate timeout message with emoji
+    let timeoutMessage = `${emoji} You hesitate, failing to react in time to the ${threat.type || "threat"}!`;
     
-    // Unit takes automatic casualties
-    const casualtiesLost = Math.floor(Math.random() * 4) + 2;
+    // Consequences for inaction but less severe than before
+    this.adjustCohesion(-12);
+    this.adjustMomentum(-15);
+    
+    // Unit takes some casualties
+    const casualtiesLost = Math.floor(Math.random() * 3) + 1; // 1-3 casualties (reduced from 2-5)
     this.state.unitStrength.current = Math.max(1, this.state.unitStrength.current - casualtiesLost);
     this.state.unitStrength.casualties += casualtiesLost;
     timeoutMessage += ` Your unit loses ${casualtiesLost} soldiers as the formation buckles!`;
     
     // Damage to player
-    if ((threat.target === "player" || Math.random() < 0.5) && this.playerStats) {
-      const damageTaken = Math.floor(Math.random() * 15) + 10;
+    if ((threat.target === "player" || Math.random() < 0.3) && this.playerStats) {
+      const damageTaken = Math.floor(Math.random() * 10) + 5; // 5-14 damage (reduced from 10-24)
       this.playerStats.health = Math.max(1, this.playerStats.health - damageTaken);
       
       // Sync with main game state
@@ -492,13 +675,16 @@ window.shieldwallSystem = {
       }
     }
     
-    // Add response to battle log
-    this.addBattleMessage(timeoutMessage);
+    // Add response to battle log with red highlight
+    this.addBattleMessage(`<span style="color: #FF6347;">${timeoutMessage}</span>`);
     
     // Clear current threat and reaction needed
     this.state.currentThreat = null;
     this.state.reactionNeeded = false;
     this.state.reactionTimeRemaining = 0;
+    
+    // Apply cooldown before next threat
+    this.state.threatCooldown = Math.random() * 2 + 1; // 1-3 second cooldown
     
     // Update UI
     this.updateBattleInterface();
@@ -718,13 +904,13 @@ window.shieldwallSystem = {
     }
     
     // Battle ends with defeat if unit strength is critically low
-    if (this.state.unitStrength.current <= this.state.unitStrength.max * 0.2) {
+    if (this.state.unitStrength.current <= this.state.unitStrength.max * 0.25) { // 25% instead of 20%
       this.endBattle("defeat");
       return true;
     }
     
     // Battle also ends if player's health reaches critical levels
-    if (this.playerStats && this.playerStats.health <= 20) {
+    if (this.playerStats && this.playerStats.health <= 30) { // 30 instead of 20
       this.endBattle("withdrawal");
       return true;
     }
@@ -763,8 +949,49 @@ window.shieldwallSystem = {
     
     // Call the battle end callback if provided
     if (typeof this.state.onBattleEnd === 'function') {
+      try {
+        // Make sure shieldwallOutcomeQueue exists
+        if (!window.shieldwallOutcomeQueue) {
+          window.shieldwallOutcomeQueue = [];
+        }
+        
+        // Find the active quest
+        const activeQuest = window.quests?.find(q => q.status === window.QUEST_STATUS.ACTIVE);
+        
+        // Store the outcome for when we return to the quest
+        if (activeQuest) {
+          window.shieldwallOutcomeQueue.push({
+            questId: activeQuest.id,
+            stageId: activeQuest.stages[activeQuest.currentStageIndex]?.id || 'unknown',
+            outcome: outcome
+          });
+        }
+        
+        // Call the original callback
+        setTimeout(() => {
+          this.state.onBattleEnd(outcome);
+        }, 2000);
+      } catch (error) {
+        console.error("Error in battle end callback:", error);
+        
+        // Fallback: process outcome ourselves
+        this.processBattleEndFallback(outcome);
+      }
+    } else {
+      // No callback defined, process outcome ourselves
+      this.processBattleEndFallback(outcome);
+    }
+  },
+  
+  // Fallback battle end processing
+  processBattleEndFallback: function(outcome) {
+    // Find the active quest
+    const activeQuest = window.quests?.find(q => q.status === window.QUEST_STATUS.ACTIVE);
+    
+    // Process outcome if we have an active quest and resumeQuestAfterShieldwall function
+    if (activeQuest && typeof window.resumeQuestAfterShieldwall === 'function') {
       setTimeout(() => {
-        this.state.onBattleEnd(outcome);
+        window.resumeQuestAfterShieldwall(activeQuest, outcome);
       }, 2000);
     }
   },
@@ -818,6 +1045,29 @@ window.shieldwallSystem = {
       battleLog.appendChild(messageElement);
       battleLog.scrollTop = battleLog.scrollHeight;
     }
+  },
+  
+  // Start visual timer animation
+  startReactionTimer: function(duration) {
+    // Find or create timer element
+    let timerBar = document.getElementById('reaction-timer-bar');
+    if (!timerBar) {
+      timerBar = document.createElement('div');
+      timerBar.id = 'reaction-timer-bar';
+      timerBar.className = 'reaction-timer-bar';
+      
+      const reactionContainer = document.getElementById('reactionContainer');
+      if (reactionContainer) {
+        reactionContainer.appendChild(timerBar);
+      }
+    }
+    
+    // Reset animation
+    timerBar.style.animation = 'none';
+    // Trigger reflow
+    void timerBar.offsetWidth;
+    // Restart animation with proper duration
+    timerBar.style.animation = `reaction-timer ${duration}s linear forwards`;
   },
   
   // Render the battle interface
@@ -1177,13 +1427,34 @@ window.shieldwallSystem = {
     const reactionContainer = document.getElementById('reactionContainer');
     if (reactionContainer) {
       reactionContainer.style.display = 'block';
+      
+      // Add attention-grabbing animation for critical threats
+      if (threat.criticalThreat) {
+        reactionContainer.classList.add('critical-threat');
+      } else {
+        reactionContainer.classList.remove('critical-threat');
+      }
     }
     
-    // Update the label to show time remaining
+    // Get threat color (default to red if not specified)
+    const threatColor = threat.color || "#FF0000";
+    
+    // Update the label to show time remaining and threat type with visual indicator
     const label = reactionContainer.querySelector('.control-label');
     if (label) {
-      label.textContent = `REACTION OPTIONS (${Math.ceil(threat.timeToReact)}s)`;
+      // Get emoji for threat (fallback to ⚠️ if none defined)
+      const emoji = threat.emoji || "⚠️";
+      
+      // Update label with emoji, colored text, and timer
+      label.innerHTML = `<span class="threat-emoji">${emoji}</span> REACT NOW! <span class="threat-timer">(${Math.ceil(threat.timeToReact)}s)</span>`;
+      
+      // Set color style
+      label.style.color = threatColor;
     }
+    
+    // Make the reaction container more visible
+    reactionContainer.style.borderColor = threatColor;
+    reactionContainer.style.boxShadow = `0 0 10px ${threatColor}`;
     
     // Clear previous options
     reactionOptions.innerHTML = '';
@@ -1204,6 +1475,15 @@ window.shieldwallSystem = {
       case "flanking":
         availableReactions = ["adjust position", "brace"];
         break;
+      case "spears":
+        availableReactions = ["brace", "shield cover"];
+        break;
+      case "officer":
+        availableReactions = ["attack", "adjust position"];
+        break;
+      case "breakthrough":
+        availableReactions = ["attack", "brace"];
+        break;
       default:
         availableReactions = ["brace", "shield cover", "step to gap", "attack"];
     }
@@ -1212,10 +1492,19 @@ window.shieldwallSystem = {
     availableReactions.forEach(reaction => {
       const button = document.createElement('button');
       button.className = 'shieldwall-btn reaction-btn';
+      
+      // Highlight the best reaction for the threat
+      if (reaction === threat.bestReaction) {
+        button.classList.add('suggested-reaction');
+      }
+      
       button.textContent = reaction.toUpperCase();
       button.onclick = () => this.handleReaction(reaction);
       reactionOptions.appendChild(button);
     });
+    
+    // Start the timer animation
+    this.startReactionTimer(threat.timeToReact);
   },
   
   // Clear reaction options
@@ -1223,6 +1512,9 @@ window.shieldwallSystem = {
     const reactionContainer = document.getElementById('reactionContainer');
     if (reactionContainer) {
       reactionContainer.style.display = 'none';
+      reactionContainer.classList.remove('critical-threat');
+      reactionContainer.style.borderColor = '';
+      reactionContainer.style.boxShadow = '';
     }
   },
   
@@ -1730,6 +2022,102 @@ window.shieldwallSystem = {
     `;
     
     document.head.appendChild(styleElement);
+  },
+  
+  // Add CSS for enhanced visual elements
+  addEnhancedStyles: function() {
+    // Check if we already added the styles
+    if (document.getElementById('shieldwall-enhanced-styles')) return;
+    
+    const styleElement = document.createElement('style');
+    styleElement.id = 'shieldwall-enhanced-styles';
+    styleElement.textContent = `
+      /* Enhanced shieldwall styles for better threat visualization */
+      
+      /* Battle log flash effect */
+      @keyframes battle-log-flash {
+        0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+      }
+      
+      .battle-log-flash {
+        animation: battle-log-flash 1s forwards;
+      }
+      
+      /* Enhanced reaction container */
+      .reaction-container {
+        position: relative;
+        transition: all 0.3s ease;
+        overflow: hidden;
+      }
+      
+      .reaction-container.critical-threat {
+        animation: critical-threat-pulse 1s infinite;
+      }
+      
+      @keyframes critical-threat-pulse {
+        0% { background-color: rgba(178, 34, 34, 0.1); }
+        50% { background-color: rgba(178, 34, 34, 0.3); }
+        100% { background-color: rgba(178, 34, 34, 0.1); }
+      }
+      
+      /* Threat emoji styling */
+      .threat-emoji {
+        font-size: 1.5em;
+        margin-right: 5px;
+        vertical-align: middle;
+      }
+      
+      /* Threat timer styling */
+      .threat-timer {
+        font-weight: bold;
+        animation: timer-pulse 1s infinite;
+      }
+      
+      @keyframes timer-pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+      }
+      
+      /* Reaction timer bar */
+      .reaction-timer-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background-color: #FF6347; /* Tomato */
+        transform-origin: left;
+      }
+      
+      @keyframes reaction-timer {
+        0% { transform: scaleX(1); background-color: #4CAF50; }
+        50% { background-color: #FFC107; }
+        75% { background-color: #FF9800; }
+        100% { transform: scaleX(0); background-color: #F44336; }
+      }
+      
+      /* Suggested reaction button styling */
+      .suggested-reaction {
+        border: 2px solid #FFD700 !important; /* Gold */
+        background-color: rgba(255, 215, 0, 0.2) !important;
+        position: relative;
+      }
+      
+      .suggested-reaction::after {
+        content: '✓';
+        position: absolute;
+        top: 2px;
+        right: 5px;
+        color: #FFD700;
+        font-weight: bold;
+        font-size: 0.8em;
+      }
+    `;
+    
+    document.head.appendChild(styleElement);
   }
 };
 
@@ -1737,33 +2125,59 @@ window.shieldwallSystem = {
 window.startShieldwallBattle = function(config) {
   console.log("Starting shieldwall battle with config:", config);
   
+  // Make sure shieldwallOutcomeQueue exists
+  if (!window.shieldwallOutcomeQueue) {
+    window.shieldwallOutcomeQueue = [];
+  }
+  
+  // Find the active quest
+  const activeQuest = window.quests?.find(q => q.status === window.QUEST_STATUS.ACTIVE);
+  
   // Make sure the system is initialized
   if (!window.shieldwallSystem.initialized) {
     window.shieldwallSystem.initialize();
   }
   
-  // Configure default battle parameters
-  const battleConfig = {
-    enemyName: config.enemyName || "Enemy Forces",
-    unitStrength: {
-      current: config.unitStrength || 40,
-      max: config.unitStrength || 40
-    },
-    cohesion: {
-      current: config.startingCohesion || 85
-    },
-    momentum: {
-      value: config.startingMomentum || 0
-    },
-    battlePhase: config.startingPhase || "preparation",
-    currentOrder: config.order || "hold the line",
+  // Store original callback
+  const originalCallback = config.onBattleEnd;
+  
+  // Replace with safe callback
+  config.onBattleEnd = function(outcome) {
+    console.log(`Battle ended with outcome: ${outcome}`);
     
-    // Callback function when battle ends
-    onBattleEnd: config.onBattleEnd || null
+    try {
+      // Make sure queue exists
+      if (!window.shieldwallOutcomeQueue) {
+        window.shieldwallOutcomeQueue = [];
+      }
+      
+      // Safely push outcome if we have a valid quest
+      if (activeQuest && activeQuest.id) {
+        window.shieldwallOutcomeQueue.push({
+          questId: activeQuest.id,
+          stageId: activeQuest.stages[activeQuest.currentStageIndex]?.id || 'unknown',
+          outcome: outcome
+        });
+        
+        console.log("Successfully stored battle outcome in queue");
+      }
+      
+      // Process the outcome immediately if possible
+      if (activeQuest && typeof window.resumeQuestAfterShieldwall === 'function') {
+        window.resumeQuestAfterShieldwall(activeQuest, outcome);
+      }
+      
+      // Call original callback if it exists
+      if (typeof originalCallback === 'function') {
+        originalCallback(outcome);
+      }
+    } catch (error) {
+      console.error("Error in battle end callback:", error);
+    }
   };
   
   // Start the shieldwall battle
-  window.shieldwallSystem.initiateBattle(battleConfig);
+  window.shieldwallSystem.initiateBattle(config);
 };
 
 // Helper function to resume a quest after a shieldwall battle
