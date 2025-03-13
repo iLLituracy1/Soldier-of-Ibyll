@@ -13,8 +13,8 @@ window.shieldwallSystem = {
     
     // Formation state
     unitStrength: {
-      current: 80,
-      max: 80,
+      current: 75,
+      max: 75,
       casualties: 0
     },
     
@@ -67,7 +67,7 @@ window.shieldwallSystem = {
       target: "formation",
       bestReaction: "brace",
       bestShieldPosition: "high",
-      timeToReact: 12, // Extended from 5s to 12s
+      timeToReact: 8, 
       criticalThreat: false
     },
     charge: {
@@ -77,7 +77,7 @@ window.shieldwallSystem = {
       target: "player",
       bestReaction: "brace",
       bestShieldPosition: "center",
-      timeToReact: 10, // Extended from 4s to 10s
+      timeToReact: 10,
       criticalThreat: false
     },
     gap: {
@@ -87,7 +87,7 @@ window.shieldwallSystem = {
       target: "formation",
       bestReaction: "step to gap",
       bestShieldPosition: "center",
-      timeToReact: 10, // Extended from 3s to 10s
+      timeToReact: 6, 
       criticalThreat: false
     },
     flanking: {
@@ -97,7 +97,7 @@ window.shieldwallSystem = {
       target: "formation",
       bestReaction: "adjust position",
       bestShieldPosition: "center",
-      timeToReact: 12, // Extended from 4s to 12s
+      timeToReact: 6, 
       criticalThreat: false
     },
     spears: {
@@ -127,7 +127,7 @@ window.shieldwallSystem = {
       target: "player",
       bestReaction: "attack",
       bestShieldPosition: "center",
-      timeToReact: 6, // One of the few threats that needs quick reaction
+      timeToReact: 5, // One of the few threats that needs quick reaction
       criticalThreat: true
     }
   },
@@ -240,8 +240,8 @@ window.shieldwallSystem = {
       enemyName: "Arrasi Forces",
       
       unitStrength: {
-        current: 80,
-        max: 80,
+        current: 75,
+        max: 75,
         casualties: 0
       },
       
@@ -1112,7 +1112,7 @@ window.shieldwallSystem = {
             <div class="enemy-line">
               Enemy Line
               <div class="formation-units enemy-units">
-                ${this.renderFormationUnits('r', 80)}
+                ${this.renderFormationUnits('r', 75)}
               </div>
               <div class="spacing-line"></div>
             </div>
@@ -2907,3 +2907,54 @@ window.resumeQuestAfterShieldwall = function(quest, outcome) {
 document.addEventListener('DOMContentLoaded', function() {
   window.shieldwallSystem.initialize();
 });
+
+// Enhanced handleReturnToCamp function to integrate better with the reward system
+window.handleReturnToCamp = function(quest) {
+  // Track performance data for conditional rewards
+  if (!quest.userData) quest.userData = {};
+  
+  // Get battle cohesion from shieldwall system if available
+  if (window.shieldwallSystem && window.shieldwallSystem.state) {
+    quest.userData.formationCohesion = window.shieldwallSystem.state.cohesion.current;
+  }
+  
+  // Set narrative for the quest conclusion
+  window.setNarrative(`
+    <p>Your Spear Host returns to camp victorious, bearing captured supplies and valuable intelligence. The elimination of the Arrasi outpost represents a significant blow to enemy operations in the region.</p>
+    
+    <p>Later that evening, the Vayren calls for you. "Report to the Sarkein's tent," he orders. "Apparently, he wants to hear about the scouting mission from someone who was there."</p>
+    
+    <p>When you arrive at the command tent, Sarkein Reval is studying the captured maps. He acknowledges your salute with a nod.</p>
+    
+    <p>"Your Squad performed well today," he says. "The intelligence your unit recovered will help us plan our next moves in this sector."</p>
+    
+    <p>The Sarkein gestures to a collection of items laid out on a corner of the table - spoils from the raid allocated to your unit.</p>
+    
+    <p>"These are yours by right of conquest," he continues. "The officer's blade is particularly fine - Arrasi steel, but with a balance superior to their typical work. Take it with my compliments."</p>
+    
+    <p>He studies the maps thoughtfully. "Tell your Vayren that I'll be looking to his unit for future operations. The Empire needs soldiers who can think and act decisively."</p>
+    
+    <p>As you leave the Sarkein's tent with your share of the spoils, there's a new respect in the eyes of your fellow soldiers. Your Squad's actions today have made a difference, and your reputation within the Kasvaari has grown.</p>
+  `);
+  
+  // Create a continue button that will trigger rewards and quest completion
+  const actionsContainer = document.getElementById('questActions');
+  if (actionsContainer) {
+    actionsContainer.innerHTML = '';
+    
+    const continueButton = document.createElement('button');
+    continueButton.className = 'quest-action-btn';
+    continueButton.textContent = 'Collect Rewards';
+    continueButton.onclick = function() {
+      // Complete the quest, which will trigger our enhanced reward system
+      window.completeQuest(quest.id);
+    };
+    
+    actionsContainer.appendChild(continueButton);
+  } else {
+    // If actions container isn't available, complete quest directly
+    setTimeout(() => {
+      window.completeQuest(quest.id);
+    }, 2000);
+  }
+};
