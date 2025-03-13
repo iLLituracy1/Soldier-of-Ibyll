@@ -112,7 +112,7 @@ window.initializeQuestTemplates = function() {
         // This is a large-scale battle - use formation/shieldwall combat
         battleType: window.BATTLE_TYPES.FORMATION, 
         enemyName: "Arrasi Garrison",
-        unitStrength: 40,
+        unitStrength: 80,
         startingCohesion: 85,
         startingMomentum: 10,
         startingPhase: "engagement",

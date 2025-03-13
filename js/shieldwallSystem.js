@@ -240,8 +240,8 @@ window.shieldwallSystem = {
       enemyName: "Arrasi Forces",
       
       unitStrength: {
-        current: 40,
-        max: 40,
+        current: 80,
+        max: 80,
         casualties: 0
       },
       
