@@ -13,8 +13,8 @@ window.shieldwallSystem = {
     
     // Formation state
     unitStrength: {
-      current: 40,
-      max: 40,
+      current: 80,
+      max: 80,
       casualties: 0
     },
     
@@ -205,8 +205,8 @@ window.shieldwallSystem = {
     this.state.active = true;
     
     // Set default values if not provided
-    if (!this.state.unitStrength.current) this.state.unitStrength.current = 40;
-    if (!this.state.unitStrength.max) this.state.unitStrength.max = 40;
+    if (!this.state.unitStrength.current) this.state.unitStrength.current = 81;
+    if (!this.state.unitStrength.max) this.state.unitStrength.max = 81;
     if (!this.state.cohesion.current) this.state.cohesion.current = 85;
     
     // Calculate advantage based on momentum
@@ -1112,14 +1112,14 @@ window.shieldwallSystem = {
             <div class="enemy-line">
               Enemy Line
               <div class="formation-units enemy-units">
-                ${this.renderFormationUnits('r', 16)}
+                ${this.renderFormationUnits('r', 80)}
               </div>
               <div class="spacing-line"></div>
             </div>
             
             <div class="player-line">
               <div class="formation-units player-units">
-                ${this.renderFormationUnits('b', 15)}
+                ${this.renderFormationUnits('b', 81)}
               </div>
               
               <div id="gapIndicator" class="gap-indicator">
