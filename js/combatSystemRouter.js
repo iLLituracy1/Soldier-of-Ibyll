@@ -208,8 +208,16 @@ function handleCombatOutcome(quest, stage, outcome, config) {
         <p>${config.successText || "You emerge victorious from the battle!"}</p>
       `);
       
-      // Progress to next stage
-      window.progressQuest(quest.id, stage.action);
+      // Progress to next stage - FIXED: Use the stage's own action instead of hardcoding it
+      // This ensures we pass the correct action that the stage expects
+      if (stage && stage.action) {
+        console.log(`Progressing quest with correct action: ${stage.action}`);
+        window.progressQuest(quest.id, stage.action);
+      } else {
+        // Fallback if no action found
+        console.warn("No action found for current stage - using default progression");
+        window.progressQuest(quest.id);
+      }
     }, 1500);
   } else {
     setTimeout(() => {

@@ -166,6 +166,14 @@ window.combatSystem = {
   
   // Process enemy's turn
   processEnemyTurn: function() {
+    // NEW: First check if enemy is already defeated
+    if (this.isEnemyDefeated()) {
+      console.log("Enemy already defeated, skipping action");
+      // Cancel any pending turns and move to resolution
+      this._processingEnemyTurn = false;
+      this.enterPhase("resolution");
+      return;
+    }
 
     // If already processed an action this turn, don't process again
     if (this._processingEnemyTurn) return;
@@ -196,7 +204,7 @@ window.combatSystem = {
     }
     
     // Move to resolution phase
-    setTimeout(() => {
+    this.scheduleEnemyAction(() => {
       this._processingEnemyTurn = false;
       this.enterPhase("resolution");
     }, 1500);
@@ -757,10 +765,20 @@ window.combatSystem = {
   
   // Handle enemy counterattack
   handleEnemyCounter: function() {
+    // NEW: Check if enemy is already defeated
+    if (this.isEnemyDefeated()) {
+      console.log("Enemy already defeated, cannot counter");
+      this.state.counterWindowOpen = false;
+      this.state.counterChain = 0;
+      this.state.lastCounterActor = null;
+      this.enterPhase("resolution");
+      return;
+    }
+
     const enemy = this.state.enemy;
     this.state.counterChain++;
     this.state.lastCounterActor = "enemy";
-  
+
     this.addCombatMessage(`The ${enemy.name} capitalizes on your misstep with a swift counterattack!`);
     
     // Check if we've reached maximum counter chain
@@ -771,7 +789,7 @@ window.combatSystem = {
       this.state.lastCounterActor = null;
       
       // Continue to resolution phase
-      setTimeout(() => this.enterPhase("resolution"), 1000);
+      this.scheduleEnemyAction(() => this.enterPhase("resolution"), 1000);
       return;
     }
     
@@ -1970,6 +1988,11 @@ window.combatSystem = {
     
     // Default: ammo exists and isn't empty
     return true;
+  },
+  
+  // Add the isEnemyDefeated helper method
+  isEnemyDefeated: function() {
+    return this.state.enemy && this.state.enemy.health <= 0;
   }
 };
 

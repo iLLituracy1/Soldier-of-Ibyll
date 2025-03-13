@@ -924,28 +924,33 @@ window.shieldwallSystem = {
     
     // Generate end of battle narrative
     let endMessage = "";
+    let outcomeTitle = "";
     
     switch (outcome) {
       case "victory":
+        outcomeTitle = "VICTORY!";
         endMessage = `Victory! The ${this.state.enemyName} break and flee the field. Your unit has held the line and emerged victorious!`;
         break;
       case "defeat":
+        outcomeTitle = "DEFEAT";
         endMessage = `Defeat! Your unit breaks under the pressure from the ${this.state.enemyName}. The shieldwall has collapsed and the battle is lost.`;
         break;
       case "withdrawal":
+        outcomeTitle = "WITHDRAWN";
         endMessage = "You're wounded and pulled back from the front line by your comrades. The battle continues without you.";
         break;
       default:
+        outcomeTitle = "BATTLE ENDED";
         endMessage = "The battle ends.";
     }
     
     this.addBattleMessage(endMessage);
     this.updateBattleInterface();
     
-    // Add complete button at battle end
-    this.showBattleEndButton(outcome);
-    
     console.log(`Battle ended with ${outcome}`);
+    
+    // Show battle results screen
+    this.showBattleResultsScreen(outcome, outcomeTitle, endMessage);
     
     // Call the battle end callback if provided
     if (typeof this.state.onBattleEnd === 'function') {
@@ -2118,6 +2123,248 @@ window.shieldwallSystem = {
     `;
     
     document.head.appendChild(styleElement);
+  },
+  
+  // Show battle results screen
+  showBattleResultsScreen: function(outcome, title, message) {
+    // Create container for results screen if it doesn't exist
+    let resultsScreen = document.getElementById('shieldwallResults');
+    if (resultsScreen) {
+      resultsScreen.remove(); // Remove existing results screen
+    }
+    
+    resultsScreen = document.createElement('div');
+    resultsScreen.id = 'shieldwallResults';
+    resultsScreen.className = 'shieldwall-results ' + outcome;
+    
+    // Unit stats
+    const unitStrength = {
+      start: this.state.unitStrength.max,
+      end: this.state.unitStrength.current,
+      casualties: this.state.unitStrength.casualties
+    };
+    
+    // Create content
+    resultsScreen.innerHTML = `
+      <div class="results-content">
+        <h2 class="results-title">${title}</h2>
+        <div class="results-message">${message}</div>
+        
+        <div class="results-stats">
+          <div class="stats-row">
+            <div class="stat-label">Initial Strength:</div>
+            <div class="stat-value">${unitStrength.start} soldiers</div>
+          </div>
+          <div class="stats-row">
+            <div class="stat-label">Remaining Strength:</div>
+            <div class="stat-value">${unitStrength.end} soldiers</div>
+          </div>
+          <div class="stats-row">
+            <div class="stat-label">Casualties:</div>
+            <div class="stat-value">${unitStrength.casualties} soldiers</div>
+          </div>
+          <div class="stats-row">
+            <div class="stat-label">Battle Duration:</div>
+            <div class="stat-value">${Math.floor(this.state.timePassed / 60)}m ${this.state.timePassed % 60}s</div>
+          </div>
+        </div>
+        
+        <button id="completeBattleBtn" class="complete-battle-btn">
+          CONTINUE
+        </button>
+      </div>
+    `;
+    
+    // Add to the battle interface
+    const battleInterface = document.getElementById('shieldwallInterface');
+    if (battleInterface) {
+      battleInterface.appendChild(resultsScreen);
+      
+      // Add button event listener
+      document.getElementById('completeBattleBtn').addEventListener('click', () => {
+        // Hide battle interface
+        this.hideBattleInterface();
+        
+        // Return to quest or main game as appropriate
+        if (window.gameState && window.gameState.inQuestSequence && window.quests) {
+          // Find active quest
+          const activeQuest = window.quests.find(q => q.status === window.QUEST_STATUS.ACTIVE);
+          if (activeQuest && window.resumeQuestAfterShieldwall) {
+            window.resumeQuestAfterShieldwall(activeQuest, outcome);
+          } else {
+            // Fallback: return to main game
+            window.updateActionButtons();
+          }
+        } else {
+          // Return to main game
+          if (typeof window.updateActionButtons === 'function') {
+            window.updateActionButtons();
+          }
+        }
+      });
+      
+      // Add pulse animation to button
+      this.pulseButton('completeBattleBtn');
+    }
+    
+    // Add CSS for results screen if not already added
+    this.addResultsScreenStyles();
+  },
+  
+  // Add styles for results screen
+  addResultsScreenStyles: function() {
+    if (document.getElementById('shieldwall-results-styles')) return;
+    
+    const styleElement = document.createElement('style');
+    styleElement.id = 'shieldwall-results-styles';
+    styleElement.textContent = `
+      .shieldwall-results {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.85);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 2000;
+        animation: fade-in 0.5s forwards;
+      }
+      
+      @keyframes fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      
+      .results-content {
+        background-color: #1a1a1a;
+        border: 3px solid #c9aa71;
+        border-radius: 10px;
+        padding: 30px;
+        max-width: 600px;
+        width: 80%;
+        text-align: center;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+      }
+      
+      .shieldwall-results.victory .results-content {
+        border-color: #a8e063;
+      }
+      
+      .shieldwall-results.defeat .results-content {
+        border-color: #ff5f6d;
+      }
+      
+      .results-title {
+        color: #c9aa71;
+        font-size: 2.5em;
+        margin: 0 0 20px 0;
+        text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      }
+      
+      .shieldwall-results.victory .results-title {
+        color: #a8e063;
+      }
+      
+      .shieldwall-results.defeat .results-title {
+        color: #ff5f6d;
+      }
+      
+      .results-message {
+        color: #e0e0e0;
+        font-size: 1.2em;
+        margin-bottom: 30px;
+        line-height: 1.4;
+      }
+      
+      .results-stats {
+        background-color: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+        text-align: left;
+      }
+      
+      .stats-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      
+      .stats-row:last-child {
+        margin-bottom: 0;
+      }
+      
+      .stat-label {
+        color: #888;
+        font-weight: bold;
+      }
+      
+      .stat-value {
+        color: #e0e0e0;
+        font-weight: bold;
+      }
+      
+      .complete-battle-btn {
+        background-color: #3a3a3a;
+        color: #ffffff;
+        border: none;
+        padding: 15px 40px;
+        font-size: 1.3em;
+        font-weight: bold;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+      }
+      
+      .complete-battle-btn:hover {
+        background-color: #4a4a4a;
+        transform: translateY(-3px);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+      }
+      
+      .complete-battle-btn:active {
+        transform: translateY(1px);
+      }
+      
+      .shieldwall-results.victory .complete-battle-btn {
+        background-color: #2a623d;
+      }
+      
+      .shieldwall-results.victory .complete-battle-btn:hover {
+        background-color: #3a724d;
+      }
+      
+      .shieldwall-results.defeat .complete-battle-btn {
+        background-color: #6d2a2a;
+      }
+      
+      .shieldwall-results.defeat .complete-battle-btn:hover {
+        background-color: #7d3a3a;
+      }
+      
+      @keyframes button-pulse {
+        0% { transform: scale(1); box-shadow: 0 0 15px rgba(0, 0, 0, 0.5); }
+        50% { transform: scale(1.05); box-shadow: 0 0 25px rgba(255, 255, 255, 0.2); }
+        100% { transform: scale(1); box-shadow: 0 0 15px rgba(0, 0, 0, 0.5); }
+      }
+      
+      .button-pulse {
+        animation: button-pulse 1.5s infinite;
+      }
+    `;
+    
+    document.head.appendChild(styleElement);
+  },
+  
+  // Button pulse animation to draw attention
+  pulseButton: function(buttonId) {
+    const button = document.getElementById(buttonId);
+    if (button) {
+      button.classList.add('button-pulse');
+    }
   }
 };
 
