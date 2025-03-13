@@ -28,6 +28,10 @@ window.gameState = {
   dailyTrainingCount: 0, // Added training limit
   inStoryEncounter: false,
   
+  // Quest state tracking
+  inQuestSequence: false,
+  awaitingQuestResponse: false, // Added for mandatory quest response
+  
   // Action tracking
   dailyPatrolDone: false,
   dailyScoutDone: false,
@@ -76,6 +80,8 @@ window.initializeGameState = function() {
   // Set additional game state values
   window.gameState.trainingProgress = 0;
   window.gameState.dailyTrainingCount = 0; // Initialize training count
+  window.gameState.inQuestSequence = false;
+  window.gameState.awaitingQuestResponse = false;
   
   // Set activity discovery flags based on origin
   if (window.player.origin === 'Lunarine') {
@@ -115,7 +121,7 @@ window.checkLevelUp = function() {
     window.showNotification(`Level up! You are now level ${window.gameState.level}!`, 'level-up');
     
     // Check for veteran achievement
-    if (window.gameState.level >= 5 && !window.achievements.find(a => a.id === 'veteran').unlocked) {
+    if (window.achievements && window.gameState.level >= 5 && !window.achievements.find(a => a.id === 'veteran').unlocked) {
       window.showAchievement('veteran');
     }
     

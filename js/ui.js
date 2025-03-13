@@ -65,42 +65,57 @@ window.updateActionButtons = function() {
   const actionsContainer = document.getElementById('actions');
   actionsContainer.innerHTML = '';
   
+  // If player is awaiting quest response, only show the quest-related button
+  // This is what makes quests feel mandatory
+  if (window.gameState.awaitingQuestResponse) {
+    // Check for active quest
+    const activeQuest = window.quests.find(q => q.status === window.QUEST_STATUS.ACTIVE);
+    if (activeQuest) {
+      window.addActionButton('Report to Sarkein', 'report_to_sarkein_action', actionsContainer);
+      console.log("Showing only 'Report to Sarkein' button due to awaiting quest response");
+      return; // Don't show any other buttons
+    }
+  }
+  
+  // If already in a quest sequence or battle, don't show regular actions
+  if (window.gameState.inBattle || window.gameState.inMission || window.gameState.inQuestSequence) {
+    return;
+  }
+  
   const timeOfDay = window.getTimeOfDay();
   const hours = Math.floor(window.gameTime / 60);
   
   // Standard actions available in camp
-  if (!window.gameState.inBattle && !window.gameState.inMission) {
-    // Training available during the day
-    if (timeOfDay === 'day' || timeOfDay === 'dawn') {
-      window.addActionButton('Train', 'train', actionsContainer);
+  // Training available during the day
+  if (timeOfDay === 'day' || timeOfDay === 'dawn') {
+    window.addActionButton('Train', 'train', actionsContainer);
+  }
+  
+  // Rest always available
+  window.addActionButton('Rest', 'rest', actionsContainer);
+  
+  // Patrol available during day and evening
+  if (timeOfDay === 'day' || timeOfDay === 'evening') {
+    window.addActionButton('Patrol', 'patrol', actionsContainer);
+  }
+  
+  // Mess hall available during meal times
+  if ((hours >= 7 && hours <= 9) || (hours >= 12 && hours <= 14) || (hours >= 18 && hours <= 20)) {
+    window.addActionButton('Mess Hall', 'mess', actionsContainer);
+  }
+  
+  // Guard duty available all times
+  window.addActionButton('Guard Duty', 'guard', actionsContainer);
+  
+  // Gambling and Brawler Pits visibility logic
+  if (timeOfDay === 'evening' || timeOfDay === 'night') {
+    // Only show if player has discovered it or has the right background
+    if (window.gameState.discoveredGamblingTent) {
+      window.addActionButton('Gambling Tent', 'gambling', actionsContainer);
     }
     
-    // Rest always available
-    window.addActionButton('Rest', 'rest', actionsContainer);
-    
-    // Patrol available during day and evening
-    if (timeOfDay === 'day' || timeOfDay === 'evening') {
-      window.addActionButton('Patrol', 'patrol', actionsContainer);
-    }
-    
-    // Mess hall available during meal times
-    if ((hours >= 7 && hours <= 9) || (hours >= 12 && hours <= 14) || (hours >= 18 && hours <= 20)) {
-      window.addActionButton('Mess Hall', 'mess', actionsContainer);
-    }
-    
-    // Guard duty available all times
-    window.addActionButton('Guard Duty', 'guard', actionsContainer);
-    
-    // Gambling and Brawler Pits visibility logic
-    if (timeOfDay === 'evening' || timeOfDay === 'night') {
-      // Only show if player has discovered it or has the right background
-      if (window.gameState.discoveredGamblingTent) {
-        window.addActionButton('Gambling Tent', 'gambling', actionsContainer);
-      }
-      
-      if (window.gameState.discoveredBrawlerPits) {
-        window.addActionButton('Brawler Pits', 'brawler_pits', actionsContainer);
-      }
+    if (window.gameState.discoveredBrawlerPits) {
+      window.addActionButton('Brawler Pits', 'brawler_pits', actionsContainer);
     }
   }
 };
@@ -118,7 +133,6 @@ window.addActionButton = function(label, action, container) {
 };
 
 // Function to handle profile panel display
-// Updated handleProfile function for enhanced UI design
 // Updated handleProfile function with fixed sizing
 window.handleProfile = function() {
   const profileDiv = document.getElementById('profile');

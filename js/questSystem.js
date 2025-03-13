@@ -27,6 +27,9 @@ window.initializeQuestSystem = function() {
   // Add inQuestSequence flag to gameState
   window.gameState.inQuestSequence = false;
   
+  // Add new awaitingQuestResponse flag
+  window.gameState.awaitingQuestResponse = false;
+  
   // Set up quest log button handler if not already defined
   if (!window.handleQuestLog) {
     window.handleQuestLog = function() {
@@ -200,12 +203,14 @@ window.assignQuest = function(templateId) {
   window.addToNarrative(`<strong>New Quest: ${quest.title}</strong><br>${quest.description}`);
   window.addToNarrative(`A messenger approaches you with orders from Sarkein Reval. "The Sarkein requests your presence at once. There's a mission that requires your attention."`);
   
-  // Set inQuestSequence to false initially - will be set to true when player reports to Sarkein
+  // Set flag to show we're awaiting quest response
+  window.gameState.awaitingQuestResponse = true;
   window.gameState.inQuestSequence = false;
   
-  // Clear current actions and add only the quest action
-  window.updateActionButtons();
-  window.addActionButton('Report to Sarkein', 'report_to_sarkein_action', document.getElementById('actions'));
+  // Clear current actions and add ONLY the quest action button
+  const actionsContainer = document.getElementById('actions');
+  actionsContainer.innerHTML = ''; // Clear all existing buttons
+  window.addActionButton('Report to Sarkein', 'report_to_sarkein_action', actionsContainer);
   
   return true;
 };
@@ -399,6 +404,9 @@ window.progressQuest = function(questId, action) {
     window.gameState.inQuestSequence = true;
   }
   
+  // Clear the awaiting response flag - player has responded to the quest
+  window.gameState.awaitingQuestResponse = false;
+  
   // Handle stage-specific actions
   window.handleQuestStageAction(quest, currentStage);
   
@@ -496,6 +504,7 @@ window.completeQuest = function(questId) {
   
   // Reset quest sequence flag
   window.gameState.inQuestSequence = false;
+  window.gameState.awaitingQuestResponse = false;
   
   // Apply rewards
   if (quest.rewards) {
@@ -557,6 +566,7 @@ window.failQuest = function(questId) {
   
   // Reset quest sequence flag
   window.gameState.inQuestSequence = false;
+  window.gameState.awaitingQuestResponse = false;
   
   // Show failure notification
   window.showQuestNotification(quest, 'failed');
@@ -735,9 +745,9 @@ window.renderQuestLog = function() {
 // Quest stage handler functions
 window.handleReportToSarkein = function(quest) {
   window.setNarrative(`
-    <p>Your Vayren orders you to report to the command tent with the rest of your Tayren. The interior is sparse but organized, with maps of the frontier spread across a sturdy wooden table. Sarkein Reval, a weathered veteran with a scar crossing his left eye, addresses the assembled soldiers.</p>
+    <p>Your Vayren orders you to report to the command tent with the rest of your Squad. The interior is sparse but organized, with maps of the frontier spread across a sturdy wooden table. Sarkein Reval, a weathered veteran with a scar crossing his left eye, addresses the assembled soldiers.</p>
     
-    <p>"Listen well," he says, his voice carrying throughout the tent. "Our scouts have identified an Arrasi outpost near the frontier that's been a staging ground for raids on our supply lines. Our Faeqin has been selected to neutralize it."</p>
+    <p>"Listen well," he says, his voice carrying throughout the tent. "Our scouts have identified an Arrasi outpost near the frontier that's been a staging ground for raids on our supply lines. Our Spear Host has been selected to neutralize it."</p>
     
     <p>He points to a location on the map. "The outpost is here, a half-day's march to the west. It's lightly garrisoned - perhaps twenty men - but they have good visibility of the surrounding area. We'll need to move quickly and quietly."</p>
     
@@ -754,15 +764,15 @@ window.handleReportToSarkein = function(quest) {
 
 window.handleBeginMarch = function(quest) {
   window.setNarrative(`
-    <p>Dawn breaks with a blood-red sun as your Faeqin assembles at the camp's edge. The Sarkein inspects the units briefly, then gives the order to move out. The column of soldiers winds its way westward, shields and spears glinting in the early morning light.</p>
+    <p>Dawn breaks with a blood-red sun as your Spear Host assembles at the camp's edge. The Sarkein inspects the units briefly, then gives the order to move out. The column of soldiers winds its way westward, shields and spears glinting in the early morning light.</p>
     
     <p>The terrain grows increasingly rugged as you approach the frontier. The column moves in practiced silence, with scouts ranging ahead and to the flanks. Dust clings to your armor and throat as the hours pass.</p>
     
-    <p>By midday, you've reached a ridge overlooking a shallow valley. The Sarkein calls for a halt and gathers the Vayrens of each Tayren.</p>
+    <p>By midday, you've reached a ridge overlooking a shallow valley. The Sarkein calls for a halt and gathers the Vayrens of each Squad.</p>
     
     <p>"The outpost is just beyond that next rise," he says, pointing westward. "We'll need to scout it properly before we commit to an attack."</p>
     
-    <p>Your Vayren returns to your Tayren with orders. "Our unit is to provide a small scouting party to circle north and assess their defenses. Three soldiers. Ready yourselves."</p>
+    <p>Your Vayren returns to your Squad with orders. "Our unit is to provide a small scouting party to circle north and assess their defenses. Three soldiers. Ready yourselves."</p>
     
     <p>The Vayren points to you and two others. "You three, move out. Circle around, observe guard positions, routines, and any weak points. Report back within the hour."</p>
   `);
@@ -773,7 +783,7 @@ window.handleBeginMarch = function(quest) {
 
 window.handleScoutOutpost = function(quest) {
   window.setNarrative(`
-    <p>Your small scouting party - consisting of you and two fellow soldiers from your Tayren - begins circling wide around the valley to approach the outpost from the north. One of your companions is a quiet Nesian with sharp eyes, the other a burly Paanic veteran.</p>
+    <p>Your small scouting party - consisting of you and two fellow soldiers from your Squad - begins circling wide around the valley to approach the outpost from the north. One of your companions is a quiet Nesian with sharp eyes, the other a burly Paanic veteran.</p>
     
     <p>Moving from cover to cover, you gradually work your way closer to the Arrasi position. The outpost comes into view: a wooden palisade surrounding several structures, with a larger central building that appears to be the command post. Two watchtowers stand at opposite corners, each manned by a single guard.</p>
     
@@ -835,7 +845,7 @@ window.handleCombatPatrol = function(quest) {
               
               <p>"Good work handling that patrol," he says grimly, "but we've lost the luxury of time. We attack now, before they realize something's wrong."</p>
               
-              <p>He rapidly issues orders, dividing the Faeqin into three assault groups.</p>
+              <p>He rapidly issues orders, dividing the Spear Host into three assault groups.</p>
             `);
             
             // Progress to the assault stage
@@ -865,9 +875,9 @@ window.handleCombatPatrol = function(quest) {
 
 window.handleAssaultOutpost = function(quest) {
   window.setNarrative(`
-    <p>The Sarkein divides your Faeqin into three assault groups. "First group will create a diversion at the main gate. Second group will scale the eastern wall. Third group, with me, will breach from the west once their attention is divided."</p>
+    <p>The Sarkein divides your Spear Host into three assault groups. "First group will create a diversion at the main gate. Second group will scale the eastern wall. Third group, with me, will breach from the west once their attention is divided."</p>
     
-    <p>Your Tayren is assigned to the second group, tasked with scaling the eastern wall. The plan is set, and with grim determination, your forces move into position.</p>
+    <p>Your Squad is assigned to the second group, tasked with scaling the eastern wall. The plan is set, and with grim determination, your forces move into position.</p>
     
     <p>The attack begins with a barrage of flaming arrows arcing toward the front gate. Shouts of alarm erupt from within the outpost. As the Arrasi soldiers rush to defend the main entrance, your group hurries toward the eastern wall with scaling ladders.</p>
   `);
@@ -894,11 +904,11 @@ window.handleAssaultOutpost = function(quest) {
           window.addToNarrative(`
             <p>The fighting is intense but brief. The Arrasi garrison, caught between three attacking forces, is quickly overwhelmed. Within minutes, the outpost is secured.</p>
             
-            <p>The Sarkein moves efficiently through the compound, directing Tayren units to gather intelligence, supplies, and set fire to the structures. Your unit helps secure several prisoners and discovers a cache of maps showing Arrasi patrol routes and supply lines - valuable intelligence for the Paanic command.</p>
+            <p>The Sarkein moves efficiently through the compound, directing units to gather intelligence, supplies, and set fire to the structures. Your unit helps secure several prisoners and discovers a cache of maps showing Arrasi patrol routes and supply lines - valuable intelligence for the Paanic command.</p>
             
             <p>"Good work, soldiers," the Sarkein announces as the outpost burns behind him. "We've cut off their eyes in this sector and gained critical information. Now we return to camp before reinforcements arrive."</p>
             
-            <p>The march back is swift but cautious. Your mission is a clear success, and you feel a surge of pride at having contributed to the Paanic cause, even as a lowly soldier in the Faeqin.</p>
+            <p>The march back is swift but cautious. Your mission is a clear success, and you feel a surge of pride at having contributed to the Paanic cause, even as a lowly soldier in the Spear Host.</p>
           `);
           
           // Add action button to complete mission
@@ -924,7 +934,7 @@ window.handleAssaultOutpost = function(quest) {
           window.addToNarrative(`
             <p>The assault goes poorly. The Arrasi defenders are more numerous and better prepared than expected. As casualties mount, the Sarkein gives the order to withdraw.</p>
             
-            <p>Your Faeqin retreats under covering fire, dragging wounded comrades back to safety. The mission is a failure, and the frontier will remain vulnerable to Arrasi raids.</p>
+            <p>Your Spear Host retreats under covering fire, dragging wounded comrades back to safety. The mission is a failure, and the frontier will remain vulnerable to Arrasi raids.</p>
             
             <p>Back at camp, the Sarkein addresses the soldiers with a somber voice. "We'll have another opportunity," he says, though the disappointment in his voice is clear. "Rest and recover. The Empire still needs its soldiers."</p>
           `);
@@ -939,17 +949,17 @@ window.handleAssaultOutpost = function(quest) {
 
 window.handleReturnToCamp = function(quest) {
   window.setNarrative(`
-    <p>Your Faeqin returns to camp victorious, bearing captured supplies and valuable intelligence. The elimination of the Arrasi outpost represents a significant blow to enemy operations in the region.</p>
+    <p>Your Spear Host returns to camp victorious, bearing captured supplies and valuable intelligence. The elimination of the Arrasi outpost represents a significant blow to enemy operations in the region.</p>
     
     <p>Later that evening, the Vayren calls for you. "Report to the Sarkein's tent," he orders. "Apparently, he wants to hear about the scouting mission from someone who was there."</p>
     
     <p>When you arrive at the command tent, Sarkein Reval is studying the captured maps. He acknowledges your salute with a nod.</p>
     
-    <p>"Your Tayren performed well today," he says, sliding a small pouch of taelors across the table toward you. "This is for your unit. The intelligence we recovered will help us plan our next moves in this sector."</p>
+    <p>"Your Squad performed well today," he says, sliding a small pouch of taelors across the table toward you. "This is for your unit. The intelligence we recovered will help us plan our next moves in this sector."</p>
     
     <p>He studies the maps thoughtfully. "Tell your Vayren that I'll be looking to his unit for future operations. The Empire needs soldiers who can think and act decisively."</p>
     
-    <p>As you leave the Sarkein's tent, there's a new respect in the eyes of your fellow soldiers. Your Tayren's actions today have made a difference, and your reputation within the Kasvaari has grown.</p>
+    <p>As you leave the Sarkein's tent, there's a new respect in the eyes of your fellow soldiers. Your Squad's actions today have made a difference, and your reputation within the Kasvaari has grown.</p>
   `);
   
   // Show notification of quest completion
@@ -1015,6 +1025,9 @@ window.handleQuestAction = function(action) {
     
     // Set inQuestSequence flag
     window.gameState.inQuestSequence = true;
+    
+    // Clear awaiting response flag
+    window.gameState.awaitingQuestResponse = false;
     
     return true; // Action handled
   }
