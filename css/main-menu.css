@@ -1,0 +1,38 @@
+/* In-Game Save Button */
+.save-game-btn {
+    background: #2a3a4a;
+    color: #e0e0e0;
+    border: none;
+    border-radius: 4px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  
+  .save-game-btn:hover {
+    background: #3a4a5a;
+    transform: translateY(-2px);
+  }
+  
+  .save-game-btn:active {
+    transform: translateY(1px);
+  }
+  
+  .save-game-btn i {
+    font-size: 1.2em;
+  }
+  
+  /* Responsive Adjustments */
+  @media (max-width: 768px) {
+    .game-title h1 {
+      font-size: 2em;
+    }
+    
+    .main-menu-btn {
+      padding: 12px 0;
+      font-size: 1.1em;
+    }
+  }

@@ -3,8 +3,8 @@
 
 /**
  * This file consolidates the game initialization flow and eliminates timing issues
- * by providing a clear sequence of operations. It replaces the original main.js and
- * incorporates parts of inventory-fix.js for a unified, reliable startup process.
+ * by providing a clear sequence of operations. It incorporates save/load functionality
+ * and main menu integration.
  */
 
 // ================= GAME INITIALIZATION SEQUENCE =================
@@ -21,6 +21,17 @@ window.initializeGame = function() {
     console.log("Initializing item templates");
     window.initializeItemTemplates();
   }
+  
+  // Phase 3: Initialize the save/load system
+  if (window.initializeSaveLoadSystem) {
+    console.log("Initializing save/load system");
+    window.initializeSaveLoadSystem();
+  }
+  
+  // Phase 4: Show main menu (instead of going straight to character creation)
+  document.getElementById('mainMenuScreen').classList.remove('hidden');
+  document.getElementById('creator').classList.add('hidden');
+  document.getElementById('gameContainer').classList.add('hidden');
   
   console.log("Game initialized and ready to play!");
 };
@@ -60,13 +71,36 @@ function setupEventHandlers() {
   });
   
   // Panel close buttons
-  document.querySelector('.profile-close')?.addEventListener('click', function() {
+  document.querySelector('#profile .panel-close')?.addEventListener('click', function() {
     document.getElementById('profile').classList.add('hidden');
   });
   
-  document.querySelector('.inventory-close')?.addEventListener('click', function() {
+  document.querySelector('#inventory .panel-close')?.addEventListener('click', function() {
     document.getElementById('inventory').classList.add('hidden');
   });
+  
+  // Add return to main menu button to game controls (in side panel)
+  const addMainMenuButton = function() {
+    const gameControls = document.querySelectorAll('.game-controls');
+    
+    gameControls.forEach(controlPanel => {
+      // Check if button already exists
+      if (controlPanel.querySelector('.main-menu-btn')) return;
+      
+      // Create the button
+      const menuButton = document.createElement('button');
+      menuButton.className = 'control-btn';
+      menuButton.innerHTML = '<i class="fas fa-home"></i>Main Menu';
+      menuButton.onclick = window.returnToMainMenu;
+      
+      // Add to the panel
+      controlPanel.appendChild(menuButton);
+    });
+  };
+  
+  // Call it now and also after a short delay to ensure DOM is ready
+  addMainMenuButton();
+  setTimeout(addMainMenuButton, 1000);
   
   console.log("Event handlers set up");
 }
@@ -112,12 +146,18 @@ window.startGameAdventure = function() {
     window.addStartingItems();
   }
   
-  // Phase 7: Update UI
+  // Phase 7: Add save game button to UI
+  if (window.addSaveGameButton) {
+    console.log("Adding save game button");
+    window.addSaveGameButton();
+  }
+  
+  // Phase 8: Update UI
   window.updateStatusBars();
   window.updateTimeAndDay(0); // Start at the initial time
   window.updateActionButtons();
   
-  // Phase 8: Set initial narrative
+  // Phase 9: Set initial narrative
   window.setNarrative(`${window.player.name}, a ${window.player.career.title} of ${window.player.origin} heritage, the road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.<br><br>
   Now, you stand at the edge of your Kasvaari's Camp, the flickering lanterns and distant clang of the forges marking the heartbeat of an army in preparation. Here, amidst the hardened warriors and the banners of noble Charters, you are no longer a traveler—you are a soldier, bound to duty, drawn by the call of empire.<br><br>
   The Western Hierarchate is a land of towering fortresses and ancient battlefields, a realm where the scars of past campaigns linger in the earth itself. The Arrasi Peninsula lies beyond the western horizon, its crystalline plains an enigma even to those who have fought there before. Soon, you will march upon those lands, crossing the vast Wall of Nesia, where the empire's dominion falters against the unknown.<br><br>
@@ -285,7 +325,7 @@ function handlePatrolAction() {
   }
   
   // Determine if combat occurs (30% chance)
-  const combatChance = 0.9;
+  const combatChance = 0.3;
   const encounterRoll = Math.random();
   
   if (encounterRoll < combatChance) {

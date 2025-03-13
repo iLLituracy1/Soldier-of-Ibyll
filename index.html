@@ -4,12 +4,90 @@
   <meta charset="UTF-8">
   <title>Soldier of Ibyll</title>
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/main-menu.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link rel="stylesheet" href="css/shieldwall-styles.css">
 </head>
 <body>
+  <!-- MAIN MENU SECTION -->
+  <div id="mainMenuScreen" class="main-menu-screen">
+    <div class="main-menu-container">
+      <div class="game-title">
+        <h1>Soldier of Ibyll</h1>
+        <h2>A Paanic Empire Roguelite</h2>
+      </div>
+      
+      <div class="menu-options">
+        <button id="newGameBtn" class="main-menu-btn">New Game</button>
+        <button id="loadGameBtn" class="main-menu-btn" disabled>Load Game</button>
+        <button id="creditsBtn" class="main-menu-btn">Credits</button>
+      </div>
+      
+      <div class="game-version">
+        <p>Alpha Version 0.1</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SAVE GAME MENU - WILL BE SHOWN WHEN SAVING -->
+  <div id="saveGameMenu" class="panel-overlay hidden">
+    <div class="save-panel">
+      <div class="panel-header">
+        <h3>Save Game</h3>
+        <button class="panel-close" id="closeSaveMenuBtn">×</button>
+      </div>
+      
+      <div class="save-slots-container">
+        <div id="saveSlots" class="save-slots"></div>
+      </div>
+      
+      <div class="save-actions">
+        <button id="createNewSaveBtn" class="action-btn">Create New Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOAD GAME MENU - WILL BE SHOWN WHEN LOADING -->
+  <div id="loadGameMenu" class="panel-overlay hidden">
+    <div class="load-panel">
+      <div class="panel-header">
+        <h3>Load Game</h3>
+        <button class="panel-close" id="closeLoadMenuBtn">×</button>
+      </div>
+      
+      <div class="save-slots-container">
+        <div id="loadSlots" class="save-slots"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREDITS SCREEN -->
+  <div id="creditsScreen" class="panel-overlay hidden">
+    <div class="credits-panel">
+      <div class="panel-header">
+        <h3>Credits</h3>
+        <button class="panel-close" id="closeCreditsBtn">×</button>
+      </div>
+      
+      <div class="credits-content">
+        <h4>Soldier of Ibyll</h4>
+        <p>A roguelite game set in the Paanic Empire</p>
+        
+        <h5>Development</h5>
+        <p>Game Designer - Unconquerable</p>
+        
+        <h5>Technologies</h5>
+        <p>HTML, CSS, JavaScript</p>
+        
+        <div class="credits-footer">
+          <p>© 2023 All Rights Reserved</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- CHARACTER CREATION AND PROLOGUE SECTIONS -->
-  <div id="creator">
+  <div id="creator" class="hidden">
     <!-- Step 1: Narrative Introduction & Heritage Selection -->
     <div id="intro" class="section">
       <h1>Character Creator</h1>
@@ -202,7 +280,7 @@
     </div>
   </div>
   
-  <!-- QUEST SCENE CONTAINER - Add this right after the gameContainer div -->
+  <!-- QUEST SCENE CONTAINER -->
   <div id="questSceneContainer" class="hidden">
     <div class="quest-scene-layout">
       <!-- HEADER -->
@@ -294,6 +372,7 @@
   <script src="js/quartermasterSystem.js"></script>
   <script src="js/shieldwallSystem.js"></script>
   <script src="js/shieldwallTutorial.js"></script>
+  <script src="js/saveLoadSystem.js"></script>
   <script src="js/main.js"></script>
   <script src="js/combatSystem.js"></script>
   <script src="js/combatSystemRouter.js"></script>
