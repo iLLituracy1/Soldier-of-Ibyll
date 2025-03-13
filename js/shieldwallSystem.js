@@ -1,9 +1,10 @@
 // shieldwallSystem.js - Formation-based combat system for large-scale battles
-// Implements core functionality of the shieldwall combat system described in design docs
+// Fixes critical bugs and improves functionality
 
 // Main shieldwall system object - contains all state and methods
 window.shieldwallSystem = {
   // System state
+  initialized: false,
   state: {
     active: false,
     battlePhase: "preparation", // preparation, skirmish, engagement, main, breaking, pursuit
@@ -57,22 +58,65 @@ window.shieldwallSystem = {
   
   // Initialize the system
   initialize: function() {
-    console.log("Shieldwall system initialized");
+    console.log("Shieldwall system initializing...");
+    
+    // Flag to prevent multiple initialization
     this.initialized = true;
     
     // Add styles if they don't exist
     if (!document.getElementById('shieldwall-styles')) {
       this.addShieldwallStyles();
     }
+    
+    console.log("Shieldwall system initialized");
   },
   
   // Start a shieldwall battle
   initiateBattle: function(config = {}) {
+    console.log("Initiating shieldwall battle with config:", config);
+    
     // Reset state for new battle
     this.resetState();
     
     // Apply configuration
-    Object.assign(this.state, config);
+    if (config) {
+      // Apply top-level properties
+      for (const key in config) {
+        if (typeof config[key] !== 'object' || config[key] === null) {
+          this.state[key] = config[key];
+        }
+      }
+      
+      // Apply nested objects carefully to avoid undefined properties
+      if (config.unitStrength) {
+        this.state.unitStrength = {
+          ...this.state.unitStrength,
+          ...config.unitStrength
+        };
+      }
+      
+      if (config.cohesion) {
+        this.state.cohesion = {
+          ...this.state.cohesion,
+          ...config.cohesion
+        };
+      }
+      
+      if (config.momentum) {
+        this.state.momentum = {
+          ...this.state.momentum,
+          ...config.momentum
+        };
+      }
+      
+      if (config.position) {
+        this.state.position = {
+          ...this.state.position,
+          ...config.position
+        };
+      }
+    }
+    
     this.state.active = true;
     
     // Set default values if not provided
@@ -87,8 +131,14 @@ window.shieldwallSystem = {
     this.renderBattleInterface();
     
     // Start with an introduction message
-    this.addBattleMessage(`The ${this.state.enemyName} advance in formation across the field. Your unit forms a shieldwall in response, weapons at the ready.`);
-    this.addBattleMessage(`Your commander calls out: "${this.state.currentOrder.toUpperCase()}!" The soldiers around you brace themselves, shields locked.`);
+    const enemyName = this.state.enemyName || "Enemy forces";
+    this.addBattleMessage(`The ${enemyName} advance in formation across the field. Your unit forms a shieldwall in response, weapons at the ready.`);
+    
+    const order = this.state.currentOrder || "hold the line";
+    this.addBattleMessage(`Your commander calls out: "${order.toUpperCase()}!" The soldiers around you brace themselves, shields locked.`);
+    
+    // Sync player stats with main game
+    this.syncPlayerStats();
     
     // Start the battle loop
     this.battleLoop();
@@ -141,12 +191,55 @@ window.shieldwallSystem = {
     };
   },
   
+  // Sync player stats with the main game state
+  syncPlayerStats: function() {
+    if (window.gameState) {
+      // Create a reference to player stats for easier updates
+      this.playerStats = {
+        health: window.gameState.health || 100,
+        maxHealth: window.gameState.maxHealth || 100,
+        stamina: window.gameState.stamina || 100,
+        maxStamina: window.gameState.maxStamina || 100,
+        morale: window.gameState.morale || 75
+      };
+      
+      console.log("Synced player stats:", this.playerStats);
+    } else {
+      // Fallback values if gameState isn't available
+      this.playerStats = {
+        health: 100,
+        maxHealth: 100,
+        stamina: 100,
+        maxStamina: 100,
+        morale: 75
+      };
+      
+      console.warn("gameState not found, using default stats");
+    }
+  },
+  
+  // Update player stats from main game state (called periodically)
+  updatePlayerStats: function() {
+    if (window.gameState) {
+      this.playerStats.health = window.gameState.health || this.playerStats.health;
+      this.playerStats.maxHealth = window.gameState.maxHealth || this.playerStats.maxHealth;
+      this.playerStats.stamina = window.gameState.stamina || this.playerStats.stamina;
+      this.playerStats.maxStamina = window.gameState.maxStamina || this.playerStats.maxStamina;
+      this.playerStats.morale = window.gameState.morale || this.playerStats.morale;
+    }
+  },
+  
   // Main battle loop
   battleLoop: function() {
     if (!this.state.active) return;
     
     // Update battle time
     this.state.timePassed += 1;
+    
+    // Update player stats periodically
+    if (this.state.timePassed % 5 === 0) {
+      this.updatePlayerStats();
+    }
     
     // Update UI
     this.updateBattleInterface();
@@ -292,6 +385,8 @@ window.shieldwallSystem = {
         case "attack":
           responseMessage = "You strike at the perfect moment, catching an enemy soldier off-guard! Your counterattack drives them back.";
           break;
+        default:
+          responseMessage = "Your quick reaction succeeds!";
       }
       
       // Update cohesion and momentum
@@ -311,6 +406,8 @@ window.shieldwallSystem = {
         case "attack":
           responseMessage = "Your attack is poorly timed, leaving you exposed. An enemy soldier counters, forcing you back into the line!";
           break;
+        default:
+          responseMessage = "Your reaction fails!";
       }
       
       // Update cohesion and momentum negatively
@@ -318,12 +415,21 @@ window.shieldwallSystem = {
       this.adjustMomentum(-15);
       
       // If it's a personal attack, reduce health
-      if (threat.target === "player") {
-        window.gameState.health = Math.max(1, window.gameState.health - 10);
-        responseMessage += " You take a hit in the process!";
+      if (threat.target === "player" && this.playerStats) {
+        const damageTaken = Math.floor(Math.random() * 8) + 5; // 5-12 damage
+        this.playerStats.health = Math.max(1, this.playerStats.health - damageTaken);
         
-        // Update main game UI health
-        window.updateStatusBars();
+        // Sync with main game state
+        if (window.gameState) {
+          window.gameState.health = this.playerStats.health;
+        }
+        
+        responseMessage += ` You take ${damageTaken} damage in the process!`;
+        
+        // Update main game UI health if possible
+        if (typeof window.updateStatusBars === 'function') {
+          window.updateStatusBars();
+        }
       }
       
       // Unit may take casualties on failed reactions
@@ -350,12 +456,13 @@ window.shieldwallSystem = {
   
   // Handle reaction timeout (player didn't react in time)
   handleReactionTimeout: function() {
+    // Safety check to ensure we have a threat
     if (!this.state.currentThreat) return;
     
     const threat = this.state.currentThreat;
     
     // Generate timeout message
-    let timeoutMessage = `You hesitate, failing to react in time to the ${threat.type}!`;
+    let timeoutMessage = `You hesitate, failing to react in time to the ${threat.type || "threat"}!`;
     
     // Harsh consequences for inaction
     this.adjustCohesion(-15);
@@ -368,13 +475,21 @@ window.shieldwallSystem = {
     timeoutMessage += ` Your unit loses ${casualtiesLost} soldiers as the formation buckles!`;
     
     // Damage to player
-    if (threat.target === "player" || Math.random() < 0.5) {
+    if ((threat.target === "player" || Math.random() < 0.5) && this.playerStats) {
       const damageTaken = Math.floor(Math.random() * 15) + 10;
-      window.gameState.health = Math.max(1, window.gameState.health - damageTaken);
+      this.playerStats.health = Math.max(1, this.playerStats.health - damageTaken);
+      
+      // Sync with main game state
+      if (window.gameState) {
+        window.gameState.health = this.playerStats.health;
+      }
+      
       timeoutMessage += ` You take ${damageTaken} damage from the enemy!`;
       
-      // Update main game UI health
-      window.updateStatusBars();
+      // Update main game UI health if possible
+      if (typeof window.updateStatusBars === 'function') {
+        window.updateStatusBars();
+      }
     }
     
     // Add response to battle log
@@ -392,11 +507,22 @@ window.shieldwallSystem = {
   
   // Change shield position
   changeShieldPosition: function(position) {
-    this.state.shieldPosition = position;
+    if (!position || typeof position !== 'string') {
+      console.error("Invalid shield position:", position);
+      return;
+    }
+    
+    // Validate position
+    if (!['high', 'center', 'low'].includes(position.toLowerCase())) {
+      console.error("Invalid shield position:", position);
+      return;
+    }
+    
+    this.state.shieldPosition = position.toLowerCase();
     
     // Add narrative
     let message = "";
-    switch (position) {
+    switch (position.toLowerCase()) {
       case "high":
         message = "You raise your shield high, providing better protection against airborne threats.";
         break;
@@ -406,6 +532,8 @@ window.shieldwallSystem = {
       case "low":
         message = "You lower your shield, better protecting against low attacks and charges.";
         break;
+      default:
+        message = "You adjust your shield position.";
     }
     
     this.addBattleMessage(message);
@@ -416,11 +544,22 @@ window.shieldwallSystem = {
   
   // Change stance
   changeStance: function(stance) {
-    this.state.playerStance = stance;
+    if (!stance || typeof stance !== 'string') {
+      console.error("Invalid stance:", stance);
+      return;
+    }
+    
+    // Validate stance
+    if (!['aggressive', 'balanced', 'defensive'].includes(stance.toLowerCase())) {
+      console.error("Invalid stance:", stance);
+      return;
+    }
+    
+    this.state.playerStance = stance.toLowerCase();
     
     // Add narrative
     let message = "";
-    switch (stance) {
+    switch (stance.toLowerCase()) {
       case "aggressive":
         message = "You adopt an aggressive stance, ready to strike at opportunities.";
         break;
@@ -430,6 +569,8 @@ window.shieldwallSystem = {
       case "defensive":
         message = "You take a defensive stance, focusing on survival and protection.";
         break;
+      default:
+        message = "You adjust your combat stance.";
     }
     
     this.addBattleMessage(message);
@@ -505,18 +646,29 @@ window.shieldwallSystem = {
           this.changeBattlePhase("breaking");
         }
         break;
+        
+      case "breaking":
+        if (this.state.cohesion.current < 10 || this.state.momentum.value < -75 || this.state.momentum.value > 75) {
+          this.changeBattlePhase("resolution");
+        }
+        break;
     }
   },
   
   // Change battle phase
   changeBattlePhase: function(newPhase) {
+    if (!newPhase || typeof newPhase !== 'string') {
+      console.error("Invalid battle phase:", newPhase);
+      return;
+    }
+    
     const oldPhase = this.state.battlePhase;
-    this.state.battlePhase = newPhase;
+    this.state.battlePhase = newPhase.toLowerCase();
     
     // Add phase transition narrative
     let transitionMessage = "";
     
-    switch (newPhase) {
+    switch (newPhase.toLowerCase()) {
       case "skirmish":
         transitionMessage = "The battle begins with skirmishers exchanging missiles. Arrows and javelins fill the air!";
         break;
@@ -533,13 +685,15 @@ window.shieldwallSystem = {
           transitionMessage = "Your line is struggling to maintain formation as the enemy presses hard!";
         }
         break;
-      case "pursuit":
+      case "resolution":
         if (this.state.momentum.value > 40) {
           transitionMessage = "The enemy breaks and runs! Your forces pursue the routing enemies!";
         } else {
           transitionMessage = "Your commander orders a retreat! Fall back in formation to avoid being cut down!";
         }
         break;
+      default:
+        transitionMessage = `Battle phase changes to ${newPhase}.`;
     }
     
     this.addBattleMessage(transitionMessage);
@@ -551,14 +705,14 @@ window.shieldwallSystem = {
   
   // Check if battle has reached an end condition
   checkBattleEndConditions: function() {
-    // Battle ends with victory if enemy is routed (momentum > 75)
-    if (this.state.momentum.value >= 75) {
+    // Battle ends with victory when in resolution phase with positive momentum
+    if (this.state.battlePhase === "resolution" && this.state.momentum.value > 0) {
       this.endBattle("victory");
       return true;
     }
     
-    // Battle ends with defeat if your unit is routed (momentum < -75)
-    if (this.state.momentum.value <= -75) {
+    // Battle ends with defeat when in resolution phase with negative momentum
+    if (this.state.battlePhase === "resolution" && this.state.momentum.value <= 0) {
       this.endBattle("defeat");
       return true;
     }
@@ -570,7 +724,7 @@ window.shieldwallSystem = {
     }
     
     // Battle also ends if player's health reaches critical levels
-    if (window.gameState.health <= 20) {
+    if (this.playerStats && this.playerStats.health <= 20) {
       this.endBattle("withdrawal");
       return true;
     }
@@ -595,6 +749,8 @@ window.shieldwallSystem = {
       case "withdrawal":
         endMessage = "You're wounded and pulled back from the front line by your comrades. The battle continues without you.";
         break;
+      default:
+        endMessage = "The battle ends.";
     }
     
     this.addBattleMessage(endMessage);
@@ -627,15 +783,20 @@ window.shieldwallSystem = {
       this.hideBattleInterface();
       
       // Return to quest if we're in quest mode
-      if (window.gameState.inQuestSequence && window.quests) {
+      if (window.gameState && window.gameState.inQuestSequence && window.quests) {
         // Find the active quest
         const activeQuest = window.quests.find(q => q.status === window.QUEST_STATUS.ACTIVE);
-        if (activeQuest) {
+        if (activeQuest && window.resumeQuestAfterShieldwall) {
           window.resumeQuestAfterShieldwall(activeQuest, outcome);
+        } else {
+          // Fallback: return to main game
+          window.updateActionButtons();
         }
       } else {
         // Otherwise return to main game
-        window.updateActionButtons();
+        if (typeof window.updateActionButtons === 'function') {
+          window.updateActionButtons();
+        }
       }
     };
     
@@ -644,10 +805,12 @@ window.shieldwallSystem = {
   
   // Add message to battle log
   addBattleMessage: function(message) {
-    // Add to battle log
+    if (!message) return;
+    
+    // Add to battle log array
     this.state.battleLog.push(message);
     
-    // Update UI
+    // Update UI if log element exists
     const battleLog = document.getElementById('shieldwallLog');
     if (battleLog) {
       const messageElement = document.createElement('p');
@@ -666,7 +829,7 @@ window.shieldwallSystem = {
       modalContainer.className = 'shieldwall-modal';
       document.body.appendChild(modalContainer);
       
-      // Create the interface
+      // Create the interface HTML structure
       modalContainer.innerHTML = `
         <div id="shieldwallInterface" class="shieldwall-interface">
           <h2 class="battle-title">BATTLE OF NESIAN FRONTIER</h2>
@@ -746,10 +909,7 @@ window.shieldwallSystem = {
             <div id="reactionContainer" class="reaction-container">
               <div class="control-label">REACTION OPTIONS (5s)</div>
               <div id="reactionOptions" class="reaction-options">
-                <button class="shieldwall-btn reaction-btn" onclick="window.shieldwallSystem.handleReaction('step to gap')">STEP TO GAP</button>
-                <button class="shieldwall-btn reaction-btn" onclick="window.shieldwallSystem.handleReaction('brace')">BRACE</button>
-                <button class="shieldwall-btn reaction-btn" onclick="window.shieldwallSystem.handleReaction('shield cover')">SHIELD COVER</button>
-                <button class="shieldwall-btn reaction-btn" onclick="window.shieldwallSystem.handleReaction('attack')">ATTACK</button>
+                <!-- Will be dynamically populated -->
               </div>
             </div>
             
@@ -810,12 +970,22 @@ window.shieldwallSystem = {
     // Update initial UI elements
     this.updateBattleInterface();
     
+    // Show / hide gap indicator
+    const gapIndicator = document.getElementById('gapIndicator');
+    if (gapIndicator) {
+      gapIndicator.style.display = 'none'; // Hide initially
+    }
+    
     // Clear reaction options
     this.clearReactionOptions();
   },
   
   // Render formation units
   renderFormationUnits: function(type, count) {
+    if (!type || typeof type !== 'string' || !count || count <= 0) {
+      return '';
+    }
+    
     let html = '';
     for (let i = 0; i < count; i++) {
       html += `<div class="unit-marker ${type}">${type.toUpperCase()}</div>`;
@@ -825,144 +995,164 @@ window.shieldwallSystem = {
   
   // Update the battle interface
   updateBattleInterface: function() {
-    // Update unit strength display
-    const unitStrengthDisplay = document.getElementById('unitStrengthDisplay');
-    if (unitStrengthDisplay) {
-      unitStrengthDisplay.textContent = `${this.state.unitStrength.current}/${this.state.unitStrength.max}`;
-    }
-    
-    // Update unit strength bar
-    const unitStrengthBar = document.getElementById('unitStrengthBar');
-    if (unitStrengthBar) {
-      const strengthPercentage = (this.state.unitStrength.current / this.state.unitStrength.max) * 100;
-      unitStrengthBar.style.width = `${strengthPercentage}%`;
-      
-      // Change color based on percentage
-      if (strengthPercentage < 30) {
-        unitStrengthBar.style.backgroundColor = '#ff5f6d';
-      } else if (strengthPercentage < 60) {
-        unitStrengthBar.style.backgroundColor = '#ffc371';
-      } else {
-        unitStrengthBar.style.backgroundColor = '#a8e063';
-      }
-    }
-    
-    // Update momentum display
-    const momentumBarPositive = document.getElementById('momentumBarPositive');
-    const momentumBarNegative = document.getElementById('momentumBarNegative');
-    const momentumAdvantage = document.getElementById('momentumAdvantage');
-    
-    if (momentumBarPositive && momentumBarNegative && momentumAdvantage) {
-      if (this.state.momentum.value >= 0) {
-        momentumBarPositive.style.width = `${this.state.momentum.value}%`;
-        momentumBarNegative.style.width = '0%';
-      } else {
-        momentumBarPositive.style.width = '0%';
-        momentumBarNegative.style.width = `${-this.state.momentum.value}%`;
+    try {
+      // Update battle title
+      const battleTitle = document.querySelector('.battle-title');
+      if (battleTitle) {
+        battleTitle.textContent = `BATTLE OF NESIAN FRONTIER`;
       }
       
-      momentumAdvantage.textContent = `[Advantage: ${this.state.momentum.advantage}]`;
-    }
-    
-    // Update battle phase display
-    const battlePhaseDisplay = document.getElementById('battlePhaseDisplay');
-    if (battlePhaseDisplay) {
-      battlePhaseDisplay.textContent = this.state.battlePhase.toUpperCase();
-    }
-    
-    // Update battle time display
-    const battleTimeDisplay = document.getElementById('battleTimeDisplay');
-    if (battleTimeDisplay) {
-      const minutes = Math.floor(this.state.timePassed / 60);
-      const seconds = Math.floor(this.state.timePassed % 60);
-      battleTimeDisplay.textContent = `Time Elapsed: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }
-    
-    // Update order display
-    const currentOrderDisplay = document.getElementById('currentOrderDisplay');
-    if (currentOrderDisplay) {
-      currentOrderDisplay.textContent = this.state.currentOrder.toUpperCase();
-    }
-    
-    // Update stance display
-    const stanceDisplay = document.getElementById('stanceDisplay');
-    if (stanceDisplay) {
-      stanceDisplay.className = `stance-display ${this.state.playerStance}`;
-      stanceDisplay.innerHTML = `${this.state.playerStance.charAt(0).toUpperCase() + this.state.playerStance.slice(1)}<br>Stance`;
-    }
-    
-    // Update shield position buttons
-    ['high', 'center', 'low'].forEach(pos => {
-      const button = document.getElementById(`${pos}Shield`);
-      if (button) {
-        if (this.state.shieldPosition === pos) {
-          button.classList.add('active');
+      // Update unit strength display
+      const unitStrengthDisplay = document.getElementById('unitStrengthDisplay');
+      if (unitStrengthDisplay) {
+        unitStrengthDisplay.textContent = `${this.state.unitStrength.current}/${this.state.unitStrength.max}`;
+      }
+      
+      // Update unit strength bar
+      const unitStrengthBar = document.getElementById('unitStrengthBar');
+      if (unitStrengthBar) {
+        const strengthPercentage = (this.state.unitStrength.current / this.state.unitStrength.max) * 100;
+        unitStrengthBar.style.width = `${strengthPercentage}%`;
+        
+        // Change color based on percentage
+        if (strengthPercentage < 30) {
+          unitStrengthBar.style.backgroundColor = '#ff5f6d';
+        } else if (strengthPercentage < 60) {
+          unitStrengthBar.style.backgroundColor = '#ffc371';
         } else {
-          button.classList.remove('active');
+          unitStrengthBar.style.backgroundColor = '#a8e063';
         }
       }
-    });
-    
-    // Update cohesion display
-    const cohesionValue = document.getElementById('cohesionValue');
-    const cohesionBar = document.getElementById('cohesionBar');
-    
-    if (cohesionValue && cohesionBar) {
-      cohesionValue.textContent = `${Math.round(this.state.cohesion.current)}%`;
-      cohesionBar.style.width = `${this.state.cohesion.current}%`;
       
-      // Update cohesion status text
-      const cohesionStatusLabel = document.querySelector('.status-label-small');
-      if (cohesionStatusLabel) {
-        cohesionStatusLabel.textContent = `[${this.state.cohesion.status.toUpperCase()}]`;
-      }
+      // Update momentum display
+      const momentumBarPositive = document.getElementById('momentumBarPositive');
+      const momentumBarNegative = document.getElementById('momentumBarNegative');
+      const momentumAdvantage = document.getElementById('momentumAdvantage');
       
-      // Change color based on status
-      if (this.state.cohesion.status === "breaking") {
-        cohesionBar.style.backgroundColor = '#ff5f6d';
-      } else if (this.state.cohesion.status === "wavering") {
-        cohesionBar.style.backgroundColor = '#ffc371';
-      } else {
-        cohesionBar.style.backgroundColor = '#a8e063';
-      }
-    }
-    
-    // Update player stats from main game
-    if (window.gameState) {
-      // Health
-      const healthValue = document.getElementById('shieldwallHealthValue');
-      const healthBar = document.getElementById('shieldwallHealthBar');
-      if (healthValue && healthBar) {
-        healthValue.textContent = `${Math.round(window.gameState.health)}/${window.gameState.maxHealth}`;
-        healthBar.style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
+      if (momentumBarPositive && momentumBarNegative && momentumAdvantage) {
+        if (this.state.momentum.value >= 0) {
+          momentumBarPositive.style.width = `${this.state.momentum.value}%`;
+          momentumBarNegative.style.width = '0%';
+        } else {
+          momentumBarPositive.style.width = '0%';
+          momentumBarNegative.style.width = `${-this.state.momentum.value}%`;
+        }
+        
+        momentumAdvantage.textContent = `[Advantage: ${this.state.momentum.advantage}]`;
       }
       
-      // Stamina
-      const staminaValue = document.getElementById('shieldwallStaminaValue');
-      const staminaBar = document.getElementById('shieldwallStaminaBar');
-      if (staminaValue && staminaBar) {
-        staminaValue.textContent = `${Math.round(window.gameState.stamina)}/${window.gameState.maxStamina}`;
-        staminaBar.style.width = `${(window.gameState.stamina / window.gameState.maxStamina) * 100}%`;
+      // Update battle phase display
+      const battlePhaseDisplay = document.getElementById('battlePhaseDisplay');
+      if (battlePhaseDisplay && this.state.battlePhase) {
+        const phase = this.state.battlePhase.toUpperCase();
+        battlePhaseDisplay.textContent = phase;
       }
       
-      // Morale
-      const moraleValue = document.getElementById('shieldwallMoraleValue');
-      const moraleBar = document.getElementById('shieldwallMoraleBar');
-      if (moraleValue && moraleBar) {
-        moraleValue.textContent = `${Math.round(window.gameState.morale)}/100`;
-        moraleBar.style.width = `${window.gameState.morale}%`;
+      // Update battle time display
+      const battleTimeDisplay = document.getElementById('battleTimeDisplay');
+      if (battleTimeDisplay) {
+        const minutes = Math.floor(this.state.timePassed / 60);
+        const seconds = Math.floor(this.state.timePassed % 60);
+        battleTimeDisplay.textContent = `Time Elapsed: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
       }
-    }
-    
-    // Update reaction timer if active
-    if (this.state.reactionNeeded) {
-      const reactionContainer = document.getElementById('reactionContainer');
-      if (reactionContainer) {
-        const label = reactionContainer.querySelector('.control-label');
-        if (label) {
-          label.textContent = `REACTION OPTIONS (${Math.max(0, Math.ceil(this.state.reactionTimeRemaining))}s)`;
+      
+      // Update order display
+      const currentOrderDisplay = document.getElementById('currentOrderDisplay');
+      if (currentOrderDisplay && this.state.currentOrder) {
+        currentOrderDisplay.textContent = this.state.currentOrder.toUpperCase();
+      }
+      
+      // Update stance display
+      const stanceDisplay = document.getElementById('stanceDisplay');
+      if (stanceDisplay && this.state.playerStance) {
+        // First convert to proper case
+        const stance = this.state.playerStance.charAt(0).toUpperCase() + this.state.playerStance.slice(1).toLowerCase();
+        
+        // Update class and text content
+        stanceDisplay.className = `stance-display ${this.state.playerStance.toLowerCase()}`;
+        stanceDisplay.innerHTML = `${stance}<br>Stance`;
+      }
+      
+      // Update shield position buttons
+      ['high', 'center', 'low'].forEach(pos => {
+        const button = document.getElementById(`${pos}Shield`);
+        if (button) {
+          if (this.state.shieldPosition === pos) {
+            button.classList.add('active');
+          } else {
+            button.classList.remove('active');
+          }
+        }
+      });
+      
+      // Update cohesion display
+      const cohesionValue = document.getElementById('cohesionValue');
+      const cohesionBar = document.getElementById('cohesionBar');
+      
+      if (cohesionValue && cohesionBar) {
+        cohesionValue.textContent = `${Math.round(this.state.cohesion.current)}%`;
+        cohesionBar.style.width = `${this.state.cohesion.current}%`;
+        
+        // Update cohesion status text
+        const cohesionStatusLabel = document.querySelector('.status-label-small');
+        if (cohesionStatusLabel && this.state.cohesion.status) {
+          cohesionStatusLabel.textContent = `[${this.state.cohesion.status.toUpperCase()}]`;
+        }
+        
+        // Change color based on status
+        if (this.state.cohesion.status === "breaking") {
+          cohesionBar.style.backgroundColor = '#ff5f6d';
+        } else if (this.state.cohesion.status === "wavering") {
+          cohesionBar.style.backgroundColor = '#ffc371';
+        } else {
+          cohesionBar.style.backgroundColor = '#a8e063';
         }
       }
+      
+      // Update player stats from main game
+      this.updatePlayerStatusBars();
+      
+      // Update reaction timer if active
+      if (this.state.reactionNeeded) {
+        const reactionContainer = document.getElementById('reactionContainer');
+        if (reactionContainer) {
+          const label = reactionContainer.querySelector('.control-label');
+          if (label) {
+            label.textContent = `REACTION OPTIONS (${Math.max(0, Math.ceil(this.state.reactionTimeRemaining))}s)`;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error updating battle interface:", error);
+    }
+  },
+  
+  // Update player status bars from stored playerStats
+  updatePlayerStatusBars: function() {
+    if (!this.playerStats) return;
+    
+    // Update health display
+    const healthValue = document.getElementById('shieldwallHealthValue');
+    const healthBar = document.getElementById('shieldwallHealthBar');
+    if (healthValue && healthBar) {
+      healthValue.textContent = `${Math.round(this.playerStats.health)}/${this.playerStats.maxHealth}`;
+      healthBar.style.width = `${(this.playerStats.health / this.playerStats.maxHealth) * 100}%`;
+    }
+    
+    // Update stamina display
+    const staminaValue = document.getElementById('shieldwallStaminaValue');
+    const staminaBar = document.getElementById('shieldwallStaminaBar');
+    if (staminaValue && staminaBar) {
+      staminaValue.textContent = `${Math.round(this.playerStats.stamina)}/${this.playerStats.maxStamina}`;
+      staminaBar.style.width = `${(this.playerStats.stamina / this.playerStats.maxStamina) * 100}%`;
+    }
+    
+    // Update morale display
+    const moraleValue = document.getElementById('shieldwallMoraleValue');
+    const moraleBar = document.getElementById('shieldwallMoraleBar');
+    if (moraleValue && moraleBar) {
+      moraleValue.textContent = `${Math.round(this.playerStats.morale)}/100`;
+      moraleBar.style.width = `${this.playerStats.morale}%`;
     }
   },
   
@@ -1034,6 +1224,47 @@ window.shieldwallSystem = {
     if (reactionContainer) {
       reactionContainer.style.display = 'none';
     }
+  },
+  
+  // Position adjustment function (left/right)
+  adjustPosition: function(direction) {
+    if (!direction || typeof direction !== 'string') {
+      console.error("Invalid position adjustment direction:", direction);
+      return;
+    }
+    
+    // Validate direction
+    direction = direction.toLowerCase();
+    if (direction !== 'left' && direction !== 'right') {
+      console.error("Invalid position adjustment direction:", direction);
+      return;
+    }
+    
+    // Update position
+    if (direction === 'left') {
+      if (this.state.position.file === 'center') {
+        this.state.position.file = 'left';
+        this.addBattleMessage("You adjust your position to the left side of the formation.");
+      } else if (this.state.position.file === 'right') {
+        this.state.position.file = 'center';
+        this.addBattleMessage("You adjust your position toward the center of the formation.");
+      } else {
+        this.addBattleMessage("You're already at the left edge of the formation.");
+      }
+    } else { // right
+      if (this.state.position.file === 'center') {
+        this.state.position.file = 'right';
+        this.addBattleMessage("You adjust your position to the right side of the formation.");
+      } else if (this.state.position.file === 'left') {
+        this.state.position.file = 'center';
+        this.addBattleMessage("You adjust your position toward the center of the formation.");
+      } else {
+        this.addBattleMessage("You're already at the right edge of the formation.");
+      }
+    }
+    
+    // Update UI
+    this.updateBattleInterface();
   },
   
   // Add CSS styles for shieldwall system
@@ -1504,11 +1735,14 @@ window.shieldwallSystem = {
 
 // Function to start a shieldwall battle from a quest
 window.startShieldwallBattle = function(config) {
+  console.log("Starting shieldwall battle with config:", config);
+  
+  // Make sure the system is initialized
   if (!window.shieldwallSystem.initialized) {
     window.shieldwallSystem.initialize();
   }
   
-  // Configure battle parameters
+  // Configure default battle parameters
   const battleConfig = {
     enemyName: config.enemyName || "Enemy Forces",
     unitStrength: {
@@ -1535,6 +1769,12 @@ window.startShieldwallBattle = function(config) {
 // Helper function to resume a quest after a shieldwall battle
 window.resumeQuestAfterShieldwall = function(quest, outcome) {
   console.log(`Resuming quest after shieldwall battle with outcome: ${outcome}`);
+  
+  // Find the current stage
+  if (!quest || !quest.stages || !quest.currentStageIndex) {
+    console.error("Invalid quest object:", quest);
+    return;
+  }
   
   const currentStage = quest.stages[quest.currentStageIndex];
   const nextStage = currentStage.nextStage;

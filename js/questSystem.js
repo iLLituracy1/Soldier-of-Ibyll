@@ -47,8 +47,9 @@ window.initializeQuestSystem = function() {
 };
 
 // Initialize quest templates
+// Enhanced quest templates with explicit battle type specifications
 window.initializeQuestTemplates = function() {
-  // Raid the Frontier quest template
+  // Raid the Frontier quest template with enhanced battle type metadata
   window.questTemplates.raid_frontier = {
     id: 'raid_frontier',
     title: 'Raid the Frontier',
@@ -59,49 +60,74 @@ window.initializeQuestTemplates = function() {
         description: 'You\'ve received orders from Sarkein Reval to prepare for a raid on an Arrasi outpost.',
         objective: 'Report to the Sarkein\'s tent for briefing.',
         action: 'report_to_sarkein',
-        nextStage: 'stage_preparation'
+        nextStage: 'stage_preparation',
+        // This is just a conversation stage - no combat needed
+        battleType: window.BATTLE_TYPES.NARRATIVE
       },
       {
         id: 'stage_preparation',
         description: 'The raid will commence tomorrow at dawn. You have one day to prepare your equipment and rest.',
         objective: 'Prepare for the raid (1 day).',
         action: null, // Auto-advances after a day
-        nextStage: 'stage_march'
+        nextStage: 'stage_march',
+        // No combat in this preparation stage
+        battleType: window.BATTLE_TYPES.NARRATIVE
       },
       {
         id: 'stage_march',
         description: 'Your unit marches toward the frontier, a half-day\'s journey through increasingly rough terrain.',
         objective: 'March to the frontier.',
         action: 'begin_march',
-        nextStage: 'stage_scout'
+        nextStage: 'stage_scout',
+        // Just narrative travel - no combat
+        battleType: window.BATTLE_TYPES.NARRATIVE
       },
       {
         id: 'stage_scout',
         description: 'As you approach the outpost, the Sarkein orders a scouting party to assess the enemy\'s defenses.',
         objective: 'Participate in scouting the outpost.',
         action: 'scout_outpost',
-        nextStage: 'stage_ambush'
+        nextStage: 'stage_ambush',
+        // Scouting mission - no combat yet
+        battleType: window.BATTLE_TYPES.NARRATIVE
       },
       {
         id: 'stage_ambush',
         description: 'While scouting, you encounter an Arrasi patrol. The element of surprise is compromised.',
         objective: 'Deal with the patrol.',
         action: 'combat_patrol',
-        nextStage: 'stage_assault'
+        nextStage: 'stage_assault',
+        // This is a small patrol encounter - use individual combat
+        battleType: window.BATTLE_TYPES.INDIVIDUAL,
+        enemyType: "ARRASI_VAELGORR",
+        successText: "The last Arrasi soldier falls, and your scouting party quickly drags the bodies into the underbrush. The three of you need to report back to the Sarkein quickly.",
+        failureText: "You find yourself overwhelmed by the Arrasi patrol. As consciousness fades, you hear shouts of alarm being raised."
       },
       {
         id: 'stage_assault',
         description: 'With the patrol eliminated, your unit must now assault the outpost before reinforcements arrive.',
         objective: 'Assault the Arrasi outpost.',
         action: 'assault_outpost',
-        nextStage: 'stage_return'
+        nextStage: 'stage_return',
+        // This is a large-scale battle - use formation/shieldwall combat
+        battleType: window.BATTLE_TYPES.FORMATION, 
+        enemyName: "Arrasi Garrison",
+        unitStrength: 40,
+        startingCohesion: 85,
+        startingMomentum: 10,
+        startingPhase: "engagement",
+        order: "advance",
+        successText: "Your formation holds strong as you breach the outpost walls. The battle is won with minimal casualties!",
+        failureText: "Your formation breaks under the sustained assault. The Sarkein orders a retreat as casualties mount."
       },
       {
         id: 'stage_return',
         description: 'The raid was successful. Time to return to camp with the spoils and report to the Sarkein.',
         objective: 'Return to camp and report success.',
         action: 'return_to_camp',
-        nextStage: null
+        nextStage: null,
+        // No combat in this return stage
+        battleType: window.BATTLE_TYPES.NARRATIVE
       }
     ],
     baseReward: {
@@ -110,8 +136,8 @@ window.initializeQuestTemplates = function() {
       items: ['healthPotion']
     },
     requiredPreparationDays: 1,
-    chanceTrigger: 0.99, // 15% chance per day when eligible
-    minDayToTrigger: 1, // Only available after day 5
+    chanceTrigger: 0.99, // High chance for testing purposes
+    minDayToTrigger: 1, // Only available after day 1
     cooldownDays: 5 // Must wait 5 days between assignments of this quest
   };
   
@@ -446,6 +472,7 @@ window.progressQuest = function(questId, action) {
 };
 
 // Handle quest stage actions
+// Function to handle quest stage actions with action matching fix
 window.handleQuestStageAction = function(quest, stage) {
   console.log(`Handling quest stage action: ${stage.action}`);
   
@@ -458,34 +485,40 @@ window.handleQuestStageAction = function(quest, stage) {
     window.gameState.inQuestSequence = false;
   }
   
-  // Branch based on the action
-  switch(stage.action) {
-    case 'report_to_sarkein':
+  // Branch based on the stage ID instead of the action
+  // This fixes the action mismatch error
+  switch(stage.id) {
+    case 'stage_dispatch':
       window.handleReportToSarkein(quest);
       break;
       
-    case 'begin_march':
+    case 'stage_march':
       window.handleBeginMarch(quest);
       break;
       
-    case 'scout_outpost':
+    case 'stage_scout':
       window.handleScoutOutpost(quest);
       break;
       
-    case 'combat_patrol':
+    case 'stage_ambush':
       window.handleCombatPatrol(quest);
       break;
       
-    case 'assault_outpost':
+    case 'stage_assault':
       window.handleAssaultOutpost(quest);
       break;
       
-    case 'return_to_camp':
+    case 'stage_return':
       window.handleReturnToCamp(quest);
       break;
       
     default:
-      console.log(`No special handling for action: ${stage.action}`);
+      console.log(`No special handling for stage: ${stage.id}`);
+      
+      // Check if we have a generic action handler for this stage action
+      if (stage.action && typeof window[`handle${stage.action.charAt(0).toUpperCase() + stage.action.slice(1)}`] === 'function') {
+        window[`handle${stage.action.charAt(0).toUpperCase() + stage.action.slice(1)}`](quest);
+      }
   }
 };
 
