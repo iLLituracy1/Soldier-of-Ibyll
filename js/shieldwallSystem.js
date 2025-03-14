@@ -67,7 +67,7 @@ window.shieldwallSystem = {
       target: "formation",
       bestReaction: "brace",
       bestShieldPosition: "high",
-      timeToReact: 8, 
+      timeToReact: 5, 
       criticalThreat: false
     },
     charge: {
@@ -77,7 +77,7 @@ window.shieldwallSystem = {
       target: "player",
       bestReaction: "brace",
       bestShieldPosition: "center",
-      timeToReact: 10,
+      timeToReact: 6,
       criticalThreat: false
     },
     gap: {
@@ -87,7 +87,7 @@ window.shieldwallSystem = {
       target: "formation",
       bestReaction: "step to gap",
       bestShieldPosition: "center",
-      timeToReact: 6, 
+      timeToReact: 5, 
       criticalThreat: false
     },
     flanking: {
@@ -97,7 +97,7 @@ window.shieldwallSystem = {
       target: "formation",
       bestReaction: "adjust position",
       bestShieldPosition: "center",
-      timeToReact: 6, 
+      timeToReact: 5, 
       criticalThreat: false
     },
     spears: {
@@ -107,7 +107,7 @@ window.shieldwallSystem = {
       target: "player",
       bestReaction: "brace",
       bestShieldPosition: "low",
-      timeToReact: 8, // Still relatively quick but more reasonable
+      timeToReact: 4, // Still relatively quick but more reasonable
       criticalThreat: true
     },
     officer: {
@@ -129,6 +129,26 @@ window.shieldwallSystem = {
       bestShieldPosition: "center",
       timeToReact: 5, // One of the few threats that needs quick reaction
       criticalThreat: true
+    },
+    cavalry: {
+      emoji: "🐎", // Horse
+      color: "#8B4513", // SaddleBrown
+      description: "Enemy cavalry charges toward your formation, thundering hooves shaking the ground!",
+      target: "formation",
+      bestReaction: "brace",
+      bestShieldPosition: "low",
+      timeToReact: 7,
+      criticalThreat: true
+    },
+    swords: {
+      emoji: "🗡️", // Dagger (using this instead of ⚔️ which is already used for charge)
+      color: "#4682B4", // Steel Blue
+      description: "A Druskari elite swings his greatsword at your head!",
+      target: "player",
+      bestReaction: "brace", // Using brace since "block" isn't currently implemented
+      bestShieldPosition: "high",
+      timeToReact: 3,
+      criticalThreat: true // Changed to true since it's a fast, dangerous attack
     }
   },
   
@@ -398,9 +418,9 @@ window.shieldwallSystem = {
     // Filter threats based on battle phase
     const availableThreats = threatsList.filter(threat => {
       if (this.state.battlePhase === "skirmish" && ["projectiles"].includes(threat.type)) return true;
-      if (this.state.battlePhase === "engagement" && ["charge", "projectiles", "spears"].includes(threat.type)) return true;
+      if (this.state.battlePhase === "engagement" && ["charge", "projectiles", "spears", "cavalry", "swords"].includes(threat.type)) return true;
       if (this.state.battlePhase === "main") return true; // All threats possible in main phase
-      if (this.state.battlePhase === "breaking" && ["gap", "flanking", "charge", "breakthrough"].includes(threat.type)) return true;
+      if (this.state.battlePhase === "breaking" && ["gap", "flanking", "charge", "breakthrough", "cavalry", "swords"].includes(threat.type)) return true;
       return false;
     });
     
@@ -470,10 +490,10 @@ window.shieldwallSystem = {
     const correctShieldPosition = threat.bestShieldPosition === this.state.shieldPosition;
     
     // Calculate success based on reaction and shield position
-    let successChance = 0.5; // Base 50% chance
+    let successChance = 0.25; // Base 25% chance
     
-    if (correctReaction) successChance += 0.3; // +30% for correct reaction
-    if (correctShieldPosition) successChance += 0.2; // +20% for correct shield position
+    if (correctReaction) successChance += 0.4; // +40% for correct reaction
+    if (correctShieldPosition) successChance += 0.25; // +25% for correct shield position
     
     // Modify based on player stance
     if (this.state.playerStance === "aggressive" && reactionType === "attack") {
@@ -517,6 +537,10 @@ window.shieldwallSystem = {
             responseMessage = "You plant your feet and brace your shield firmly as the enemy charges. The impact is jarring, but your stance holds and you push back against the attacker.";
           } else if (threat.type === "spears") {
             responseMessage = "You angle your shield downward, deflecting the thrusting spears. The spearheads scrape harmlessly off your shield's surface.";
+          } else if (threat.type === "cavalry") {
+            responseMessage = "You brace in proper formation with your comrades as the cavalry thunders closer. The wall of shields and spears forces the riders to veer away at the last moment.";
+          } else if (threat.type === "swords") {
+            responseMessage = "You raise your shield just in time to block the Druskari elite's greatsword. The blade crashes against your shield with tremendous force, but your stance holds firm.";
           } else {
             responseMessage = `You brace firmly, your shield positioned perfectly against the ${threat.type}. Your section of the line holds strong!`;
           }
@@ -566,6 +590,10 @@ window.shieldwallSystem = {
             responseMessage = "Your footing slips as you attempt to brace, leaving you vulnerable to the enemy charge. The impact knocks you back into your comrades, disrupting your unit's line.";
           } else if (threat.type === "spears") {
             responseMessage = "You fail to angle your shield correctly, allowing an enemy spear to slip past your guard. The thrust catches you painfully along the arm.";
+          } else if (threat.type === "cavalry") {
+            responseMessage = "You fail to set your shield firmly as the cavalry approaches. A rider breaks through, scattering soldiers and forcing your formation to bend backward.";
+          } else if (threat.type === "swords") {
+            responseMessage = "You raise your shield too slowly, and the Druskari elite's greatsword slips past your defense. The blade strikes a glancing blow to your shoulder, sending a jolt of pain through your arm.";
           } else {
             responseMessage = `Your bracing is too late or poorly positioned. The ${threat.type} breaks through your defense, causing your section to falter!`;
           }
@@ -620,8 +648,8 @@ window.shieldwallSystem = {
       }
       
       // Unit may take casualties on failed reactions
-      if (Math.random() < 0.2) { // Reduced from 0.3
-        const casualtiesLost = Math.floor(Math.random() * 2) + 1; // 1-2 casualties (reduced from 1-3)
+      if (Math.random() < 0.3) { 
+        const casualtiesLost = Math.floor(Math.random() * 3) + 1; // 1-3 casualties
         this.state.unitStrength.current = Math.max(1, this.state.unitStrength.current - casualtiesLost);
         this.state.unitStrength.casualties += casualtiesLost;
         responseMessage += ` Your unit loses ${casualtiesLost} ${casualtiesLost === 1 ? 'soldier' : 'soldiers'} in the chaos!`;
@@ -662,7 +690,7 @@ window.shieldwallSystem = {
     this.adjustMomentum(-15);
     
     // Unit takes some casualties
-    const casualtiesLost = Math.floor(Math.random() * 3) + 1; // 1-3 casualties (reduced from 2-5)
+    const casualtiesLost = Math.floor(Math.random() * 5) + 2;
     this.state.unitStrength.current = Math.max(1, this.state.unitStrength.current - casualtiesLost);
     this.state.unitStrength.casualties += casualtiesLost;
     timeoutMessage += ` Your unit loses ${casualtiesLost} soldiers as the formation buckles!`;
@@ -778,7 +806,7 @@ window.shieldwallSystem = {
     // Update UI
     this.updateBattleInterface();
     
-    // ADD THIS LINE:
+    
     // Update player marker to reflect stance
     this.updatePlayerPositionMarker();
   },
@@ -1506,6 +1534,12 @@ window.shieldwallSystem = {
         break;
       case "breakthrough":
         availableReactions = ["attack", "brace"];
+        break;
+      case "cavalry":
+        availableReactions = ["brace", "attack"]; // Added for cavalry
+        break;
+      case "swords":
+        availableReactions = ["brace", "shield cover"]; // Added for swords
         break;
       default:
         availableReactions = ["brace", "shield cover", "step to gap", "attack"];
@@ -2297,6 +2331,63 @@ window.shieldwallSystem = {
         80% { opacity: 0.7; }
         100% { opacity: 0; }
       }
+      
+      /* Cavalry Effect - NEW */
+      .cavalry-effect {
+        width: 50px;
+        height: 25px;
+        position: absolute;
+        background-color: #8B4513;
+        border-radius: 40% 10% 10% 40%;
+        animation: cavalry-charge 3s forwards;
+        transform-origin: center;
+      }
+      
+      .cavalry-effect:before {
+        content: '';
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        top: -5px;
+        left: 5px;
+        background-color: #8B4513;
+        border-radius: 50%;
+      }
+      
+      @keyframes cavalry-charge {
+        0% { transform: translateX(-100px) scale(0.7); opacity: 0.7; }
+        40% { transform: translateX(0) scale(1); opacity: 1; }
+        100% { transform: translateX(200px) scale(1.2); opacity: 0; }
+      }
+      
+      /* Sword Effect - NEW */
+      .sword-effect {
+        width: 30px;
+        height: 5px;
+        background-color: #4682B4;
+        position: absolute;
+        top: 60%;
+        transform-origin: right center;
+        animation: sword-swing 1s forwards;
+      }
+      
+      .sword-effect:before {
+        content: '';
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #4682B4;
+        right: -2px;
+        top: -1.5px;
+      }
+      
+      @keyframes sword-swing {
+        0% { transform: rotate(-45deg) translateX(0); opacity: 0; }
+        20% { opacity: 1; }
+        50% { transform: rotate(0deg) translateX(0); }
+        100% { transform: rotate(45deg) translateX(10px); opacity: 0; }
+      }
     `;
     
     document.head.appendChild(styleElement);
@@ -2716,6 +2807,12 @@ window.shieldwallSystem = {
         case "breakthrough":
           this.addBreakthroughEffect(formationOverview);
           break;
+        case "cavalry":
+          this.addCavalryEffect(formationOverview);
+          break;
+        case "swords":
+          this.addSwordEffect(formationOverview);
+          break;
       }
     }
   },
@@ -2812,6 +2909,51 @@ window.shieldwallSystem = {
     setTimeout(() => {
       breaking.remove();
     }, 2500);
+  },
+  
+  // Add cavalry charge effect
+  addCavalryEffect: function(container) {
+    // Create multiple cavalry units charging
+    for (let i = 0; i < 3; i++) {
+      const cavalry = document.createElement('div');
+      cavalry.className = 'battle-effect cavalry-effect';
+      
+      // Stagger the horsemen
+      cavalry.style.left = `${30 + (i * 15)}%`;
+      cavalry.style.top = `${15 + (i * 5)}%`;
+      cavalry.style.animationDelay = `${i * 0.2}s`;
+      
+      container.appendChild(cavalry);
+      
+      // Remove after animation completes
+      setTimeout(() => {
+        cavalry.remove();
+      }, 3000);
+    }
+  },
+  
+  // Add sword effect
+  addSwordEffect: function(container) {
+    const sword = document.createElement('div');
+    sword.className = 'battle-effect sword-effect';
+    
+    // Position near the player
+    const playerMarker = document.getElementById('playerPosition');
+    if (playerMarker) {
+      const rect = playerMarker.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const relativeLeft = (rect.left - containerRect.left) / containerRect.width * 100;
+      sword.style.left = `${relativeLeft}%`;
+    } else {
+      sword.style.left = '50%';
+    }
+    
+    container.appendChild(sword);
+    
+    // Remove after animation completes
+    setTimeout(() => {
+      sword.remove();
+    }, 1000);
   }
 };
 
