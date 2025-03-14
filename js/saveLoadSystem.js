@@ -232,223 +232,369 @@ function resetAndReinitializeGame() {
   console.log("Game systems reinitialized");
 }
 
-// Create new items from saved data instead of trying to restore references
-function rebuildInventoryItems(savedInventory) {
-  if (!savedInventory || !Array.isArray(savedInventory) || savedInventory.length === 0) {
-    console.log("No inventory items to rebuild");
-    return [];
+/**
+ * Creates a complete serializable copy of an item
+ * Captures all necessary properties to fully recreate the item
+ */
+function createSerializableItem(item) {
+  if (!item || item === "occupied") return item;
+  
+  try {
+    // Get the template
+    const template = item.getTemplate();
+    
+    // Create a complete item record
+    const serializedItem = {
+      // Basic item identification
+      templateId: item.templateId,
+      instanceId: item.instanceId,
+      
+      // Item state
+      quantity: item.quantity || 1,
+      durability: item.durability,
+      equipped: item.equipped || false,
+      
+      // Ammunition properties
+      ammoType: item.ammoType,
+      capacity: item.capacity,
+      currentAmount: item.currentAmount,
+      compatibleWeapons: item.compatibleWeapons,
+      
+      // Template properties (complete data to rebuild without matching)
+      template: {
+        id: template.id,
+        name: template.name,
+        description: template.description,
+        category: template.category,
+        rarity: template.rarity,
+        value: template.value,
+        weight: template.weight,
+        symbol: template.symbol,
+        stackable: template.stackable,
+        maxStack: template.maxStack,
+        
+        // Equipment properties
+        equipSlot: template.equipSlot,
+        hands: template.hands,
+        
+        // Stats and effects
+        stats: template.stats || {},
+        effects: template.effects || [],
+        
+        // Weapon/armor specific
+        weaponType: template.weaponType,
+        armorType: template.armorType,
+        damageType: template.damageType,
+        maxDurability: template.maxDurability,
+        blockChance: template.blockChance,
+        
+        // Requirements
+        requirements: template.requirements || {}
+      }
+    };
+    
+    return serializedItem;
+  } catch (error) {
+    console.error("Error creating serializable item:", error);
+    return null;
+  }
+}
+
+/**
+ * Prepares player inventory for saving by creating complete serializable copies
+ */
+function prepareInventoryForSave(inventory) {
+  if (!inventory || !Array.isArray(inventory)) return [];
+  
+  const serializedInventory = [];
+  
+  inventory.forEach(item => {
+    const serializedItem = createSerializableItem(item);
+    if (serializedItem) {
+      serializedInventory.push(serializedItem);
+    }
+  });
+  
+  return serializedInventory;
+}
+
+/**
+ * Prepares player equipment for saving by creating complete serializable copies
+ */
+function prepareEquipmentForSave(equipment) {
+  if (!equipment) return {};
+  
+  const serializedEquipment = {};
+  
+  for (const slot in equipment) {
+    const item = equipment[slot];
+    
+    // Special "occupied" marker for off-hand with two-handed weapon
+    if (item === "occupied") {
+      serializedEquipment[slot] = "occupied";
+    } else if (item) {
+      const serializedItem = createSerializableItem(item);
+      if (serializedItem) {
+        serializedEquipment[slot] = serializedItem;
+      } else {
+        serializedEquipment[slot] = null;
+      }
+    } else {
+      serializedEquipment[slot] = null;
+    }
   }
   
-  console.log(`Rebuilding ${savedInventory.length} inventory items from save data`);
+  return serializedEquipment;
+}
+
+/**
+ * Updated player save function that stores complete item data
+ */
+function savePlayerData(player) {
+  // Create deep copy of basic player data
+  const playerData = JSON.parse(JSON.stringify({
+    origin: player.origin,
+    career: player.career,
+    name: player.name,
+    phy: player.phy,
+    men: player.men,
+    skills: player.skills,
+    taelors: player.taelors,
+    events: player.events,
+    inventoryCapacity: player.inventoryCapacity
+  }));
   
-  const newInventory = [];
+  // Add fully serialized inventory and equipment
+  playerData.inventory = prepareInventoryForSave(player.inventory);
+  playerData.equipment = prepareEquipmentForSave(player.equipment);
   
-  // Process each saved item
-  savedInventory.forEach((savedItem, index) => {
-    try {
-      if (!savedItem || !savedItem.templateId) {
-        console.warn(`Invalid item at index ${index}, skipping`);
-        return;
+  return playerData;
+}
+
+/**
+ * Creates a complete item instance from serialized data
+ */
+function createItemFromSerialized(serializedItem) {
+  if (!serializedItem || serializedItem === "occupied") return serializedItem;
+  
+  try {
+    // First, ensure the template exists in our system
+    let template = window.itemTemplates[serializedItem.templateId];
+    
+    // If template doesn't exist, create it from the saved data
+    if (!template && serializedItem.template) {
+      // Create appropriate template based on category
+      if (serializedItem.template.category === window.ITEM_CATEGORIES.WEAPON) {
+        template = window.createWeapon(serializedItem.template);
+      } else if (serializedItem.template.category === window.ITEM_CATEGORIES.ARMOR) {
+        template = window.createArmor(serializedItem.template);
+      } else if (serializedItem.template.category === window.ITEM_CATEGORIES.CONSUMABLE) {
+        template = window.createConsumable(serializedItem.template);
+      } else if (serializedItem.template.category === window.ITEM_CATEGORIES.MOUNT) {
+        template = window.createMount(serializedItem.template);
+      } else if (serializedItem.template.category === window.ITEM_CATEGORIES.AMMUNITION) {
+        template = window.createAmmunition(serializedItem.template);
+      } else {
+        template = window.createItemTemplate(serializedItem.template);
       }
       
-      // Find matching template by ID
-      const templateId = savedItem.templateId;
-      let template = window.itemTemplates[templateId];
-      
-      // If direct match fails, try to find a similar template
-      if (!template) {
-        // Try without underscores
-        const noUnderscoreId = templateId.replace(/_/g, '');
-        
-        for (const id in window.itemTemplates) {
-          const cleanId = id.replace(/_/g, '');
-          if (cleanId.toLowerCase() === noUnderscoreId.toLowerCase()) {
-            template = window.itemTemplates[id];
-            console.log(`Found alternative template for ${templateId}: ${id}`);
-            break;
-          }
-        }
-        
-        // Try by category and name keywords
-        if (!template) {
-          // Find default template based on item type
-          if (templateId.includes('potion')) {
-            template = window.itemTemplates.healthPotion || window.itemTemplates['health_potion'];
-          } else if (templateId.includes('sword')) {
-            template = window.itemTemplates.basicSword || window.itemTemplates['basic_sword'];
-          } else if (templateId.includes('armor')) {
-            template = window.itemTemplates.legionArmor || window.itemTemplates['legion_armor'];
-          } else if (templateId.includes('javelin') || templateId.includes('pack')) {
-            template = window.itemTemplates.javelinPack || window.itemTemplates['javelin_pack'];
-          }
-        }
+      // Add to item templates if it doesn't exist
+      if (template && !window.itemTemplates[template.id]) {
+        window.itemTemplates[template.id] = template;
       }
+    }
+    
+    // If we still don't have a template (neither found nor created), use fallbacks
+    if (!template) {
+      console.warn(`Could not find or create template for ${serializedItem.templateId}, using fallback`);
       
-      // If we still can't find a template, create a generic one
-      if (!template) {
-        console.warn(`Could not find template for ${templateId}, creating placeholder`);
-        
-        // Create a generic template based on category hints in the ID
-        if (templateId.includes('potion')) {
-          template = window.createConsumable({
-            id: 'generic_potion',
-            name: 'Generic Potion',
-            description: 'A replacement potion.',
-            value: 20
-          });
-        } else if (templateId.includes('sword') || templateId.includes('weapon')) {
-          template = window.createWeapon({
-            id: 'generic_weapon',
-            name: 'Generic Weapon',
-            description: 'A replacement weapon.',
-            damage: 8
-          });
-        } else if (templateId.includes('armor')) {
-          template = window.createArmor({
-            id: 'generic_armor',
-            name: 'Generic Armor',
-            description: 'A replacement armor piece.',
-            defense: 8
-          });
+      // Use appropriate fallback based on category
+      if (serializedItem.template && serializedItem.template.category === window.ITEM_CATEGORIES.WEAPON) {
+        // For weapons, try to match the general type
+        if (serializedItem.template.weaponType && 
+            serializedItem.template.weaponType.name === "Battle Axe") {
+          template = window.itemTemplates.battleaxe || window.itemTemplates.basicAxe;
+        } else if (serializedItem.template.weaponType && 
+                  serializedItem.template.weaponType.name === "Bow") {
+          template = window.itemTemplates.hunterBow;
         } else {
-          // Last resort - generic item
-          template = window.createItemTemplate({
-            id: 'generic_item',
-            name: 'Generic Item',
-            description: 'A replacement item.',
-            category: window.ITEM_CATEGORIES.MATERIAL
-          });
+          // Default to basic sword
+          template = window.itemTemplates.basicSword;
         }
+      } else if (serializedItem.template && serializedItem.template.category === window.ITEM_CATEGORIES.ARMOR) {
+        template = window.itemTemplates.legionArmor;
+      } else if (serializedItem.template && serializedItem.template.category === window.ITEM_CATEGORIES.AMMUNITION) {
+        // Choose ammunition based on type
+        if (serializedItem.ammoType === "arrow") {
+          template = window.itemTemplates.quiver;
+        } else if (serializedItem.ammoType === "shot") {
+          template = window.itemTemplates.cartridgePouch;
+        } else {
+          template = window.itemTemplates.javelinPack;
+        }
+      } else {
+        // Generic item as last resort
+        template = window.createItemTemplate({
+          id: 'generic_item',
+          name: serializedItem.template ? serializedItem.template.name : 'Unknown Item',
+          description: 'A replacement item.',
+          category: serializedItem.template ? serializedItem.template.category : window.ITEM_CATEGORIES.MATERIAL,
+          equipSlot: serializedItem.template ? serializedItem.template.equipSlot : null
+        });
+        window.itemTemplates[template.id] = template;
       }
-      
-      // Create new item instance from template
-      const newItem = window.createItemInstance(template, savedItem.quantity || 1);
-      
-      // Copy over critical properties from the saved item
-      if (savedItem.equipped) newItem.equipped = true;
-      if (savedItem.durability !== undefined) newItem.durability = savedItem.durability;
-      
-      // Special handling for ammunition
-      if (savedItem.capacity !== undefined) newItem.capacity = savedItem.capacity;
-      if (savedItem.currentAmount !== undefined) newItem.currentAmount = savedItem.currentAmount;
-      
-      // Add to new inventory
-      newInventory.push(newItem);
-      
+    }
+    
+    // Create new item instance
+    const newItem = window.createItemInstance(template, serializedItem.quantity || 1);
+    
+    // Copy saved state
+    if (serializedItem.durability !== undefined) newItem.durability = serializedItem.durability;
+    if (serializedItem.equipped) newItem.equipped = true;
+    
+    // Copy ammunition properties
+    if (serializedItem.capacity !== undefined) newItem.capacity = serializedItem.capacity;
+    if (serializedItem.currentAmount !== undefined) newItem.currentAmount = serializedItem.currentAmount;
+    if (serializedItem.compatibleWeapons) newItem.compatibleWeapons = serializedItem.compatibleWeapons;
+    
+    return newItem;
+  } catch (error) {
+    console.error("Error creating item from serialized data:", error);
+    return null;
+  }
+}
+
+/**
+ * Rebuilds player inventory from saved data
+ */
+function rebuildInventoryFromSaved(savedInventory) {
+  if (!savedInventory || !Array.isArray(savedInventory)) return [];
+  
+  const rebuiltInventory = [];
+  
+  savedInventory.forEach((serializedItem, index) => {
+    try {
+      const newItem = createItemFromSerialized(serializedItem);
+      if (newItem) {
+        rebuiltInventory.push(newItem);
+      }
     } catch (error) {
       console.error(`Error rebuilding inventory item ${index}:`, error);
     }
   });
   
-  console.log(`Successfully rebuilt ${newInventory.length} out of ${savedInventory.length} inventory items`);
-  return newInventory;
+  return rebuiltInventory;
 }
 
-// Rebuild equipment slots from saved data
-function rebuildEquipment(savedEquipment) {
-  if (!savedEquipment) {
-    console.log("No equipment to rebuild");
-    return {};
-  }
+/**
+ * Rebuilds player equipment from saved data
+ */
+function rebuildEquipmentFromSaved(savedEquipment) {
+  if (!savedEquipment) return {};
   
-  console.log("Rebuilding equipment from save data");
-  
-  const newEquipment = {};
-  
-  // Check if player is cavalry to handle mount slot
-  const isCavalry = window.player.career && window.player.career.title === "Castellan Cavalry";
-  console.log(`Rebuilding equipment for ${isCavalry ? 'cavalry' : 'non-cavalry'} character`);
+  const rebuiltEquipment = {};
   
   // Track which slots we need to fill
   const requiredSlots = ['head', 'body', 'mainHand', 'offHand', 'accessory', 'ammunition'];
   
   // Add mount slot if player is cavalry
-  if (isCavalry) {
+  if (window.player.career && window.player.career.title === "Castellan Cavalry") {
     requiredSlots.push('mount');
   }
   
   // Process each slot
   for (const slot in savedEquipment) {
-    const savedItem = savedEquipment[slot];
-    
-    // Skip empty slots or "occupied" marker
-    if (!savedItem || savedItem === "occupied") {
-      newEquipment[slot] = savedItem; // Copy as is
-      continue;
-    }
-    
     try {
-      // Find matching template by ID
-      const templateId = savedItem.templateId;
-      let template = window.itemTemplates[templateId];
+      const serializedItem = savedEquipment[slot];
       
-      // If direct match fails, try to find a similar template
-      if (!template) {
-        // Try without underscores
-        const noUnderscoreId = templateId.replace(/_/g, '');
-        
-        for (const id in window.itemTemplates) {
-          const cleanId = id.replace(/_/g, '');
-          if (cleanId.toLowerCase() === noUnderscoreId.toLowerCase()) {
-            template = window.itemTemplates[id];
-            console.log(`Found alternative template for ${templateId}: ${id}`);
-            break;
-          }
-        }
-        
-        // Find by slot type if still not found
-        if (!template) {
-          // Find a template that fits this slot
-          for (const id in window.itemTemplates) {
-            const testTemplate = window.itemTemplates[id];
-            if (testTemplate.equipSlot === slot) {
-              template = testTemplate;
-              console.log(`Using alternative template ${id} for ${slot} slot`);
-              break;
-            }
-          }
-        }
-      }
-      
-      // If we found a template, create a new item
-      if (template) {
-        const newItem = window.createItemInstance(template);
-        newItem.equipped = true;
-        
-        // Copy over critical properties from the saved item
-        if (savedItem.durability !== undefined) newItem.durability = savedItem.durability;
-        
-        // Special handling for ammunition
-        if (slot === 'ammunition') {
-          newItem.capacity = savedItem.capacity || template.capacity || 20;
-          newItem.currentAmount = savedItem.currentAmount !== undefined ? 
-            savedItem.currentAmount : newItem.capacity;
-        }
-        
-        // Add to equipment
-        newEquipment[slot] = newItem;
+      // Handle special "occupied" marker
+      if (serializedItem === "occupied") {
+        rebuiltEquipment[slot] = "occupied";
+      } else if (serializedItem) {
+        const newItem = createItemFromSerialized(serializedItem);
+        rebuiltEquipment[slot] = newItem;
       } else {
-        console.warn(`Could not find template for ${slot} equipment, leaving empty`);
-        newEquipment[slot] = null;
+        rebuiltEquipment[slot] = null;
       }
     } catch (error) {
       console.error(`Error rebuilding equipment in slot ${slot}:`, error);
-      newEquipment[slot] = null;
+      rebuiltEquipment[slot] = null;
     }
   }
   
   // Ensure all required slots exist
   requiredSlots.forEach(slot => {
-    if (newEquipment[slot] === undefined) {
-      newEquipment[slot] = null;
+    if (rebuiltEquipment[slot] === undefined) {
+      rebuiltEquipment[slot] = null;
     }
   });
   
-  console.log("Equipment rebuilt successfully");
-  return newEquipment;
+  // Consistency check for two-handed weapons
+  if (rebuiltEquipment.mainHand && 
+      rebuiltEquipment.mainHand.getTemplate && 
+      rebuiltEquipment.mainHand.getTemplate().weaponType && 
+      rebuiltEquipment.mainHand.getTemplate().weaponType.hands === 2) {
+    // If main hand has a two-handed weapon, make sure off-hand is marked as occupied
+    rebuiltEquipment.offHand = "occupied";
+  }
+  
+  return rebuiltEquipment;
 }
 
-// Load a game by ID - COMPLETELY REWRITTEN
+// Create a new save with complete item data
+function createNewSave() {
+  console.log("Creating new save with complete item data");
+  
+  // Check if we've reached max saves
+  const saveList = getSaveList();
+  if (saveList.length >= MAX_SAVES) {
+    window.showNotification(`Maximum of ${MAX_SAVES} saves reached. Please delete a save first.`, 'warning');
+    return;
+  }
+  
+  // Create save ID
+  const saveId = 'save_' + Date.now();
+  
+  // Create save data
+  const saveTimestamp = Date.now();
+  const saveTitle = `${window.player.name}'s Campaign`;
+  
+  // Create save object for the list
+  const saveInfo = {
+    id: saveId,
+    title: saveTitle,
+    playerName: window.player.name,
+    career: window.player.career.title,
+    day: window.gameDay,
+    timestamp: saveTimestamp
+  };
+  
+  // Create fully serialized player data with complete item information
+  const playerData = savePlayerData(window.player);
+  
+  // Create full save data
+  const saveData = {
+    player: playerData,
+    gameState: JSON.parse(JSON.stringify(window.gameState)),
+    gameTime: window.gameTime,
+    gameDay: window.gameDay,
+    saveInfo: saveInfo
+  };
+  
+  // Save to localStorage
+  localStorage.setItem(SAVE_KEY_PREFIX + saveId, JSON.stringify(saveData));
+  
+  // Update save list
+  saveList.push(saveInfo);
+  updateSaveList(saveList);
+  
+  // Refresh save slots
+  populateSaveSlots();
+  
+  window.showNotification('Game saved successfully!', 'success');
+}
+
+// Load a game by ID - completely rewritten to use serialized item data
 function loadGame(saveId) {
   console.log(`Loading game with ID: ${saveId}`);
   
@@ -529,14 +675,14 @@ function loadGame(saveId) {
       },
       taelors: Number(saveData.player.taelors || 25),
       events: saveData.player.events || [],
-      inventoryCapacity: Number(saveData.player.inventoryCapacity || 20) // Set inventory capacity
+      inventoryCapacity: Number(saveData.player.inventoryCapacity || 20)
     };
     
-    // STEP 4: Rebuild inventory with new item instances
-    window.player.inventory = rebuildInventoryItems(saveData.player.inventory);
+    // STEP 4: Rebuild inventory with complete item data
+    window.player.inventory = rebuildInventoryFromSaved(saveData.player.inventory);
     
-    // STEP 5: Rebuild equipment with new item instances
-    window.player.equipment = rebuildEquipment(saveData.player.equipment);
+    // STEP 5: Rebuild equipment with complete item data
+    window.player.equipment = rebuildEquipmentFromSaved(saveData.player.equipment);
     
     // STEP 6: Initialize additional systems with the loaded player data
     if (typeof window.initializeQuestSystem === 'function') {
@@ -731,56 +877,6 @@ function populateSaveSlots() {
   });
 }
 
-// Create a new save
-function createNewSave() {
-  console.log("Creating new save");
-  
-  // Check if we've reached max saves
-  const saveList = getSaveList();
-  if (saveList.length >= MAX_SAVES) {
-    window.showNotification(`Maximum of ${MAX_SAVES} saves reached. Please delete a save first.`, 'warning');
-    return;
-  }
-  
-  // Create save ID
-  const saveId = 'save_' + Date.now();
-  
-  // Create save data
-  const saveTimestamp = Date.now();
-  const saveTitle = `${window.player.name}'s Campaign`;
-  
-  // Create save object for the list
-  const saveInfo = {
-    id: saveId,
-    title: saveTitle,
-    playerName: window.player.name,
-    career: window.player.career.title,
-    day: window.gameDay,
-    timestamp: saveTimestamp
-  };
-  
-  // Create full save data - use clean copying to avoid circular references
-  const saveData = {
-    player: JSON.parse(JSON.stringify(window.player)), // Deep copy
-    gameState: JSON.parse(JSON.stringify(window.gameState)), // Deep copy
-    gameTime: window.gameTime,
-    gameDay: window.gameDay,
-    saveInfo: saveInfo
-  };
-  
-  // Save to localStorage
-  localStorage.setItem(SAVE_KEY_PREFIX + saveId, JSON.stringify(saveData));
-  
-  // Update save list
-  saveList.push(saveInfo);
-  updateSaveList(saveList);
-  
-  // Refresh save slots
-  populateSaveSlots();
-  
-  window.showNotification('Game saved successfully!', 'success');
-}
-
 // Overwrite an existing save
 function overwriteSave(saveId) {
   if (!confirm('Are you sure you want to overwrite this save?')) {
@@ -804,10 +900,13 @@ function overwriteSave(saveId) {
   saveInfo.day = window.gameDay;
   saveInfo.timestamp = Date.now();
   
+  // Create player data with full item serialization
+  const playerData = savePlayerData(window.player);
+  
   // Create full save data
   const saveData = {
-    player: JSON.parse(JSON.stringify(window.player)), // Deep copy
-    gameState: JSON.parse(JSON.stringify(window.gameState)), // Deep copy
+    player: playerData,
+    gameState: JSON.parse(JSON.stringify(window.gameState)),
     gameTime: window.gameTime,
     gameDay: window.gameDay,
     saveInfo: saveInfo

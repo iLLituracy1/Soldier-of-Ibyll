@@ -84,12 +84,15 @@ function setupEventHandlers() {
     const gameControls = document.querySelectorAll('.game-controls');
     
     gameControls.forEach(controlPanel => {
-      // Check if button already exists
-      if (controlPanel.querySelector('.main-menu-btn')) return;
+      // FIXED: Check specifically for a main menu button using class and text content
+      if (controlPanel.querySelector('.control-btn[data-purpose="main-menu"]')) {
+        return; // Button already exists in this panel
+      }
       
       // Create the button
       const menuButton = document.createElement('button');
       menuButton.className = 'control-btn';
+      menuButton.setAttribute('data-purpose', 'main-menu'); // Add identifier attribute
       menuButton.innerHTML = '<i class="fas fa-home"></i>Main Menu';
       menuButton.onclick = window.returnToMainMenu;
       
@@ -98,9 +101,25 @@ function setupEventHandlers() {
     });
   };
   
-  // Call it now and also after a short delay to ensure DOM is ready
+  // FIXED: Call only once, and if needed set a timeout for a safety check
   addMainMenuButton();
-  setTimeout(addMainMenuButton, 1000);
+  
+  // Safety check in case some elements weren't loaded yet
+  setTimeout(() => {
+    const gameControls = document.querySelectorAll('.game-controls');
+    
+    // Only add buttons to panels that don't have them yet
+    gameControls.forEach(panel => {
+      if (!panel.querySelector('.control-btn[data-purpose="main-menu"]')) {
+        const menuButton = document.createElement('button');
+        menuButton.className = 'control-btn';
+        menuButton.setAttribute('data-purpose', 'main-menu');
+        menuButton.innerHTML = '<i class="fas fa-home"></i>Main Menu';
+        menuButton.onclick = window.returnToMainMenu;
+        panel.appendChild(menuButton);
+      }
+    });
+  }, 1000);
   
   console.log("Event handlers set up");
 }
