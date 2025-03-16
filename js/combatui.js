@@ -324,6 +324,11 @@ const originalUpdateCombatInterface = window.combatSystem.updateCombatInterface;
 window.combatSystem.updateCombatInterface = function() {
   // Call the original function first
   originalUpdateCombatInterface.call(this);
+
+    // Add knocked down indicator if applicable
+    if (this.state.enemy.knockedDown) {
+      document.getElementById('enemyName').textContent += " (Knocked Down)";
+    }
   
   // Add or update status indicators
   let statusContainer = document.querySelector('.combat-status-indicators');

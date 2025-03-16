@@ -149,10 +149,26 @@ window.combatSystem = {
         this.scheduleEnemyAction(() => this.enterPhase("player"), 1000);
         break;
         
-      case "player":
-        // Update UI to show player options
-        this.updateCombatOptions();
-        break;
+        case "player":
+          // Check if player is stunned
+          if (window.gameState.playerStunned) {
+            this.addCombatMessage(`You're still recovering from being stunned and cannot act!`);
+            window.gameState.playerStunned = false; // Clear stun for next turn
+            
+            // Skip to enemy phase
+            setTimeout(() => this.enterPhase("enemy"), 1500);
+            return;
+          }
+          
+          // Check if player is knocked down
+          if (window.gameState.knockedDown) {
+            this.handlePlayerGetUp();
+            return;
+          }
+          
+          // Update UI to show player options (original code)
+          this.updateCombatOptions();
+          break;
         
       case "enemy":
         // NEW: Check if enemy is already defeated before processing turn
@@ -181,6 +197,30 @@ window.combatSystem = {
     
     console.log(`Combat phase changed: ${previousPhase} -> ${phase}`);
   },
+
+      // Handle player getting up from knocked down
+    handlePlayerGetUp: function() {
+      // Update combat actions to only show get up option
+      const actionsContainer = document.getElementById('combatActions');
+      actionsContainer.innerHTML = '';
+      
+      // Add get up button
+      this.addCombatButton("Get Up", () => this.executePlayerGetUp(), actionsContainer);
+      
+      // Add narrative
+      this.addCombatMessage(`You're on the ground and need to get back to your feet.`);
+    },
+
+    // Execute player getting up action
+    executePlayerGetUp: function() {
+      this.addCombatMessage(`You struggle back to your feet, ready to continue the fight.`);
+      
+      // Clear knocked down status
+      window.gameState.knockedDown = false;
+      
+      // Move to enemy phase - player used their turn to get up
+      setTimeout(() => this.enterPhase("enemy"), 1000);
+    },
   
   // Process enemy's turn
   processEnemyTurn: function() {
@@ -190,6 +230,26 @@ window.combatSystem = {
       // Cancel any pending turns and move to resolution
       this._processingEnemyTurn = false;
       this.enterPhase("resolution");
+      return;
+    }
+
+    // Check if enemy is stunned or knocked down
+    if (this.state.enemy.stunned) {
+      this.addCombatMessage(`The ${this.state.enemy.name} is still stunned and cannot act!`);
+      // Remove stun for next turn
+      this.state.enemy.stunned = false;
+      
+      // Move directly to resolution phase
+      this.scheduleEnemyAction(() => {
+        this._processingEnemyTurn = false;
+        this.enterPhase("resolution");
+      }, 1500);
+      return;
+    }
+
+    // Check if enemy is knocked down (after stun wears off)
+    if (this.state.enemy.knockedDown) {
+      this.handleEnemyGetUp();
       return;
     }
 
@@ -227,6 +287,22 @@ window.combatSystem = {
       this.enterPhase("resolution");
     }, 1500);
   },
+
+  // Handle enemy getting up from knocked down
+    handleEnemyGetUp: function() {
+      const enemy = this.state.enemy;
+      
+      this.addCombatMessage(`The ${enemy.name} struggles to get back to their feet.`);
+      
+      // Clear knocked down status
+      enemy.knockedDown = false;
+      
+      // Move to resolution phase - enemy used their turn to get up
+      this.scheduleEnemyAction(() => {
+        this._processingEnemyTurn = false;
+        this.enterPhase("resolution");
+      }, 1500);
+    },
   
   // Determine enemy's next action based on AI logic
   determineEnemyAction: function() {
@@ -415,7 +491,17 @@ window.combatSystem = {
     if (attackType === "Throw Javelin") {
       return this.handleJavelinThrow();
     }
-    
+
+    // Special case for shield bash
+    if (attackType === "Shield Bash") {
+      return this.handleShieldBash();
+    }
+
+    // Special case for shield shove
+    if (attackType === "Shove") {
+      return this.handleShieldShove();
+    }
+        
     // Get player weapon
     const weapon = window.player.equipment?.mainHand;
     if (!weapon && attackType !== "Punch") {
@@ -561,7 +647,7 @@ window.combatSystem = {
     const hitBonus = 10;
     const hitSuccess = this.resolveAttackSuccess({
       name: "javelin",
-      stats: { damage: 12, armorPenetration: 5 }
+      stats: { damage: 22, armorPenetration: 5 }
     }, "Throw", hitBonus);
     
     if (hitSuccess) {
@@ -593,6 +679,181 @@ window.combatSystem = {
     // Move to enemy phase - no counter opportunity on javelin misses
     setTimeout(() => this.enterPhase("enemy"), 1000);
   },
+
+  // Handle shield bash attack
+handleShieldBash: function() {
+  // Get player's shield
+  const shield = window.player.equipment?.offHand;
+  if (!shield || shield === "occupied") {
+    this.addCombatMessage("You need a shield to bash!");
+    return;
+  }
+  
+  const shieldTemplate = shield.getTemplate();
+  
+  // Check if it's actually a shield
+  if (shieldTemplate.weaponType?.name !== "Shield") {
+    this.addCombatMessage("You need a shield to bash!");
+    return;
+  }
+  
+  // Generate attack narrative
+  this.addCombatMessage(`You thrust forward with your ${shieldTemplate.name}, attempting to bash the ${this.state.enemy.name}.`);
+  
+  // Reduce shield durability with each use
+  if (shield.durability !== undefined) {
+    // Random durability reduction between 1-2 points
+    const durabilityLoss = Math.floor(Math.random() * 2) + 1;
+    shield.durability = Math.max(0, shield.durability - durabilityLoss);
+    
+    // Check if shield breaks
+    if (shield.durability <= 0) {
+      this.addCombatMessage(`Your ${shieldTemplate.name} breaks during the bash attack!`);
+      // Shield still hits in this attack, but will be unusable after
+    }
+  }
+  
+  // Determine hit success
+  const hitSuccess = this.resolveAttackSuccess({
+    name: shieldTemplate.name,
+    stats: { damage: 5 }  // Shields do less damage but can stun
+  }, "Bash");
+  
+  if (hitSuccess) {
+    // Calculate damage - shield bashes do less damage
+    const damage = Math.round(5 + Math.random() * 3);
+    
+    // Apply damage to enemy
+    this.state.enemy.health = Math.max(0, this.state.enemy.health - damage);
+    
+    // Generate hit narrative
+    this.addCombatMessage(`Your shield connects solidly, dealing ${damage} damage and staggering the ${this.state.enemy.name}!`);
+    
+    // Special shield bash effect: chance to stun the enemy
+    if (Math.random() < 0.5) {  // 50% chance to stun
+      this.addCombatMessage(`The ${this.state.enemy.name} is stunned by your shield bash!`);
+      // Apply stun effect (enemy misses their next turn)
+      this.state.enemy.stunned = true;
+    }
+    
+    // Reset counter chain after successful hit
+    this.state.counterChain = 0;
+    this.state.counterWindowOpen = false;
+    this.state.lastCounterActor = null;
+    
+    // Check if enemy is defeated
+    if (this.state.enemy.health <= 0) {
+      this.addCombatMessage(this.generateVictoryNarrative());
+      
+      // End combat immediately
+      setTimeout(() => this.endCombat(true), 1500);
+      return;
+    }
+  } else {
+    // Generate miss narrative
+    this.addCombatMessage(`The ${this.state.enemy.name} dodges your shield bash!`);
+    
+    // Potential counterattack window
+    if (this.shouldEnemyCounter()) {
+      this.state.counterWindowOpen = true;
+      this.state.counterChain = 0; // Reset counter chain at start of new exchange
+      this.addCombatMessage(`The ${this.state.enemy.name} sees an opening and prepares to counter!`);
+      
+      // Move to enemy phase for counter
+      setTimeout(() => this.handleEnemyCounter(), 1000);
+      return;
+    }
+  }
+  
+  // Update UI
+  this.updateCombatInterface();
+  
+  // Move to enemy phase if no counter
+  if (!this.state.counterWindowOpen) {
+    setTimeout(() => this.enterPhase("enemy"), 1000);
+  }
+},
+
+
+// Handle shield shove attack
+handleShieldShove: function() {
+  // Get player's shield
+  const shield = window.player.equipment?.offHand;
+  if (!shield || shield === "occupied") {
+    this.addCombatMessage("You need a shield to shove!");
+    return;
+  }
+  
+  const shieldTemplate = shield.getTemplate();
+  
+  // Check if it's actually a shield
+  if (shieldTemplate.weaponType?.name !== "Shield") {
+    this.addCombatMessage("You need a shield to shove!");
+    return;
+  }
+  
+  // Generate attack narrative
+  this.addCombatMessage(`You drive your ${shieldTemplate.name} forward with force, attempting to shove the ${this.state.enemy.name} back.`);
+  
+  // Reduce shield durability slightly with each use
+  if (shield.durability !== undefined) {
+    // Minimal durability reduction for shoving (0-1 points)
+    const durabilityLoss = Math.floor(Math.random() * 2);
+    shield.durability = Math.max(0, shield.durability - durabilityLoss);
+  }
+  
+  // Calculate success chance based on player's phy + melee skill vs enemy power
+  const playerPush = (window.player.phy || 5) + (window.player.skills.melee || 0);
+  const enemyResist = (this.state.enemy.power || 5) + (this.state.enemy.counterSkill || 0);
+  const successChance = 50 + ((playerPush - enemyResist) * 5);
+  
+  // Roll for success
+  const roll = Math.random() * 100;
+  const success = roll <= successChance;
+  
+  if (success) {
+    // Increase distance by 1
+    this.state.distance = Math.min(3, this.state.distance + 1);
+    
+    this.addCombatMessage(`You successfully push the ${this.state.enemy.name} back!`);
+    
+    // Check for knockdown
+    const knockdownChance = 40 + ((playerPush - enemyResist) * 3);
+    const knockdownRoll = Math.random() * 100;
+    const knockedDown = knockdownRoll <= knockdownChance;
+    
+    if (knockedDown) {
+      this.addCombatMessage(`The ${this.state.enemy.name} loses balance and falls to the ground!`);
+      
+      // Apply knocked down status
+      this.state.enemy.knockedDown = true;
+      // First turn they're stunned
+      this.state.enemy.stunned = true;
+    }
+  } else {
+    this.addCombatMessage(`The ${this.state.enemy.name} holds their ground against your shove.`);
+    
+    // Potential counterattack window
+    if (this.shouldEnemyCounter()) {
+      this.state.counterWindowOpen = true;
+      this.state.counterChain = 0;
+      this.addCombatMessage(`The ${this.state.enemy.name} sees an opening and prepares to counter!`);
+      
+      // Move to enemy phase for counter
+      setTimeout(() => this.handleEnemyCounter(), 1000);
+      return;
+    }
+  }
+  
+  // Update UI
+  this.updateCombatInterface();
+  
+  // Move to enemy phase
+  if (!this.state.counterWindowOpen) {
+    setTimeout(() => this.enterPhase("enemy"), 1000);
+  }
+},
+
   
   // Handle player counter attack
   handlePlayerCounter: function(attackType) {
@@ -730,8 +991,98 @@ window.combatSystem = {
   },
   
   // Handle enemy attack
-  handleEnemyAttack: function(attackType, targetArea) {
-    const enemy = this.state.enemy;
+ // Handle enemy attack
+handleEnemyAttack: function(attackType, targetArea) {
+  const enemy = this.state.enemy;
+  
+  // Shield Shove handling
+  if (attackType === "ShieldShove") {
+    this.addCombatMessage(`The ${enemy.name} lunges forward, trying to shove you back with their shield!`);
+    
+    // Calculate success chance based on enemy stats vs player phy + melee
+    const enemyPush = (enemy.power || 5) + (enemy.counterSkill || 0);
+    const playerResist = (window.player.phy || 5) + (window.player.skills?.melee || 0);
+    const successChance = 50 + ((enemyPush - playerResist) * 5);
+    
+    // Roll for success
+    const roll = Math.random() * 100;
+    const success = roll <= successChance;
+    
+    if (success) {
+      // Increase distance by 1
+      this.state.distance = Math.min(3, this.state.distance + 1);
+      
+      this.addCombatMessage(`The ${enemy.name} successfully pushes you back!`);
+      
+      // Check for knockdown
+      const knockdownChance = 40 + ((enemyPush - playerResist) * 3);
+      const knockdownRoll = Math.random() * 100;
+      const knockedDown = knockdownRoll <= knockdownChance;
+      
+      if (knockedDown) {
+        this.addCombatMessage(`You lose your balance and fall to the ground!`);
+        
+        // Apply player knocked down status
+        window.gameState.knockedDown = true;
+        
+        // End the turn
+        this.updateCombatInterface();
+        return;
+      }
+    } else {
+      this.addCombatMessage(`You hold your ground against the shield shove.`);
+    }
+    
+    // Update UI and continue
+    this.updateCombatInterface();
+    return;
+  }
+  
+  // Shield Bash handling
+  if (attackType === "ShieldBash") {
+    this.addCombatMessage(`The ${enemy.name} swings their shield at you in a powerful bash!`);
+    
+    // Check for player shield block
+    if (this.checkPlayerShieldBlock()) {
+      this.addCombatMessage(`You raise your shield just in time, blocking the bash completely!`);
+      return;
+    }
+    
+    // Determine hit success
+    const defenseBonus = this.state.playerStance === "defensive" ? 20 : 0;
+    const hitChance = 45 + (enemy.accuracy || 0) - (window.player.skills?.melee * 5 || 0) - defenseBonus;
+    const hitRoll = Math.random() * 100;
+    
+    if (hitRoll < hitChance) {
+      // Attack hits - shield bashes do less damage but can stun
+      const damage = Math.round(5 + Math.random() * 3);
+      
+      // Apply damage to player
+      window.gameState.health = Math.max(0, window.gameState.health - damage);
+      
+      // Generate hit narrative
+      this.addCombatMessage(`The shield bash connects, dealing ${damage} damage and staggering you!`);
+      
+      // Chance to stun player
+      if (Math.random() < 0.4) {
+        this.addCombatMessage(`You're momentarily stunned by the impact!`);
+        window.gameState.playerStunned = true;
+      }
+      
+      // Check if player is defeated
+      if (window.gameState.health <= 0) {
+        this.addCombatMessage(`You've been critically wounded and can no longer fight.`);
+        setTimeout(() => this.endCombat(false), 1500);
+        return;
+      }
+    } else {
+      this.addCombatMessage(`You manage to dodge the shield bash!`);
+    }
+    
+    // Update UI and continue
+    this.updateCombatInterface();
+    return;
+  }
     
     // NEW: Special handling for javelin throws
     if (attackType === "ThrowJavelin") {
@@ -1060,7 +1411,22 @@ window.combatSystem = {
         armorDurabilityReduction += Math.min(50, durabilityPercent / 2); // Cap at 50%
       }
     }
-    
+
+    const shield = window.player.equipment?.offHand;
+    if (shield && shield !== "occupied") {
+      const shieldTemplate = shield.getTemplate();
+      if (shieldTemplate.weaponType?.name === "Shield") {
+        // Shield bash is only available at close range (0 or 1)
+        if (this.state.distance <= 1 && !attacks.includes("Shield Bash")) {
+          attacks.push("Shield Bash");
+        }
+        
+        // Shove is only available at grappling range (0)
+        if (this.state.distance === 0 && !attacks.includes("Shove")) {
+          attacks.push("Shove");
+        }
+      }
+    }
     // Calculate damage with randomness
     let damage = baseDamage * (1 + Math.random() * 0.4 - 0.2);
     
@@ -1757,24 +2123,42 @@ window.combatSystem = {
     return availableAttacks;
   },
   
-  // Get random enemy attack
-  getRandomEnemyAttack: function() {
-    const enemy = this.state.enemy;
-    
-    // Different attack options based on distance
-    if (this.state.distance <= 1) {
-      // Melee range attacks
-      const meleeAttacks = ["Strike", "Slash", "Stab"];
-      return meleeAttacks[Math.floor(Math.random() * meleeAttacks.length)];
-    } else if (this.state.distance === 2 && this.enemyHasAmmo('javelin')) {
-      // Medium range with javelins available
-      return "ThrowJavelin";
-    } else {
-      // Default attacks
-      const basicAttacks = ["Strike", "Slash", "Stab"];
-      return basicAttacks[Math.floor(Math.random() * basicAttacks.length)];
-    }
-  },
+    // Get random enemy attack
+    getRandomEnemyAttack: function() {
+      const enemy = this.state.enemy;
+      
+      // Special shield attacks if enemy has a shield and we're at appropriate distance
+      if (enemy.hasShield) {
+        if (this.state.distance === 0) {
+          // At grappling range, chance to use shield shove
+          if (Math.random() < 0.4) {
+            return "ShieldShove";
+          }
+        }
+        
+        if (this.state.distance <= 1) {
+          // At close range, chance to use shield bash
+          if (Math.random() < 0.3) {
+            return "ShieldBash";
+          }
+        }
+      }
+      
+      // If no shield attack selected, use standard attacks
+      // Different attack options based on distance
+      if (this.state.distance <= 1) {
+        // Melee range attacks
+        const meleeAttacks = ["Strike", "Slash", "Stab"];
+        return meleeAttacks[Math.floor(Math.random() * meleeAttacks.length)];
+      } else if (this.state.distance === 2 && this.enemyHasAmmo('javelin')) {
+        // Medium range with javelins available
+        return "ThrowJavelin";
+      } else {
+        // Default attacks
+        const basicAttacks = ["Strike", "Slash", "Stab"];
+        return basicAttacks[Math.floor(Math.random() * basicAttacks.length)];
+      }
+    },
   
   // Get random target area
   getRandomTargetArea: function() {
