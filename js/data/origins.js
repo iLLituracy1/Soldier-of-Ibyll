@@ -17,9 +17,7 @@ window.origins = {
       <p>Your loyalty to the Empire was secured by political maneuvering and power plays. Now, marching east under the imperial banner, you must prove your mettle in a landscape where honor and ambition collide.</p>
     `,
     careers: [
-      { title: "Scout", description: "With a re-engineered matchlock rifle from ancient ruins, you serve as a keen-eyed forward observer." },
       { title: "Squire", description: "Trained under a noble banner, you mastered swordsmanship and etiquette, now tested in brutal warfare." },
-      { title: "Castellan Cavalry", description: "Riding advanced equestrian constructs, you embody Nesia's proud martial tradition, though survival is never assured." }
     ]
   },
   "Lunarine": {
@@ -41,7 +39,6 @@ window.origins = {
     careers: [
       { title: "Berserker", description: "Your raw fury, honed among untamed clans, fuels devastating attacks. Will you harness your strength for glory or risk being consumed by it?" },
       { title: "Marauder", description: "Once a cunning free spirit on the Wyrdplains, you now tread a fine line between your feral past and your duty to the Empire." },
-      { title: "Plains Huntsman", description: "Skilled with bow and spear, you were raised under open skies. The strict discipline of the legion challenges your independent nature." }
     ]
   }
 };

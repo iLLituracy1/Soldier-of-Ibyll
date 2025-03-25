@@ -1,5 +1,5 @@
-// combatSystem.js - COMPLETE UPDATED COMBAT SYSTEM MODULE 
-// Implements a narrative-driven combat system with stances, distances, counter chains, and weapon-based actions
+// combatSystem.js - ENHANCED MULTI-COMBAT SYSTEM MODULE
+// Implements a narrative-driven combat system with multiple combatants, stances, distances, and turn limits
 
 // Combat state and management object
 window.combatSystem = {
@@ -7,16 +7,21 @@ window.combatSystem = {
   state: {
     active: false,
     turn: 0,
-    phase: "initial", // initial, player, enemy, resolution
-    enemy: null,
+    maxTurns: 10, // Maximum turns before combat shifts
+    phase: "initial", // initial, player, ally, enemy, resolution
     distance: 2, // 0:Grappling, 1:Close, 2:Medium, 3:Far
     playerStance: "neutral", // neutral, aggressive, defensive
-    enemyStance: "neutral",
-    counterWindowOpen: false,
     targetArea: "body", // head, body, legs
     combatLog: [],
     
+    // Multi-combat properties
+    enemies: [], // Array of enemy objects
+    allies: [],  // Array of ally objects
+    activeEnemyIndex: 0, // Current enemy taking action
+    activeAllyIndex: 0,  // Current ally taking action
+    
     // Counter system properties
+    counterWindowOpen: false,
     counterChain: 0,          // Tracks how many counters in a row
     maxCounterChain: 4,       // Maximum number of back-and-forth exchanges
     lastCounterActor: null,   // Who performed the last counter ("player" or "enemy")
@@ -50,40 +55,110 @@ window.combatSystem = {
     // Add an initialization flag for systems that need to check
     this.initialized = true;
     // Add any one-time initialization here
+    
+    // Tell the UI module that we're initialized
+    if (window.combatUI && typeof window.combatUI.onCombatSystemInitialized === 'function') {
+      window.combatUI.onCombatSystemInitialized();
+    }
   },
   
-  // Start combat with an enemy
-  initiateCombat: function(enemyType) {
+  // Start combat with enemy(ies) and optional ally(ies)
+  initiateCombat: function(enemyTypes, allyTypes = []) {
     // Reset combat state
     this.state = {
       active: true,
       turn: 0,
+      maxTurns: 30,
       phase: "initial",
       distance: 2,
       playerStance: "neutral",
-      enemyStance: "neutral",
-      counterWindowOpen: false,
+      enemyStance: "neutral", // For backward compatibility with combatUI.js
       targetArea: "body",
       combatLog: [],
       
+      // Multi-combat properties
+      enemies: [],
+      allies: [],
+      activeEnemyIndex: 0,
+      activeAllyIndex: 0,
+      
       // Counter system properties
+      counterWindowOpen: false,
       counterChain: 0,
       maxCounterChain: 4,
-      lastCounterActor: null
+      lastCounterActor: null,
+      
+      // Backward compatibility
+      enemy: null
     };
     
-    // Create enemy instance
-    this.state.enemy = this.createEnemy(enemyType);
+    // Create enemy instances
+    if (typeof enemyTypes === 'string') {
+      // Single enemy (backward compatibility)
+      const enemy = this.createEnemy(enemyTypes);
+      this.state.enemies.push(enemy);
+      this.state.enemy = enemy; // For backward compatibility
+    } else {
+      // Multiple enemies
+      for (const enemyType of enemyTypes) {
+        const enemy = this.createEnemy(enemyType);
+        this.state.enemies.push(enemy);
+        if (this.state.enemies.length === 1) {
+          this.state.enemy = enemy; // For backward compatibility
+        }
+      }
+    }
     
-    // Set up the combat interface
-    this.renderCombatInterface();
+    // Create ally instances
+    for (const allyType of allyTypes) {
+      this.state.allies.push(this.createAlly(allyType));
+    }
     
-    // Start with initial narrative
-    this.addCombatMessage(`You're locked in combat with a ${this.state.enemy.name}.`);
+    // Tell the UI to set up the combat interface
+    if (window.combatUI) {
+      window.combatUI.renderCombatInterface();
+    }
+    
+    // Generate descriptive intro based on number of combatants
+    let intro;
+    if (this.state.enemies.length === 1) {
+      intro = `You're locked in combat with a ${this.state.enemies[0].name}.`;
+    } else {
+      intro = `You're locked in combat with ${this.getEnemyGroupDescription()}.`;
+    }
+    
+    // Add ally description if present
+    if (this.state.allies.length > 0) {
+      const allyNames = this.state.allies.map(a => a.name);
+      if (allyNames.length === 1) {
+        intro += ` A ${allyNames[0]} fights alongside you.`;
+      } else {
+        const lastAlly = allyNames.pop();
+        intro += ` ${allyNames.join(', ')} and a ${lastAlly} fight alongside you.`;
+      }
+    }
+    
+    this.addCombatMessage(intro);
     this.addCombatMessage(`You circle each other, feeling out the ground, prodding for weaknesses.`);
     
     // Enter player phase
     this.enterPhase("player");
+  },
+  
+  // Helper function to get a description of the enemy group
+  getEnemyGroupDescription: function() {
+    const enemies = this.state.enemies;
+    
+    if (enemies.length === 1) {
+      return `a ${enemies[0].name}`;
+    } else if (enemies.length === 2) {
+      return `a ${enemies[0].name} and a ${enemies[1].name}`;
+    } else {
+      // Create a comma-separated list with "and" before the last item
+      const names = enemies.map(e => e.name);
+      const lastEnemy = names.pop();
+      return `${names.join(', ')} and a ${lastEnemy}`;
+    }
   },
   
   // Create an enemy instance from template
@@ -105,7 +180,7 @@ window.combatSystem = {
     // Create a copy of the template with initial values
     const enemy = {
       ...template,
-      id: `enemy_${Date.now()}`,
+      id: `enemy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       currentStance: template.preferredStance || "neutral",
       nextAction: null
     };
@@ -118,16 +193,55 @@ window.combatSystem = {
     return enemy;
   },
   
+  // Create an ally instance from template
+  createAlly: function(allyType) {
+    // Get template from ally templates
+    const template = window.ALLY_TEMPLATES[allyType];
+    if (!template) {
+      console.error("Ally template not found:", allyType);
+      // Create a fallback ally
+      return {
+        name: "Unknown Ally",
+        description: "A mysterious ally.",
+        health: 50,
+        maxHealth: 50,
+        stats: { power: 5, defense: 5, speed: 5 }
+      };
+    }
+    
+    // Create a copy of the template with initial values
+    const ally = {
+      ...template,
+      id: `ally_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      currentStance: template.preferredStance || "neutral",
+      nextAction: null
+    };
+    
+    // Properly clone ammunition data if present
+    if (template.ammunition) {
+      ally.ammunition = JSON.parse(JSON.stringify(template.ammunition));
+    }
+    
+    return ally;
+  },
+  
   // Enter a specific combat phase
   enterPhase: function(phase) {
     const previousPhase = this.state.phase;
+    
+    // Store player's target when transitioning from player phase
+    if (previousPhase === "player" && phase !== "player") {
+      this._playerTargetIndex = this.state.activeEnemyIndex;
+    }
+    
     this.state.phase = phase;
     
     // If we're in a counter window, don't change phases normally
     if (this.state.counterWindowOpen && phase !== "initial" && phase !== "resolution") {
       if (this.state.lastCounterActor === "player") {
-        // NEW: Check if enemy is defeated before counter
-        if (this.isEnemyDefeated()) {
+        // Check if current active enemy is defeated before counter
+        const activeEnemy = this.getActiveEnemy();
+        if (!activeEnemy || activeEnemy.health <= 0) {
           this.state.counterWindowOpen = false;
           this.enterPhase("resolution");
           return;
@@ -138,7 +252,9 @@ window.combatSystem = {
         return;
       } else if (this.state.lastCounterActor === "enemy") {
         // Show player counter options
-        this.updateCounterOptions();
+        if (window.combatUI) {
+          window.combatUI.updateCounterOptions();
+        }
         return;
       }
     }
@@ -149,107 +265,290 @@ window.combatSystem = {
         this.scheduleEnemyAction(() => this.enterPhase("player"), 1000);
         break;
         
-        case "player":
-          // Check if player is stunned
-          if (window.gameState.playerStunned) {
-            this.addCombatMessage(`You're still recovering from being stunned and cannot act!`);
-            window.gameState.playerStunned = false; // Clear stun for next turn
-            
-            // Skip to enemy phase
+      case "player":
+        // Check if player is stunned
+        if (window.gameState.playerStunned) {
+          this.addCombatMessage(`You're still recovering from being stunned and cannot act!`);
+          window.gameState.playerStunned = false; // Clear stun for next turn
+          
+          // Skip to ally phase if allies exist, otherwise enemy phase
+          if (this.state.allies.length > 0) {
+            this.enterPhase("ally");
+          } else {
             setTimeout(() => this.enterPhase("enemy"), 1500);
-            return;
           }
+          return;
+        }
+        
+        // Check if player is knocked down
+        if (window.gameState.knockedDown) {
+          this.handlePlayerGetUp();
+          return;
+        }
+        
+        // Update UI to show player options
+        if (window.combatUI) {
+          window.combatUI.updateCombatOptions();
+        }
+        break;
+        
+      case "ally":
+        // Check if there are any allies
+        if (this.state.allies.length === 0) {
+          this.enterPhase("enemy");
+          return;
+        }
+        
+        // Reset ally index if needed
+        if (this.state.activeAllyIndex >= this.state.allies.length) {
+          this.state.activeAllyIndex = 0;
+        }
+        
+        // Get current ally
+        const ally = this.state.allies[this.state.activeAllyIndex];
+        
+        // Check if ally is defeated
+        if (ally.health <= 0) {
+          // Skip this ally's turn
+          this.state.activeAllyIndex++;
           
-          // Check if player is knocked down
-          if (window.gameState.knockedDown) {
-            this.handlePlayerGetUp();
-            return;
+          // If we've processed all allies, move to enemy phase
+          if (this.state.activeAllyIndex >= this.state.allies.length) {
+            this.enterPhase("enemy");
+          } else {
+            // Otherwise, process the next ally
+            this.enterPhase("ally");
           }
-          
-          // Update UI to show player options (original code)
-          this.updateCombatOptions();
-          break;
+          return;
+        }
+        
+        // Process ally turn (AI controlled)
+        this.processAllyTurn(ally);
+        break;
         
       case "enemy":
-        // NEW: Check if enemy is already defeated before processing turn
-        if (this.isEnemyDefeated()) {
-          console.log("Enemy already defeated, skipping to resolution");
+        // Reset enemy index if needed
+        if (this.state.activeEnemyIndex >= this.state.enemies.length) {
+          this.state.activeEnemyIndex = 0;
+        }
+        
+        // Check if all enemies are defeated
+        if (this.areAllEnemiesDefeated()) {
           this.enterPhase("resolution");
           return;
         }
+        
+        // Get active enemy
+        const activeEnemy = this.getActiveEnemy();
+        
+        // If no valid enemy, move to resolution
+        if (!activeEnemy) {
+          this.enterPhase("resolution");
+          return;
+        }
+        
+        // Check if current enemy is defeated
+        if (activeEnemy.health <= 0) {
+          // Skip this enemy's turn
+          this.state.activeEnemyIndex++;
+          
+          // If we've processed all enemies, move to resolution
+          if (this.state.activeEnemyIndex >= this.state.enemies.length) {
+            this.enterPhase("resolution");
+          } else {
+            // Otherwise, process the next enemy
+            this.enterPhase("enemy");
+          }
+          return;
+        }
+        
+        // Backward compatibility with combatUI.js - update enemyStance 
+        this.state.enemyStance = activeEnemy.currentStance;
+        
         // Process enemy turn
         this.scheduleEnemyAction(() => this.processEnemyTurn(), 1000);
         break;
         
       case "resolution":
-        // Check if the combat is over
-        if (this.state.enemy.health <= 0) {
+        // Check if all enemies are defeated
+        if (this.areAllEnemiesDefeated()) {
           this.endCombat(true); // Player victory
-        } else if (window.gameState.health <= 0) {
-          this.endCombat(false); // Player defeat
-        } else {
-          // Combat continues
-          this.state.turn++;
-          this.enterPhase("player");
+          return;
         }
+        
+        // Check if player is defeated
+        if (window.gameState.health <= 0) {
+          this.endCombat(false); // Player defeat
+          return;
+        }
+        
+        // Check if maximum turns reached
+        if (this.state.turn >= this.state.maxTurns) {
+          this.endCombatEarly();
+          return;
+        }
+        
+        // Combat continues - increment turn counter
+        this.state.turn++;
+        
+        // Update turn counter in UI
+        if (window.combatUI) {
+          window.combatUI.updateTurnCounter();
+        }
+        
+        // Restore player's target if needed
+        if (this._playerTargetIndex !== undefined) {
+          // Ensure the target is still valid
+          if (this._playerTargetIndex < this.state.enemies.length && 
+              this.state.enemies[this._playerTargetIndex] && 
+              this.state.enemies[this._playerTargetIndex].health > 0) {
+            this.state.activeEnemyIndex = this._playerTargetIndex;
+          } else {
+            // If original target is invalid, find the first valid enemy
+            this.state.activeEnemyIndex = this.state.enemies.findIndex(e => e.health > 0);
+            if (this.state.activeEnemyIndex === -1) this.state.activeEnemyIndex = 0;
+          }
+        }
+        
+        // Return to player phase
+        this.enterPhase("player");
         break;
     }
     
     console.log(`Combat phase changed: ${previousPhase} -> ${phase}`);
+    
+    // Notify UI of phase change
+    if (window.combatUI && typeof window.combatUI.onPhaseChanged === 'function') {
+      window.combatUI.onPhaseChanged(phase, previousPhase);
+    }
   },
-
-      // Handle player getting up from knocked down
-    handlePlayerGetUp: function() {
-      // Update combat actions to only show get up option
-      const actionsContainer = document.getElementById('combatActions');
-      actionsContainer.innerHTML = '';
-      
-      // Add get up button
-      this.addCombatButton("Get Up", () => this.executePlayerGetUp(), actionsContainer);
-      
-      // Add narrative
-      this.addCombatMessage(`You're on the ground and need to get back to your feet.`);
-    },
-
-    // Execute player getting up action
-    executePlayerGetUp: function() {
-      this.addCombatMessage(`You struggle back to your feet, ready to continue the fight.`);
-      
-      // Clear knocked down status
-      window.gameState.knockedDown = false;
-      
-      // Move to enemy phase - player used their turn to get up
+  
+  // Helper function to get the active enemy
+  getActiveEnemy: function() {
+    return this.state.enemies[this.state.activeEnemyIndex];
+  },
+  
+  // Helper function to check if all enemies are defeated
+  areAllEnemiesDefeated: function() {
+    return this.state.enemies.every(enemy => enemy.health <= 0);
+  },
+  
+  // Helper function to check if all allies are defeated
+  areAllAlliesDefeated: function() {
+    return this.state.allies.every(ally => ally.health <= 0);
+  },
+  
+  // End combat early due to turn limit
+  endCombatEarly: function() {
+    // Create narrative about the battle shifting
+    const narrativeText = [
+      "The battle shifts! Reinforcements arrive on both sides, forcing your engagement to end as the larger conflict swallows your skirmish.",
+      "You disengage from your opponents, regrouping with your allies as the battlefield churns with fresh combatants."
+    ];
+    
+    // Add messages to combat log
+    for (const line of narrativeText) {
+      this.addCombatMessage(line);
+    }
+    
+    // Show battle conclusion modal if UI exists
+    if (window.combatUI && typeof window.combatUI.showBattleConclusionModal === 'function') {
+      window.combatUI.showBattleConclusionModal('draw', narrativeText);
+      return; // UI will handle the actual ending
+    } else {
+      // Fallback if UI isn't available
+      setTimeout(() => this.endCombat("draw"), 2000);
+    }
+  },
+  
+  // Handle player getting up from knocked down
+  handlePlayerGetUp: function() {
+    // Notify the UI to update for get up action
+    if (window.combatUI) {
+      window.combatUI.showGetUpOption();
+    }
+    
+    // Add narrative
+    this.addCombatMessage(`You're on the ground and need to get back to your feet.`);
+  },
+  
+  // Execute player getting up action
+  executePlayerGetUp: function() {
+    this.addCombatMessage(`You struggle back to your feet, ready to continue the fight.`);
+    
+    // Clear knocked down status
+    window.gameState.knockedDown = false;
+    
+    // Move to ally phase if allies exist, otherwise enemy phase
+    if (this.state.allies.length > 0) {
+      setTimeout(() => this.enterPhase("ally"), 1000);
+    } else {
       setTimeout(() => this.enterPhase("enemy"), 1000);
-    },
+    }
+  },
   
   // Process enemy's turn
   processEnemyTurn: function() {
-    // NEW: First check if enemy is already defeated
-    if (this.isEnemyDefeated()) {
-      console.log("Enemy already defeated, skipping action");
-      // Cancel any pending turns and move to resolution
+    // Store the player's currently targeted enemy index
+    const playerTargetIndex = this.state.activeEnemyIndex;
+    
+    // Get the enemy whose turn it is (may be different from the player's target)
+    const enemy = this.state.enemies[this.state.activeEnemyIndex];
+    
+    // Safety check - if no enemy, move to next phase
+    if (!enemy) {
       this._processingEnemyTurn = false;
-      this.enterPhase("resolution");
+      
+      // Find the next valid enemy to take a turn, without changing player's target
+      let nextEnemyTurnIndex = this.state.activeEnemyIndex + 1;
+      if (nextEnemyTurnIndex >= this.state.enemies.length) {
+        this.enterPhase("resolution");
+      } else {
+        // Temporarily set activeEnemyIndex to the next enemy's turn
+        this.state.activeEnemyIndex = nextEnemyTurnIndex;
+        this.enterPhase("enemy");
+      }
+      return;
+    }
+    
+    // Check if enemy is already defeated
+    if (enemy.health <= 0) {
+      console.log("Enemy already defeated, skipping action");
+      // Move to next enemy or resolution phase
+      this._processingEnemyTurn = false;
+      this.state.activeEnemyIndex++;
+      
+      if (this.state.activeEnemyIndex >= this.state.enemies.length) {
+        this.enterPhase("resolution");
+      } else {
+        this.enterPhase("enemy");
+      }
       return;
     }
 
-    // Check if enemy is stunned or knocked down
-    if (this.state.enemy.stunned) {
-      this.addCombatMessage(`The ${this.state.enemy.name} is still stunned and cannot act!`);
+    // Check if enemy is stunned
+    if (enemy.stunned) {
+      this.addCombatMessage(`The ${enemy.name} is still stunned and cannot act!`);
       // Remove stun for next turn
-      this.state.enemy.stunned = false;
+      enemy.stunned = false;
       
-      // Move directly to resolution phase
+      // Move to next enemy or resolution phase
       this.scheduleEnemyAction(() => {
         this._processingEnemyTurn = false;
-        this.enterPhase("resolution");
+        this.state.activeEnemyIndex++;
+        
+        if (this.state.activeEnemyIndex >= this.state.enemies.length) {
+          this.enterPhase("resolution");
+        } else {
+          this.enterPhase("enemy");
+        }
       }, 1500);
       return;
     }
 
-    // Check if enemy is knocked down (after stun wears off)
-    if (this.state.enemy.knockedDown) {
-      this.handleEnemyGetUp();
+    // Check if enemy is knocked down
+    if (enemy.knockedDown) {
+      this.handleEnemyGetUp(enemy);
       return;
     }
 
@@ -264,7 +563,7 @@ window.combatSystem = {
     }
     
     // Determine enemy action based on AI
-    const action = this.determineEnemyAction();
+    const action = this.determineEnemyAction(enemy);
     
     // Process the chosen action
     switch(action.type) {
@@ -273,40 +572,94 @@ window.combatSystem = {
         break;
       
       case "stance":
-        this.handleEnemyStanceChange(action.value);
+        this.handleEnemyStanceChange(enemy, action.value);
         break;
       
       case "attack":
-        this.handleEnemyAttack(action.attackType, action.targetArea);
+        this.handleEnemyAttack(enemy, action.attackType, action.targetArea);
         break;
     }
     
-    // Move to resolution phase
+    // Move to next enemy or resolution phase
     this.scheduleEnemyAction(() => {
       this._processingEnemyTurn = false;
-      this.enterPhase("resolution");
+      
+      // Store the player's target for later restoration
+      const playerTarget = playerTargetIndex;
+      
+      // Increment the active enemy turn counter but don't change player's target
+      let nextEnemyTurnIndex = this.state.activeEnemyIndex + 1;
+      
+      if (nextEnemyTurnIndex >= this.state.enemies.length) {
+        // Restore player's target before changing phase
+        this.state.activeEnemyIndex = playerTarget;
+        this.enterPhase("resolution");
+      } else {
+        // Set activeEnemyIndex to the next enemy's turn
+        this.state.activeEnemyIndex = nextEnemyTurnIndex;
+        this.enterPhase("enemy");
+      }
     }, 1500);
   },
-
+  
+  // Process ally turn
+  processAllyTurn: function(ally) {
+    this.addCombatMessage(`${ally.name} takes action.`);
+    
+    // Determine ally action based on AI
+    const action = this.determineAllyAction(ally);
+    
+    // Process the chosen action
+    switch(action.type) {
+      case "distance":
+        this.handleAllyDistanceChange(ally, action.value);
+        break;
+      
+      case "stance":
+        this.handleAllyStanceChange(ally, action.value);
+        break;
+      
+      case "attack":
+        this.handleAllyAttack(ally, action.attackType, action.targetEnemyIndex, action.targetArea);
+        break;
+    }
+    
+    // Move to next ally or enemy phase
+    this.scheduleEnemyAction(() => {
+      this.state.activeAllyIndex++;
+      
+      // If we've processed all allies, move to enemy phase
+      if (this.state.activeAllyIndex >= this.state.allies.length) {
+        this.enterPhase("enemy");
+      } else {
+        // Otherwise, process the next ally
+        this.enterPhase("ally");
+      }
+    }, 1500);
+  },
+  
   // Handle enemy getting up from knocked down
-    handleEnemyGetUp: function() {
-      const enemy = this.state.enemy;
+  handleEnemyGetUp: function(enemy) {
+    this.addCombatMessage(`The ${enemy.name} struggles to get back to their feet.`);
+    
+    // Clear knocked down status
+    enemy.knockedDown = false;
+    
+    // Move to next enemy or resolution phase
+    this.scheduleEnemyAction(() => {
+      this._processingEnemyTurn = false;
+      this.state.activeEnemyIndex++;
       
-      this.addCombatMessage(`The ${enemy.name} struggles to get back to their feet.`);
-      
-      // Clear knocked down status
-      enemy.knockedDown = false;
-      
-      // Move to resolution phase - enemy used their turn to get up
-      this.scheduleEnemyAction(() => {
-        this._processingEnemyTurn = false;
+      if (this.state.activeEnemyIndex >= this.state.enemies.length) {
         this.enterPhase("resolution");
-      }, 1500);
-    },
+      } else {
+        this.enterPhase("enemy");
+      }
+    }, 1500);
+  },
   
   // Determine enemy's next action based on AI logic
-  determineEnemyAction: function() {
-    const enemy = this.state.enemy;
+  determineEnemyAction: function(enemy) {
     const distanceDiff = this.state.distance - enemy.preferredDistance;
     
     // Probabilities based on situation
@@ -323,14 +676,14 @@ window.combatSystem = {
       actionProbabilities.attack = 0.2;
     }
     
-    if (this.state.playerStance === "aggressive" && this.state.enemyStance !== "defensive") {
+    if (this.state.playerStance === "aggressive" && enemy.currentStance !== "defensive") {
       // Player is aggressive, more likely to change to defensive
       actionProbabilities.stance = 0.5;
       actionProbabilities.attack = 0.3;
     }
     
-    // NEW: Prioritize javelin throws at medium range if ammo available
-    if (this.state.distance === 2 && this.enemyHasAmmo('javelin')) {
+    // Prioritize javelin throws at medium range if ammo available
+    if (this.state.distance === 2 && this.enemyHasAmmo(enemy, 'javelin')) {
       // At medium range with javelins, more likely to attack
       actionProbabilities.attack = 0.8;
       actionProbabilities.distance = 0.1;
@@ -370,8 +723,8 @@ window.combatSystem = {
         };
       
       case "attack":
-        // NEW: Check for javelin throw opportunity at medium range
-        if (this.state.distance === 2 && this.enemyHasAmmo('javelin')) {
+        // Check for javelin throw opportunity at medium range
+        if (this.state.distance === 2 && this.enemyHasAmmo(enemy, 'javelin')) {
           return {
             type: "attack",
             attackType: "ThrowJavelin",
@@ -391,10 +744,77 @@ window.combatSystem = {
         // Choose attack type and target
         return {
           type: "attack",
-          attackType: this.getRandomEnemyAttack(),
+          attackType: this.getRandomEnemyAttack(enemy),
           targetArea: this.getRandomTargetArea()
         };
     }
+  },
+  
+  // Determine ally's next action based on AI logic
+  determineAllyAction: function(ally) {
+    // Find the best enemy to target
+    const targetEnemyIndex = this.findBestEnemyTarget();
+    const targetEnemy = this.state.enemies[targetEnemyIndex];
+    
+    // If no valid targets, just change stance
+    if (!targetEnemy || targetEnemy.health <= 0) {
+      return {
+        type: "stance",
+        value: "neutral"
+      };
+    }
+    
+    // Probabilities based on situation (similar to enemy logic but targeting enemies)
+    const distanceDiff = this.state.distance - ally.preferredDistance;
+    
+    // Distance adjustment is more important
+    if (Math.abs(distanceDiff) > 1) {
+      return {
+        type: "distance",
+        value: distanceDiff > 0 ? -1 : 1
+      };
+    }
+    
+    // Prioritize javelin throws at medium range if ammo available
+    if (this.state.distance === 2 && this.allyHasAmmo(ally, 'javelin')) {
+      return {
+        type: "attack",
+        attackType: "ThrowJavelin",
+        targetEnemyIndex: targetEnemyIndex,
+        targetArea: this.getRandomTargetArea()
+      };
+    }
+    
+    // If in preferred range, attack
+    if (this.state.distance <= ally.weaponRange) {
+      return {
+        type: "attack",
+        attackType: this.getRandomAllyAttack(ally),
+        targetEnemyIndex: targetEnemyIndex,
+        targetArea: this.getRandomTargetArea()
+      };
+    }
+    
+    // Default to stance change
+    return {
+      type: "stance",
+      value: "aggressive"
+    };
+  },
+  
+  // Find the best enemy to target (lowest health)
+  findBestEnemyTarget: function() {
+    let lowestHealth = Infinity;
+    let targetIndex = 0;
+    
+    this.state.enemies.forEach((enemy, index) => {
+      if (enemy.health > 0 && enemy.health < lowestHealth) {
+        lowestHealth = enemy.health;
+        targetIndex = index;
+      }
+    });
+    
+    return targetIndex;
   },
   
   // Process a player action during combat
@@ -416,6 +836,10 @@ window.combatSystem = {
       case "change_target":
         this.handleTargetChange(params.target);
         break;
+        
+      case "select_enemy":
+        this.handleSelectEnemy(params.enemyIndex);
+        break;
       
       case "attack":
         this.handlePlayerAttack(params.attackType);
@@ -434,9 +858,26 @@ window.combatSystem = {
         return;
     }
     
-    // Move to enemy phase unless combat has ended
+    // Move to ally phase (if allies present) or enemy phase unless combat has ended
     if (this.state.active && !this.state.counterWindowOpen) {
-      this.enterPhase("enemy");
+      if (this.state.allies.length > 0) {
+        this.enterPhase("ally");
+      } else {
+        this.enterPhase("enemy");
+      }
+    }
+  },
+  
+  // Handle player changing target enemy
+  handleSelectEnemy: function(enemyIndex) {
+    this.state.activeEnemyIndex = enemyIndex;
+    const enemy = this.state.enemies[enemyIndex];
+    
+    this.addCombatMessage(`You focus your attention on the ${enemy.name}.`);
+    
+    // Update UI
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
     }
   },
   
@@ -456,7 +897,27 @@ window.combatSystem = {
     this.addCombatMessage(this.generateEnemyReactionToDistance());
     
     // Update UI
-    this.updateCombatInterface();
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
+  },
+  
+  // Handle ally changing distance
+  handleAllyDistanceChange: function(ally, change) {
+    const oldDistance = this.state.distance;
+    this.state.distance = Math.max(0, Math.min(3, this.state.distance + change));
+    
+    // Generate appropriate narrative
+    if (change < 0) {
+      this.addCombatMessage(`${ally.name} advances, closing the distance.`);
+    } else {
+      this.addCombatMessage(`${ally.name} falls back, increasing the gap.`);
+    }
+    
+    // Update UI
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
   },
   
   // Handle player changing stance
@@ -471,7 +932,29 @@ window.combatSystem = {
     this.addCombatMessage(this.generateEnemyReactionToStance());
     
     // Update UI
-    this.updateCombatInterface();
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
+  },
+  
+  // Handle ally changing stance
+  handleAllyStanceChange: function(ally, newStance) {
+    const oldStance = ally.currentStance;
+    ally.currentStance = newStance;
+    
+    // Generate appropriate narrative
+    if (newStance === "aggressive") {
+      this.addCombatMessage(`${ally.name} shifts into an aggressive posture, readying to strike.`);
+    } else if (newStance === "defensive") {
+      this.addCombatMessage(`${ally.name} raises their guard, adopting a defensive stance.`);
+    } else {
+      this.addCombatMessage(`${ally.name} resets to a balanced, neutral stance.`);
+    }
+    
+    // Update UI
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
   },
   
   // Handle player changing target area
@@ -482,24 +965,35 @@ window.combatSystem = {
     this.addCombatMessage(`You adjust your aim, focusing on the ${this.targetLabels[targetArea]}.`);
     
     // Update UI
-    this.updateCombatInterface();
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
   },
   
   // Handle player attack
   handlePlayerAttack: function(attackType) {
+    // Get active enemy target
+    const enemy = this.getActiveEnemy();
+    
+    // Check if target enemy is valid
+    if (!enemy || enemy.health <= 0) {
+      this.addCombatMessage("Your target is no longer a threat. Choose another enemy.");
+      return;
+    }
+    
     // Special case for javelin throws
     if (attackType === "Throw Javelin") {
-      return this.handleJavelinThrow();
+      return this.handleJavelinThrow(enemy);
     }
 
     // Special case for shield bash
     if (attackType === "Shield Bash") {
-      return this.handleShieldBash();
+      return this.handleShieldBash(enemy);
     }
 
     // Special case for shield shove
     if (attackType === "Shove") {
-      return this.handleShieldShove();
+      return this.handleShieldShove(enemy);
     }
         
     // Get player weapon
@@ -512,35 +1006,8 @@ window.combatSystem = {
     // Get weapon template
     const weaponTemplate = weapon ? weapon.getTemplate() : { name: "fist", category: "weapon" };
     
-    // Handle ranged weapons
-    const isRanged = attackType === "Shoot" || attackType === "Aimed Shot" || 
-                   weaponTemplate.weaponType?.name === "Bow" ||
-                   weaponTemplate.weaponType?.name === "Crossbow" ||
-                   weaponTemplate.weaponType?.name === "Rifle";
-    
-    if (isRanged) {
-      const ammo = window.player.equipment?.ammunition;
-      
-      if (!ammo) {
-        this.addCombatMessage("You need ammunition to use this weapon!");
-        return;
-      }
-      
-      if (!window.checkWeaponAmmoCompatibility()) {
-        this.addCombatMessage(`${ammo.getName()} is not compatible with your ${weaponTemplate.name}!`);
-        return;
-      }
-      
-      // Check if ammunition is depleted
-      if (ammo.currentAmount <= 0) {
-        this.addCombatMessage("You're out of ammunition!");
-        return;
-      }
-      
-      // Use 1 ammunition
-      ammo.useAmmo(1);
-      this.addCombatMessage(`You fire your ${weaponTemplate.name}. (${ammo.currentAmount}/${ammo.capacity} ${ammo.getTemplate().ammoType}s remaining)`);
-    }
+    // Handle ranged weapons - intentionally disabled except for javelins
+    const isRanged = false; // All ranged weapons disabled except javelin throws
     
     // Generate attack narrative
     this.addCombatMessage(this.generateAttackNarrative(weaponTemplate, attackType));
@@ -559,12 +1026,11 @@ window.combatSystem = {
     }
     
     // Check for shield block first (before determining hit success)
-    if (this.checkEnemyShieldBlock()) {
+    if (this.checkEnemyShieldBlock(enemy)) {
       // Attack was blocked by enemy shield
-      this.addCombatMessage(`Your attack is blocked by the ${this.state.enemy.name}'s shield with a resounding clang!`);
+      this.addCombatMessage(`Your attack is blocked by the ${enemy.name}'s shield with a resounding clang!`);
       
       // No counter chance on shield block
-      setTimeout(() => this.enterPhase("enemy"), 1000);
       return;
     }
     
@@ -576,10 +1042,15 @@ window.combatSystem = {
       const damage = this.calculateDamage(weaponTemplate, attackType);
       
       // Apply damage to enemy
-      this.state.enemy.health = Math.max(0, this.state.enemy.health - damage);
+      enemy.health = Math.max(0, enemy.health - damage);
       
       // Generate hit narrative
       this.addCombatMessage(this.generateHitNarrative(weaponTemplate, attackType, damage));
+      
+      // Update UI immediately to show health change
+      if (window.combatUI) {
+        window.combatUI.updateCombatInterface();
+      }
       
       // Reset counter chain after successful hit
       this.state.counterChain = 0;
@@ -587,22 +1058,25 @@ window.combatSystem = {
       this.state.lastCounterActor = null;
       
       // Check if enemy is defeated
-      if (this.state.enemy.health <= 0) {
-        this.addCombatMessage(this.generateVictoryNarrative());
+      if (enemy.health <= 0) {
+        this.addCombatMessage(`The ${enemy.name} collapses before you, defeated.`);
         
-        // End combat immediately instead of going to enemy phase
-        setTimeout(() => this.endCombat(true), 1500);
-        return; // Important: return here to prevent proceeding to enemy phase
+        // Check if all enemies are defeated
+        if (this.areAllEnemiesDefeated()) {
+          // End combat immediately
+          setTimeout(() => this.endCombat(true), 1500);
+          return;
+        }
       }
     } else {
       // Generate miss narrative
       this.addCombatMessage(this.generateMissNarrative(weaponTemplate, attackType));
       
       // Potential counterattack window
-      if (this.shouldEnemyCounter()) {
+      if (this.shouldEnemyCounter(enemy)) {
         this.state.counterWindowOpen = true;
         this.state.counterChain = 0; // Reset counter chain at start of new exchange
-        this.addCombatMessage(`The ${this.state.enemy.name} sees an opening and prepares to counter!`);
+        this.addCombatMessage(`The ${enemy.name} sees an opening and prepares to counter!`);
         
         // Move to enemy phase for counter
         setTimeout(() => this.handleEnemyCounter(), 1000);
@@ -611,16 +1085,122 @@ window.combatSystem = {
     }
     
     // Update UI
-    this.updateCombatInterface();
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
+  },
+  
+  // Handle ally attack
+  handleAllyAttack: function(ally, attackType, targetEnemyIndex, targetArea) {
+    const enemy = this.state.enemies[targetEnemyIndex];
     
-    // Move to enemy phase if no counter
-    if (!this.state.counterWindowOpen) {
-      setTimeout(() => this.enterPhase("enemy"), 1000);
+    // Check if target enemy is still alive
+    if (!enemy || enemy.health <= 0) {
+      this.addCombatMessage(`${ally.name} looks for another target as their intended foe is already down.`);
+      return;
+    }
+    
+    // Special case for javelin throws
+    if (attackType === "ThrowJavelin") {
+      if (!this.allyHasAmmo(ally, 'javelin')) {
+        this.addCombatMessage(`${ally.name} reaches for a javelin but has none left.`);
+        attackType = this.getRandomAllyAttack(ally);
+      } else {
+        // Use a javelin
+        this.useAllyAmmo(ally, 'javelin');
+        
+        const javelinName = ally.ammunition.javelin.name || "javelin";
+        this.addCombatMessage(`${ally.name} hurls a ${javelinName} at the ${enemy.name}!`);
+        
+        // Check for enemy shield block
+        if (this.checkEnemyShieldBlock(enemy)) {
+          this.addCombatMessage(`The ${enemy.name}'s shield deflects the javelin with a loud thud!`);
+          return;
+        }
+        
+        // Calculate hit chance
+        const hitChance = 60 + (ally.accuracy || 0) - (enemy.defense || 0);
+        const hitRoll = Math.random() * 100;
+        
+        if (hitRoll < hitChance) {
+          // Calculate damage
+          const damage = Math.round(10 + (ally.power || 5) * 0.5 + Math.random() * 5);
+          
+          // Apply damage to enemy
+          enemy.health = Math.max(0, enemy.health - damage);
+          
+          // Generate hit narrative
+          this.addCombatMessage(`The javelin strikes true, dealing ${damage} damage to the ${enemy.name}!`);
+          
+          // Update UI immediately to show health change
+          if (window.combatUI) {
+            window.combatUI.updateCombatInterface();
+          }
+          
+          // Check if enemy is defeated
+          if (enemy.health <= 0) {
+            this.addCombatMessage(`${ally.name} has defeated the ${enemy.name}!`);
+          }
+        } else {
+          // Javelin misses
+          this.addCombatMessage(`The javelin flies wide, missing the ${enemy.name}.`);
+        }
+        
+        return;
+      }
+    }
+    
+    this.addCombatMessage(`${ally.name} attacks the ${enemy.name}'s ${this.targetLabels[targetArea]}!`);
+    
+    // Check for enemy shield block
+    if (this.checkEnemyShieldBlock(enemy)) {
+      this.addCombatMessage(`The attack is blocked by the ${enemy.name}'s shield with a resounding clang!`);
+      return;
+    }
+    
+    // Determine hit success
+    const hitChance = 50 + (ally.accuracy || 0) - (enemy.defense || 0);
+    const hitRoll = Math.random() * 100;
+    
+    if (hitRoll < hitChance) {
+      // Calculate damage
+      const damage = this.calculateAllyDamage(ally, enemy, targetArea);
+      
+      // Apply damage to enemy
+      enemy.health = Math.max(0, enemy.health - damage);
+      
+      // Generate hit narrative
+      this.addCombatMessage(`The attack connects, dealing ${Math.round(damage)} damage to the ${enemy.name}!`);
+      
+      // Update UI immediately to show health change
+      if (window.combatUI) {
+        window.combatUI.updateCombatInterface();
+      }
+      
+      // Check if enemy is defeated
+      if (enemy.health <= 0) {
+        this.addCombatMessage(`${ally.name} has defeated the ${enemy.name}!`);
+      }
+    } else {
+      // Attack misses
+      this.addCombatMessage(`${ally.name}'s attack misses as the ${enemy.name} evades.`);
+    }
+    
+    // Update UI
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
     }
   },
   
   // Implementation of javelin throwing as a specialized attack
-  handleJavelinThrow: function() {
+  handleJavelinThrow: function(enemy) {
+    // Check if at correct distance for javelin throw (medium range, distance 2)
+    if (this.state.distance !== 2) {
+      this.addCombatMessage("You can only throw javelins at medium range!");
+      return;
+    }
+
+
     // Get ammunition
     const ammo = window.player.equipment?.ammunition;
     
@@ -641,7 +1221,7 @@ window.combatSystem = {
       ammo.currentAmount = Math.max(0, ammo.currentAmount - 1);
     }
     
-    this.addCombatMessage(`You throw a javelin at the ${this.state.enemy.name}. (${ammo.currentAmount}/${ammo.capacity} javelins remaining)`);
+    this.addCombatMessage(`You throw a javelin at the ${enemy.name}. (${ammo.currentAmount}/${ammo.capacity} javelins remaining)`);
     
     // Javelins have good hit chance but moderate damage
     const hitBonus = 10;
@@ -655,208 +1235,224 @@ window.combatSystem = {
       const damage = Math.round(10 + Math.random() * 5);
       
       // Apply damage to enemy
-      this.state.enemy.health = Math.max(0, this.state.enemy.health - damage);
+      enemy.health = Math.max(0, enemy.health - damage);
       
       // Generate hit narrative
-      this.addCombatMessage(`Your javelin strikes true, piercing the ${this.state.enemy.name} for ${damage} damage!`);
+      this.addCombatMessage(`Your javelin strikes true, piercing the ${enemy.name} for ${damage} damage!`);
+      
+      // Update UI immediately to show health change
+      if (window.combatUI) {
+        window.combatUI.updateCombatInterface();
+      }
       
       // Check if enemy is defeated
-      if (this.state.enemy.health <= 0) {
-        this.addCombatMessage(this.generateVictoryNarrative());
+      if (enemy.health <= 0) {
+        this.addCombatMessage(`The ${enemy.name} collapses, defeated by your well-aimed javelin.`);
         
-        // End combat immediately instead of going to enemy phase
-        setTimeout(() => this.endCombat(true), 1500);
-        return; // Important: return here to prevent proceeding to enemy phase
+        // Check if all enemies are defeated
+        if (this.areAllEnemiesDefeated()) {
+          // End combat immediately
+          setTimeout(() => this.endCombat(true), 1500);
+          return;
+        }
       }
     } else {
       // Generate miss narrative
-      this.addCombatMessage(`Your javelin flies wide, missing the ${this.state.enemy.name}!`);
+      this.addCombatMessage(`Your javelin flies wide, missing the ${enemy.name}!`);
     }
     
     // Update UI
-    this.updateCombatInterface();
-    
-    // Move to enemy phase - no counter opportunity on javelin misses
-    setTimeout(() => this.enterPhase("enemy"), 1000);
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
   },
 
   // Handle shield bash attack
-handleShieldBash: function() {
-  // Get player's shield
-  const shield = window.player.equipment?.offHand;
-  if (!shield || shield === "occupied") {
-    this.addCombatMessage("You need a shield to bash!");
-    return;
-  }
-  
-  const shieldTemplate = shield.getTemplate();
-  
-  // Check if it's actually a shield
-  if (shieldTemplate.weaponType?.name !== "Shield") {
-    this.addCombatMessage("You need a shield to bash!");
-    return;
-  }
-  
-  // Generate attack narrative
-  this.addCombatMessage(`You thrust forward with your ${shieldTemplate.name}, attempting to bash the ${this.state.enemy.name}.`);
-  
-  // Reduce shield durability with each use
-  if (shield.durability !== undefined) {
-    // Random durability reduction between 1-2 points
-    const durabilityLoss = Math.floor(Math.random() * 2) + 1;
-    shield.durability = Math.max(0, shield.durability - durabilityLoss);
-    
-    // Check if shield breaks
-    if (shield.durability <= 0) {
-      this.addCombatMessage(`Your ${shieldTemplate.name} breaks during the bash attack!`);
-      // Shield still hits in this attack, but will be unusable after
-    }
-  }
-  
-  // Determine hit success
-  const hitSuccess = this.resolveAttackSuccess({
-    name: shieldTemplate.name,
-    stats: { damage: 5 }  // Shields do less damage but can stun
-  }, "Bash");
-  
-  if (hitSuccess) {
-    // Calculate damage - shield bashes do less damage
-    const damage = Math.round(5 + Math.random() * 3);
-    
-    // Apply damage to enemy
-    this.state.enemy.health = Math.max(0, this.state.enemy.health - damage);
-    
-    // Generate hit narrative
-    this.addCombatMessage(`Your shield connects solidly, dealing ${damage} damage and staggering the ${this.state.enemy.name}!`);
-    
-    // Special shield bash effect: chance to stun the enemy
-    if (Math.random() < 0.5) {  // 50% chance to stun
-      this.addCombatMessage(`The ${this.state.enemy.name} is stunned by your shield bash!`);
-      // Apply stun effect (enemy misses their next turn)
-      this.state.enemy.stunned = true;
-    }
-    
-    // Reset counter chain after successful hit
-    this.state.counterChain = 0;
-    this.state.counterWindowOpen = false;
-    this.state.lastCounterActor = null;
-    
-    // Check if enemy is defeated
-    if (this.state.enemy.health <= 0) {
-      this.addCombatMessage(this.generateVictoryNarrative());
-      
-      // End combat immediately
-      setTimeout(() => this.endCombat(true), 1500);
+  handleShieldBash: function(enemy) {
+    // Get player's shield
+    const shield = window.player.equipment?.offHand;
+    if (!shield || shield === "occupied") {
+      this.addCombatMessage("You need a shield to bash!");
       return;
     }
-  } else {
-    // Generate miss narrative
-    this.addCombatMessage(`The ${this.state.enemy.name} dodges your shield bash!`);
     
-    // Potential counterattack window
-    if (this.shouldEnemyCounter()) {
-      this.state.counterWindowOpen = true;
-      this.state.counterChain = 0; // Reset counter chain at start of new exchange
-      this.addCombatMessage(`The ${this.state.enemy.name} sees an opening and prepares to counter!`);
-      
-      // Move to enemy phase for counter
-      setTimeout(() => this.handleEnemyCounter(), 1000);
+    const shieldTemplate = shield.getTemplate();
+    
+    // Check if it's actually a shield
+    if (shieldTemplate.weaponType?.name !== "Shield") {
+      this.addCombatMessage("You need a shield to bash!");
       return;
     }
-  }
-  
-  // Update UI
-  this.updateCombatInterface();
-  
-  // Move to enemy phase if no counter
-  if (!this.state.counterWindowOpen) {
-    setTimeout(() => this.enterPhase("enemy"), 1000);
-  }
-},
-
-
-// Handle shield shove attack
-handleShieldShove: function() {
-  // Get player's shield
-  const shield = window.player.equipment?.offHand;
-  if (!shield || shield === "occupied") {
-    this.addCombatMessage("You need a shield to shove!");
-    return;
-  }
-  
-  const shieldTemplate = shield.getTemplate();
-  
-  // Check if it's actually a shield
-  if (shieldTemplate.weaponType?.name !== "Shield") {
-    this.addCombatMessage("You need a shield to shove!");
-    return;
-  }
-  
-  // Generate attack narrative
-  this.addCombatMessage(`You drive your ${shieldTemplate.name} forward with force, attempting to shove the ${this.state.enemy.name} back.`);
-  
-  // Reduce shield durability slightly with each use
-  if (shield.durability !== undefined) {
-    // Minimal durability reduction for shoving (0-1 points)
-    const durabilityLoss = Math.floor(Math.random() * 2);
-    shield.durability = Math.max(0, shield.durability - durabilityLoss);
-  }
-  
-  // Calculate success chance based on player's phy + melee skill vs enemy power
-  const playerPush = (window.player.phy || 5) + (window.player.skills.melee || 0);
-  const enemyResist = (this.state.enemy.power || 5) + (this.state.enemy.counterSkill || 0);
-  const successChance = 50 + ((playerPush - enemyResist) * 5);
-  
-  // Roll for success
-  const roll = Math.random() * 100;
-  const success = roll <= successChance;
-  
-  if (success) {
-    // Increase distance by 1
-    this.state.distance = Math.min(3, this.state.distance + 1);
     
-    this.addCombatMessage(`You successfully push the ${this.state.enemy.name} back!`);
+    // Generate attack narrative
+    this.addCombatMessage(`You thrust forward with your ${shieldTemplate.name}, attempting to bash the ${enemy.name}.`);
     
-    // Check for knockdown
-    const knockdownChance = 40 + ((playerPush - enemyResist) * 3);
-    const knockdownRoll = Math.random() * 100;
-    const knockedDown = knockdownRoll <= knockdownChance;
-    
-    if (knockedDown) {
-      this.addCombatMessage(`The ${this.state.enemy.name} loses balance and falls to the ground!`);
+    // Reduce shield durability with each use
+    if (shield.durability !== undefined) {
+      // Random durability reduction between 1-2 points
+      const durabilityLoss = Math.floor(Math.random() * 2) + 1;
+      shield.durability = Math.max(0, shield.durability - durabilityLoss);
       
-      // Apply knocked down status
-      this.state.enemy.knockedDown = true;
-      // First turn they're stunned
-      this.state.enemy.stunned = true;
+      // Check if shield breaks
+      if (shield.durability <= 0) {
+        this.addCombatMessage(`Your ${shieldTemplate.name} breaks during the bash attack!`);
+        // Shield still hits in this attack, but will be unusable after
+      }
     }
-  } else {
-    this.addCombatMessage(`The ${this.state.enemy.name} holds their ground against your shove.`);
     
-    // Potential counterattack window
-    if (this.shouldEnemyCounter()) {
-      this.state.counterWindowOpen = true;
+    // Determine hit success
+    const hitSuccess = this.resolveAttackSuccess({
+      name: shieldTemplate.name,
+      stats: { damage: 5 }  // Shields do less damage but can stun
+    }, "Bash");
+    
+    if (hitSuccess) {
+      // Calculate damage - shield bashes do less damage
+      const damage = Math.round(5 + Math.random() * 3);
+      
+      // Apply damage to enemy
+      enemy.health = Math.max(0, enemy.health - damage);
+      
+      // Generate hit narrative
+      this.addCombatMessage(`Your shield connects solidly, dealing ${damage} damage and staggering the ${enemy.name}!`);
+      
+      // Update UI immediately to show health change
+      if (window.combatUI) {
+        window.combatUI.updateCombatInterface();
+      }
+      
+      // Special shield bash effect: chance to stun the enemy
+      if (Math.random() < 0.5) {  // 50% chance to stun
+        this.addCombatMessage(`The ${enemy.name} is stunned by your shield bash!`);
+        // Apply stun effect (enemy misses their next turn)
+        enemy.stunned = true;
+      }
+      
+      // Reset counter chain after successful hit
       this.state.counterChain = 0;
-      this.addCombatMessage(`The ${this.state.enemy.name} sees an opening and prepares to counter!`);
+      this.state.counterWindowOpen = false;
+      this.state.lastCounterActor = null;
       
-      // Move to enemy phase for counter
-      setTimeout(() => this.handleEnemyCounter(), 1000);
+      // Check if enemy is defeated
+      if (enemy.health <= 0) {
+        this.addCombatMessage(`The ${enemy.name} collapses from your shield bash.`);
+        
+        // Check if all enemies are defeated
+        if (this.areAllEnemiesDefeated()) {
+          // End combat immediately
+          setTimeout(() => this.endCombat(true), 1500);
+          return;
+        }
+      }
+    } else {
+      // Generate miss narrative
+      this.addCombatMessage(`The ${enemy.name} dodges your shield bash!`);
+      
+      // Potential counterattack window
+      if (this.shouldEnemyCounter(enemy)) {
+        this.state.counterWindowOpen = true;
+        this.state.counterChain = 0; // Reset counter chain at start of new exchange
+        this.addCombatMessage(`The ${enemy.name} sees an opening and prepares to counter!`);
+        
+        // Move to enemy phase for counter
+        setTimeout(() => this.handleEnemyCounter(), 1000);
+        return;
+      }
+    }
+    
+    // Update UI
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
+  },
+
+  // Handle shield shove attack
+  handleShieldShove: function(enemy) {
+    // Get player's shield
+    const shield = window.player.equipment?.offHand;
+    if (!shield || shield === "occupied") {
+      this.addCombatMessage("You need a shield to shove!");
       return;
     }
-  }
-  
-  // Update UI
-  this.updateCombatInterface();
-  
-  // Move to enemy phase
-  if (!this.state.counterWindowOpen) {
-    setTimeout(() => this.enterPhase("enemy"), 1000);
-  }
-},
-
+    
+    const shieldTemplate = shield.getTemplate();
+    
+    // Check if it's actually a shield
+    if (shieldTemplate.weaponType?.name !== "Shield") {
+      this.addCombatMessage("You need a shield to shove!");
+      return;
+    }
+    
+    // Generate attack narrative
+    this.addCombatMessage(`You drive your ${shieldTemplate.name} forward with force, attempting to shove the ${enemy.name} back.`);
+    
+    // Reduce shield durability slightly with each use
+    if (shield.durability !== undefined) {
+      // Minimal durability reduction for shoving (0-1 points)
+      const durabilityLoss = Math.floor(Math.random() * 2);
+      shield.durability = Math.max(0, shield.durability - durabilityLoss);
+    }
+    
+    // Calculate success chance based on player's phy + melee skill vs enemy power
+    const playerPush = (window.player.phy || 5) + (window.player.skills.melee || 0);
+    const enemyResist = (enemy.power || 5) + (enemy.counterSkill || 0);
+    const successChance = 50 + ((playerPush - enemyResist) * 5);
+    
+    // Roll for success
+    const roll = Math.random() * 100;
+    const success = roll <= successChance;
+    
+    if (success) {
+      // Increase distance by 1
+      this.state.distance = Math.min(3, this.state.distance + 1);
+      
+      this.addCombatMessage(`You successfully push the ${enemy.name} back!`);
+      
+      // Check for knockdown
+      const knockdownChance = 40 + ((playerPush - enemyResist) * 3);
+      const knockdownRoll = Math.random() * 100;
+      const knockedDown = knockdownRoll <= knockdownChance;
+      
+      if (knockedDown) {
+        this.addCombatMessage(`The ${enemy.name} loses balance and falls to the ground!`);
+        
+        // Apply knocked down status
+        enemy.knockedDown = true;
+        // First turn they're stunned
+        enemy.stunned = true;
+      }
+    } else {
+      this.addCombatMessage(`The ${enemy.name} holds their ground against your shove.`);
+      
+      // Potential counterattack window
+      if (this.shouldEnemyCounter(enemy)) {
+        this.state.counterWindowOpen = true;
+        this.state.counterChain = 0;
+        this.addCombatMessage(`The ${enemy.name} sees an opening and prepares to counter!`);
+        
+        // Move to enemy phase for counter
+        setTimeout(() => this.handleEnemyCounter(), 1000);
+        return;
+      }
+    }
+    
+    // Update UI
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
+  },
   
   // Handle player counter attack
   handlePlayerCounter: function(attackType) {
+    const enemy = this.getActiveEnemy();
+    if (!enemy) {
+      // Target enemy is no longer valid
+      this.state.counterWindowOpen = false;
+      this.state.counterChain = 0;
+      this.state.lastCounterActor = null;
+      return;
+    }
+    
     this.state.counterChain++;
     this.state.lastCounterActor = "player";
     
@@ -867,7 +1463,7 @@ handleShieldShove: function() {
     // Generate counter narrative
     this.addCombatMessage(`You seize the opportunity with a lightning-fast counter-riposte!`);
     
-    // Reduce weapon durability with each use (NEW)
+    // Reduce weapon durability with each use
     if (weapon && weapon.durability !== undefined) {
       // Random durability reduction between 1-2 points
       const durabilityLoss = Math.floor(Math.random() * 2) + 1;
@@ -882,7 +1478,7 @@ handleShieldShove: function() {
     
     // Check if we've reached maximum counter chain
     if (this.state.counterChain >= this.state.maxCounterChain) {
-      this.addCombatMessage(`After a frenzied exchange of feints and counters, both you and the ${this.state.enemy.name} back off, breathing heavily.`);
+      this.addCombatMessage(`After a frenzied exchange of feints and counters, both you and the ${enemy.name} back off, breathing heavily.`);
       this.state.counterChain = 0;
       this.state.counterWindowOpen = false;
       this.state.lastCounterActor = null;
@@ -893,9 +1489,9 @@ handleShieldShove: function() {
     }
     
     // Check for shield block
-    if (this.checkEnemyShieldBlock()) {
+    if (this.checkEnemyShieldBlock(enemy)) {
       // Attack was blocked by enemy shield
-      this.addCombatMessage(`Your counter-attack is blocked by the ${this.state.enemy.name}'s shield!`);
+      this.addCombatMessage(`Your counter-attack is blocked by the ${enemy.name}'s shield!`);
       
       // End the counter exchange
       this.state.counterChain = 0;
@@ -903,7 +1499,11 @@ handleShieldShove: function() {
       this.state.lastCounterActor = null;
       
       // Move to enemy phase
-      setTimeout(() => this.enterPhase("enemy"), 1000);
+      if (this.state.allies.length > 0) {
+        setTimeout(() => this.enterPhase("ally"), 1000);
+      } else {
+        setTimeout(() => this.enterPhase("enemy"), 1000);
+      }
       return;
     }
   
@@ -916,10 +1516,15 @@ handleShieldShove: function() {
       const damage = this.calculateDamage(weaponTemplate, attackType) * 1.5;
       
       // Apply damage to enemy
-      this.state.enemy.health = Math.max(0, this.state.enemy.health - damage);
+      enemy.health = Math.max(0, enemy.health - damage);
       
       // Generate hit narrative
       this.addCombatMessage(`Your counter-riposte lands perfectly, dealing ${Math.round(damage)} damage!`);
+      
+      // Update UI immediately to show health change
+      if (window.combatUI) {
+        window.combatUI.updateCombatInterface();
+      }
       
       // Reset counter chain after successful hit
       this.state.counterChain = 0;
@@ -927,19 +1532,26 @@ handleShieldShove: function() {
       this.state.lastCounterActor = null;
       
       // Check if enemy is defeated
-      if (this.state.enemy.health <= 0) {
-        this.addCombatMessage(this.generateVictoryNarrative());
+      if (enemy.health <= 0) {
+        this.addCombatMessage(`The ${enemy.name} falls before your counter-attack.`);
         
-        // End combat immediately instead of going to enemy phase
-        setTimeout(() => this.endCombat(true), 1500);
-        return; // Important: return here to prevent proceeding to enemy phase
+        // Check if all enemies are defeated
+        if (this.areAllEnemiesDefeated()) {
+          // End combat immediately
+          setTimeout(() => this.endCombat(true), 1500);
+          return;
+        }
       }
       
       // Continue to next phase
-      setTimeout(() => this.enterPhase("enemy"), 1000);
+      if (this.state.allies.length > 0) {
+        setTimeout(() => this.enterPhase("ally"), 1000);
+      } else {
+        setTimeout(() => this.enterPhase("enemy"), 1000);
+      }
     } else {
       // Counter missed
-      this.addCombatMessage(`Your counter-riposte misses as the ${this.state.enemy.name} deftly evades!`);
+      this.addCombatMessage(`Your counter-riposte misses as the ${enemy.name} deftly evades!`);
       
       // Enemy gets counter opportunity
       this.state.counterWindowOpen = true;
@@ -949,7 +1561,9 @@ handleShieldShove: function() {
     }
     
     // Update UI
-    this.updateCombatInterface();
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
   },
   
   // Handle enemy changing distance
@@ -958,7 +1572,7 @@ handleShieldShove: function() {
     this.state.distance = Math.max(0, Math.min(3, this.state.distance + change));
     
     // Generate appropriate narrative
-    const enemy = this.state.enemy;
+    const enemy = this.getActiveEnemy();
     
     if (change < 0) {
       this.addCombatMessage(`The ${enemy.name} advances toward you, closing the distance.`);
@@ -967,17 +1581,20 @@ handleShieldShove: function() {
     }
     
     // Update UI
-    this.updateCombatInterface();
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
   },
   
   // Handle enemy changing stance
-  handleEnemyStanceChange: function(newStance) {
-    const oldStance = this.state.enemyStance;
+  handleEnemyStanceChange: function(enemy, newStance) {
+    const oldStance = enemy.currentStance;
+    enemy.currentStance = newStance;
+    
+    // For backward compatibility
     this.state.enemyStance = newStance;
     
     // Generate appropriate narrative
-    const enemy = this.state.enemy;
-    
     if (newStance === "aggressive") {
       this.addCombatMessage(`The ${enemy.name} shifts into an aggressive posture, readying to strike.`);
     } else if (newStance === "defensive") {
@@ -987,113 +1604,118 @@ handleShieldShove: function() {
     }
     
     // Update UI
-    this.updateCombatInterface();
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
   },
   
   // Handle enemy attack
- // Handle enemy attack
-handleEnemyAttack: function(attackType, targetArea) {
-  const enemy = this.state.enemy;
-  
-  // Shield Shove handling
-  if (attackType === "ShieldShove") {
-    this.addCombatMessage(`The ${enemy.name} lunges forward, trying to shove you back with their shield!`);
-    
-    // Calculate success chance based on enemy stats vs player phy + melee
-    const enemyPush = (enemy.power || 5) + (enemy.counterSkill || 0);
-    const playerResist = (window.player.phy || 5) + (window.player.skills?.melee || 0);
-    const successChance = 50 + ((enemyPush - playerResist) * 5);
-    
-    // Roll for success
-    const roll = Math.random() * 100;
-    const success = roll <= successChance;
-    
-    if (success) {
-      // Increase distance by 1
-      this.state.distance = Math.min(3, this.state.distance + 1);
+  handleEnemyAttack: function(enemy, attackType, targetArea) {
+    // Shield Shove handling
+    if (attackType === "ShieldShove") {
+      this.addCombatMessage(`The ${enemy.name} lunges forward, trying to shove you back with their shield!`);
       
-      this.addCombatMessage(`The ${enemy.name} successfully pushes you back!`);
+      // Calculate success chance based on enemy stats vs player phy + melee
+      const enemyPush = (enemy.power || 5) + (enemy.counterSkill || 0);
+      const playerResist = (window.player.phy || 5) + (window.player.skills?.melee || 0);
+      const successChance = 50 + ((enemyPush - playerResist) * 5);
       
-      // Check for knockdown
-      const knockdownChance = 40 + ((enemyPush - playerResist) * 3);
-      const knockdownRoll = Math.random() * 100;
-      const knockedDown = knockdownRoll <= knockdownChance;
+      // Roll for success
+      const roll = Math.random() * 100;
+      const success = roll <= successChance;
       
-      if (knockedDown) {
-        this.addCombatMessage(`You lose your balance and fall to the ground!`);
+      if (success) {
+        // Increase distance by 1
+        this.state.distance = Math.min(3, this.state.distance + 1);
         
-        // Apply player knocked down status
-        window.gameState.knockedDown = true;
+        this.addCombatMessage(`The ${enemy.name} successfully pushes you back!`);
         
-        // End the turn
-        this.updateCombatInterface();
-        return;
+        // Check for knockdown
+        const knockdownChance = 40 + ((enemyPush - playerResist) * 3);
+        const knockdownRoll = Math.random() * 100;
+        const knockedDown = knockdownRoll <= knockdownChance;
+        
+        if (knockedDown) {
+          this.addCombatMessage(`You lose your balance and fall to the ground!`);
+          
+          // Apply player knocked down status
+          window.gameState.knockedDown = true;
+          
+          // End the turn
+          if (window.combatUI) {
+            window.combatUI.updateCombatInterface();
+          }
+          return;
+        }
+      } else {
+        this.addCombatMessage(`You hold your ground against the shield shove.`);
       }
-    } else {
-      this.addCombatMessage(`You hold your ground against the shield shove.`);
-    }
-    
-    // Update UI and continue
-    this.updateCombatInterface();
-    return;
-  }
-  
-  // Shield Bash handling
-  if (attackType === "ShieldBash") {
-    this.addCombatMessage(`The ${enemy.name} swings their shield at you in a powerful bash!`);
-    
-    // Check for player shield block
-    if (this.checkPlayerShieldBlock()) {
-      this.addCombatMessage(`You raise your shield just in time, blocking the bash completely!`);
+      
+      // Update UI and continue
+      if (window.combatUI) {
+        window.combatUI.updateCombatInterface();
+      }
       return;
     }
     
-    // Determine hit success
-    const defenseBonus = this.state.playerStance === "defensive" ? 20 : 0;
-    const hitChance = 45 + (enemy.accuracy || 0) - (window.player.skills?.melee * 5 || 0) - defenseBonus;
-    const hitRoll = Math.random() * 100;
-    
-    if (hitRoll < hitChance) {
-      // Attack hits - shield bashes do less damage but can stun
-      const damage = Math.round(5 + Math.random() * 3);
+    // Shield Bash handling
+    if (attackType === "ShieldBash") {
+      this.addCombatMessage(`The ${enemy.name} swings their shield at you in a powerful bash!`);
       
-      // Apply damage to player
-      window.gameState.health = Math.max(0, window.gameState.health - damage);
-      
-      // Generate hit narrative
-      this.addCombatMessage(`The shield bash connects, dealing ${damage} damage and staggering you!`);
-      
-      // Chance to stun player
-      if (Math.random() < 0.4) {
-        this.addCombatMessage(`You're momentarily stunned by the impact!`);
-        window.gameState.playerStunned = true;
-      }
-      
-      // Check if player is defeated
-      if (window.gameState.health <= 0) {
-        this.addCombatMessage(`You've been critically wounded and can no longer fight.`);
-        setTimeout(() => this.endCombat(false), 1500);
+      // Check for player shield block
+      if (this.checkPlayerShieldBlock()) {
+        this.addCombatMessage(`You raise your shield just in time, blocking the bash completely!`);
         return;
       }
-    } else {
-      this.addCombatMessage(`You manage to dodge the shield bash!`);
+      
+      // Determine hit success
+      const defenseBonus = this.state.playerStance === "defensive" ? 20 : 0;
+      const hitChance = 45 + (enemy.accuracy || 0) - (window.player.skills?.melee * 5 || 0) - defenseBonus;
+      const hitRoll = Math.random() * 100;
+      
+      if (hitRoll < hitChance) {
+        // Attack hits - shield bashes do less damage but can stun
+        const damage = Math.round(5 + Math.random() * 3);
+        
+        // Apply damage to player
+        window.gameState.health = Math.max(0, window.gameState.health - damage);
+        
+        // Generate hit narrative
+        this.addCombatMessage(`The shield bash connects, dealing ${damage} damage and staggering you!`);
+        
+        // Chance to stun player
+        if (Math.random() < 0.4) {
+          this.addCombatMessage(`You're momentarily stunned by the impact!`);
+          window.gameState.playerStunned = true;
+        }
+        
+        // Check if player is defeated
+        if (window.gameState.health <= 0) {
+          this.addCombatMessage(`You've been critically wounded and can no longer fight.`);
+          setTimeout(() => this.endCombat(false), 1500);
+          return;
+        }
+      } else {
+        this.addCombatMessage(`You manage to dodge the shield bash!`);
+      }
+      
+      // Update UI and continue
+      if (window.combatUI) {
+        window.combatUI.updateCombatInterface();
+      }
+      return;
     }
     
-    // Update UI and continue
-    this.updateCombatInterface();
-    return;
-  }
-    
-    // NEW: Special handling for javelin throws
+    // Javelin throw handling
     if (attackType === "ThrowJavelin") {
       // Check if enemy has javelins and is at a valid range
-      if (!this.enemyHasAmmo('javelin') || this.state.distance !== 2) {
+      if (!this.enemyHasAmmo(enemy, 'javelin') || this.state.distance !== 2) {
         // Fallback to standard attack if can't throw javelin
         this.addCombatMessage(`The ${enemy.name} reaches for a javelin but has none left.`);
-        attackType = this.getRandomEnemyAttack();
+        attackType = this.getRandomEnemyAttack(enemy);
       } else {
         // Use a javelin
-        this.useEnemyAmmo('javelin');
+        this.useEnemyAmmo(enemy, 'javelin');
         
         const javelinName = enemy.ammunition.javelin.name || "javelin";
         this.addCombatMessage(`The ${enemy.name} hurls a ${javelinName} at you!`);
@@ -1140,7 +1762,9 @@ handleEnemyAttack: function(attackType, targetArea) {
         }
         
         // Update UI and return - don't process normal attacks after javelin
-        this.updateCombatInterface();
+        if (window.combatUI) {
+          window.combatUI.updateCombatInterface();
+        }
         return;
       }
     }
@@ -1148,7 +1772,6 @@ handleEnemyAttack: function(attackType, targetArea) {
     // Normal attack handling if not a javelin or javelin failed
     this.addCombatMessage(`The ${enemy.name} attacks your ${this.targetLabels[targetArea]}!`);
     
-    // Rest of original handleEnemyAttack code remains the same...
     // Check for player shield block
     if (this.checkPlayerShieldBlock()) {
       // Attack was blocked by player's shield
@@ -1202,19 +1825,26 @@ handleEnemyAttack: function(attackType, targetArea) {
         this.state.lastCounterActor = "enemy";
         
         // Update UI to show counter options
-        this.updateCounterOptions();
+        if (window.combatUI) {
+          window.combatUI.updateCounterOptions();
+        }
         return;
       }
     }
     
     // Update UI
-    this.updateCombatInterface();
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
   },
   
   // Handle enemy counterattack
   handleEnemyCounter: function() {
-    // NEW: Check if enemy is already defeated
-    if (this.isEnemyDefeated()) {
+    // Get the active enemy
+    const enemy = this.getActiveEnemy();
+    
+    // Safety check
+    if (!enemy || enemy.health <= 0) {
       console.log("Enemy already defeated, cannot counter");
       this.state.counterWindowOpen = false;
       this.state.counterChain = 0;
@@ -1223,7 +1853,6 @@ handleEnemyAttack: function(attackType, targetArea) {
       return;
     }
 
-    const enemy = this.state.enemy;
     this.state.counterChain++;
     this.state.lastCounterActor = "enemy";
 
@@ -1267,7 +1896,7 @@ handleEnemyAttack: function(attackType, targetArea) {
       
       this.addCombatMessage(`The counterattack connects with devastating effect, dealing ${Math.round(damage)} damage!`);
       
-      // Reduce armor durability if hit (NEW)
+      // Reduce armor durability if hit
       this.reducePlayerArmorDurability('body', 2); // Counter attacks cause more durability damage
       
       // Reset counter chain after successful hit
@@ -1293,11 +1922,13 @@ handleEnemyAttack: function(attackType, targetArea) {
       this.state.counterWindowOpen = true;
       
       // Update UI to show only counter attack options
-      this.updateCounterOptions();
+      if (window.combatUI) {
+        window.combatUI.updateCounterOptions();
+      }
     }
   },
   
-  // NEW: Reduce player armor durability when hit
+  // Reduce player armor durability when hit
   reducePlayerArmorDurability: function(targetArea, amount = 1) {
     let armorPiece = null;
     
@@ -1350,9 +1981,7 @@ handleEnemyAttack: function(attackType, targetArea) {
   },
   
   // Check if enemy's shield blocks an attack
-  checkEnemyShieldBlock: function() {
-    const enemy = this.state.enemy;
-    
+  checkEnemyShieldBlock: function(enemy) {
     // Check if enemy has a shield
     if (!enemy.hasShield) return false;
     
@@ -1360,7 +1989,7 @@ handleEnemyAttack: function(attackType, targetArea) {
     let blockChance = enemy.blockChance || 15; // Default 15% if not specified
     
     // Add bonus for defensive stance
-    if (this.state.enemyStance === "defensive") {
+    if (enemy.currentStance === "defensive") {
       blockChance += 15; // +15% block chance in defensive stance
     }
     
@@ -1368,9 +1997,9 @@ handleEnemyAttack: function(attackType, targetArea) {
     return Math.random() * 100 < blockChance;
   },
   
-  // Calculate enemy damage - updated with armor durability damage reduction
+  // Calculate enemy damage
   calculateEnemyDamage: function(targetArea) {
-    const enemy = this.state.enemy;
+    const enemy = this.getActiveEnemy();
     const baseDamage = enemy.power || 5;
     
     // Get player defense stats
@@ -1411,22 +2040,7 @@ handleEnemyAttack: function(attackType, targetArea) {
         armorDurabilityReduction += Math.min(50, durabilityPercent / 2); // Cap at 50%
       }
     }
-
-    const shield = window.player.equipment?.offHand;
-    if (shield && shield !== "occupied") {
-      const shieldTemplate = shield.getTemplate();
-      if (shieldTemplate.weaponType?.name === "Shield") {
-        // Shield bash is only available at close range (0 or 1)
-        if (this.state.distance <= 1 && !attacks.includes("Shield Bash")) {
-          attacks.push("Shield Bash");
-        }
-        
-        // Shove is only available at grappling range (0)
-        if (this.state.distance === 0 && !attacks.includes("Shove")) {
-          attacks.push("Shove");
-        }
-      }
-    }
+    
     // Calculate damage with randomness
     let damage = baseDamage * (1 + Math.random() * 0.4 - 0.2);
     
@@ -1443,9 +2057,9 @@ handleEnemyAttack: function(attackType, targetArea) {
     }
     
     // Adjust based on stance
-    if (this.state.enemyStance === "aggressive") {
+    if (enemy.currentStance === "aggressive") {
       damage *= 1.3; // More damage in aggressive stance
-    } else if (this.state.enemyStance === "defensive") {
+    } else if (enemy.currentStance === "defensive") {
       damage *= 0.7; // Less damage in defensive stance
     }
     
@@ -1453,7 +2067,40 @@ handleEnemyAttack: function(attackType, targetArea) {
     return Math.round(damage);
   },
   
-  // Calculate player damage based on weapon and attack - updated with armor penetration
+  // Calculate damage for ally attacks
+  calculateAllyDamage: function(ally, enemy, targetArea) {
+    const baseDamage = ally.power || 5;
+    
+    // Calculate damage with randomness
+    let damage = baseDamage * (1 + Math.random() * 0.4 - 0.2);
+    
+    // Apply ally's armor penetration against enemy defense
+    const armorPen = ally.armorPenetration || 0;
+    const enemyDefense = enemy.defense || 0;
+    const effectiveDefense = Math.max(0, enemyDefense - armorPen);
+    
+    // Reduce by defense, minimum 1 damage
+    damage = Math.max(1, damage - effectiveDefense * 0.5);
+    
+    // Adjust based on stance
+    if (ally.currentStance === "aggressive") {
+      damage *= 1.3; // More damage in aggressive stance
+    } else if (ally.currentStance === "defensive") {
+      damage *= 0.7; // Less damage in defensive stance
+    }
+    
+    // Apply target area modifier
+    if (targetArea === "head") {
+      damage *= 1.5; // Headshots do more damage
+    } else if (targetArea === "legs") {
+      damage *= 0.8; // Leg hits do less damage
+    }
+    
+    // Round to nearest integer
+    return Math.round(damage);
+  },
+  
+  // Calculate player damage based on weapon and attack
   calculateDamage: function(weaponTemplate, attackType) {
     const baseDamage = weaponTemplate.stats.damage || 5;
     const damageMultiplier = this.getAttackDamageMultiplier(attackType);
@@ -1501,7 +2148,8 @@ handleEnemyAttack: function(attackType, targetArea) {
     
     // Apply armor penetration against enemy defense
     const armorPenetration = weaponTemplate.stats.armorPenetration || 0;
-    const enemyDefense = this.state.enemy.defense || 0;
+    const enemy = this.getActiveEnemy();
+    const enemyDefense = enemy ? (enemy.defense || 0) : 0;
     const effectiveDefense = Math.max(0, enemyDefense - armorPenetration);
     
     // Reduce damage based on enemy defense
@@ -1510,7 +2158,7 @@ handleEnemyAttack: function(attackType, targetArea) {
     }
     
     // Apply enemy stance defense
-    if (this.state.enemyStance === "defensive") {
+    if (enemy && enemy.currentStance === "defensive") {
       damage *= 0.7; // Enemy takes less damage in defensive stance
     }
     
@@ -1520,7 +2168,9 @@ handleEnemyAttack: function(attackType, targetArea) {
   
   // Resolve if an attack hits with optional hit bonus
   resolveAttackSuccess: function(weaponTemplate, attackType, hitBonus = 0) {
-    const enemy = this.state.enemy;
+    const enemy = this.getActiveEnemy();
+    if (!enemy) return false;
+    
     const accuracyMultiplier = this.getAttackAccuracyMultiplier(attackType);
     
     // Base chance from player skill
@@ -1546,7 +2196,7 @@ handleEnemyAttack: function(attackType, targetArea) {
       hitChance -= 10; // Less accurate in defensive stance
     }
     
-    if (this.state.enemyStance === "defensive") {
+    if (enemy.currentStance === "defensive") {
       hitChance -= 15; // Harder to hit defensive enemies
     }
     
@@ -1565,15 +2215,15 @@ handleEnemyAttack: function(attackType, targetArea) {
   },
   
   // Check if enemy should counterattack
-  shouldEnemyCounter: function() {
+  shouldEnemyCounter: function(enemy) {
     // Base counter chance
     let counterChance = 0.3;
     
     // Adjust based on enemy stats
-    counterChance += (this.state.enemy.counterSkill || 0) * 0.05;
+    counterChance += (enemy.counterSkill || 0) * 0.05;
     
     // Adjust based on stances
-    if (this.state.enemyStance === "defensive") {
+    if (enemy.currentStance === "defensive") {
       counterChance += 0.2; // More likely to counter in defensive stance
     }
     
@@ -1608,7 +2258,10 @@ handleEnemyAttack: function(attackType, targetArea) {
       this.addCombatMessage("You try to escape but fail! The enemy gets an opening to attack!");
       
       // Enemy gets a free attack
-      setTimeout(() => this.handleEnemyAttack(this.getRandomEnemyAttack(), this.getRandomTargetArea()), 1000);
+      const activeEnemy = this.getActiveEnemy();
+      if (activeEnemy) {
+        setTimeout(() => this.handleEnemyAttack(activeEnemy, this.getRandomEnemyAttack(activeEnemy), this.getRandomTargetArea()), 1000);
+      }
     }
   },
   
@@ -1617,15 +2270,40 @@ handleEnemyAttack: function(attackType, targetArea) {
     // Set combat as inactive
     this.state.active = false;
     
+    // Prepare conclusion narrative based on outcome
+    let narrativeText = [];
+    let conclusionType = typeof outcome === 'string' ? outcome : (outcome ? 'victory' : 'defeat');
+    
     if (outcome === true) {
       // Player victory
-      window.gameState.experience += this.state.enemy.experienceValue || 10;
+      narrativeText = [
+        "The battlefield falls silent as your enemies have been defeated.",
+        "You stand victorious, your weapons slick with the blood of your foes."
+      ];
       
-      // Show victory message
-      window.showNotification(`Victory! +${this.state.enemy.experienceValue || 10} XP`, 'success');
+      let totalExp = 0;
       
-      // Generate loot
-      this.generateLoot();
+      // Calculate total experience from all enemies
+      this.state.enemies.forEach(enemy => {
+        if (enemy.health <= 0) {
+          totalExp += enemy.experienceValue || 10;
+        } else {
+          // Partial XP for damaged enemies
+          const damagePercent = (enemy.maxHealth - enemy.health) / enemy.maxHealth;
+          totalExp += Math.floor((enemy.experienceValue || 10) * damagePercent * 0.5);
+        }
+      });
+      
+      window.gameState.experience += totalExp;
+      
+      // Add experience gain to narrative
+      narrativeText.push(`You've earned ${totalExp} experience from this encounter.`);
+      
+      // Generate loot from all defeated enemies
+      const lootMessage = this.generateLootFromAll();
+      if (lootMessage) {
+        narrativeText.push(lootMessage);
+      }
       
       // Update achievement if first combat victory
       if (!window.gameState.combatVictoryAchieved) {
@@ -1635,31 +2313,73 @@ handleEnemyAttack: function(attackType, targetArea) {
       
       // Slightly damage player's armor during combat
       this.applyArmorDurabilityDamage();
+    } else if (outcome === "draw") {
+      // Combat ended early (turn limit) - narrative is handled in endCombatEarly
+      let partialExp = 0;
+      
+      // Calculate partial experience based on damage dealt to enemies
+      this.state.enemies.forEach(enemy => {
+        const damageDealt = enemy.maxHealth - enemy.health;
+        const percentDamage = damageDealt / enemy.maxHealth;
+        partialExp += Math.floor((enemy.experienceValue || 10) * percentDamage * 0.5);
+      });
+      
+      window.gameState.experience += partialExp;
+      
+      // Add to the narrative
+      narrativeText.push(`You earned ${partialExp} experience for your efforts before the battle shifted.`);
+      
+      // Minor armor durability damage
+      this.applyArmorDurabilityDamage(0.75);
     } else if (outcome === "retreat") {
       // Player retreated
-      window.showNotification("You managed to escape combat.", 'info');
+      narrativeText = [
+        "You find an opening and quickly disengage from combat.",
+        "With swift footwork, you manage to escape the fight and slip away."
+      ];
       
       // Minor armor durability damage on retreat
-      this.applyArmorDurabilityDamage(0.5); // Half damage on retreat
+      this.applyArmorDurabilityDamage(0.5);
     } else {
       // Player defeat
+      narrativeText = [
+        "Your vision blurs as exhaustion and pain overtake you.",
+        "Though defeated, you somehow manage to crawl away before your enemies can finish you off."
+      ];
+      
       window.gameState.health = Math.max(1, window.gameState.health); // Ensure player doesn't die
-      window.showNotification("You were defeated but survived.", 'warning');
       
       // Apply stamina penalty for defeat
       window.gameState.stamina = Math.max(0, window.gameState.stamina - 50);
+      narrativeText.push("The defeat has severely drained your stamina.");
       
       // More significant armor durability damage on defeat
-      this.applyArmorDurabilityDamage(2); // Double damage on defeat
+      this.applyArmorDurabilityDamage(2);
     }
     
-    // Hide combat interface
-    document.getElementById('combatInterface').classList.add('hidden');
-    
-    // Hide the modal container
-    const modalContainer = document.querySelector('.combat-modal');
-    if (modalContainer) {
-      modalContainer.style.display = 'none';
+    // Show conclusion modal through UI if available
+    if (window.combatUI && typeof window.combatUI.showBattleConclusionModal === 'function') {
+      window.combatUI.showBattleConclusionModal(conclusionType, narrativeText);
+    } else {
+      // Fallback method - just hide combat interface
+      document.getElementById('combatInterface').classList.add('hidden');
+      
+      // Hide the modal container
+      const modalContainer = document.querySelector('.combat-modal');
+      if (modalContainer) {
+        modalContainer.style.display = 'none';
+      }
+      
+      // Show notification based on outcome
+      if (outcome === true) {
+        window.showNotification(`Victory! +${totalExp} XP`, 'success');
+      } else if (outcome === "draw") {
+        window.showNotification(`Combat ended in a draw.`, 'info');
+      } else if (outcome === "retreat") {
+        window.showNotification("You managed to escape combat.", 'info');
+      } else {
+        window.showNotification("You were defeated but survived.", 'warning');
+      }
     }
     
     // Update game UI
@@ -1669,6 +2389,60 @@ handleEnemyAttack: function(attackType, targetArea) {
     
     // Check for level up
     window.checkLevelUp();
+  },
+  
+  // Generate loot from all defeated enemies
+  generateLootFromAll: function() {
+    let lootGenerated = false;
+    let lootMessages = [];
+    
+    this.state.enemies.forEach(enemy => {
+      // Only generate loot from defeated enemies
+      if (enemy.health > 0) return;
+      
+      // Check if enemy has loot table
+      if (!enemy.lootTable || enemy.lootTable.length === 0) {
+        return;
+      }
+      
+      // Determine if loot drops (once per enemy)
+      const lootChance = enemy.lootChance || 0.5;
+      if (Math.random() > lootChance) {
+        return;
+      }
+      
+      // Select a random item from loot table
+      const lootIndex = Math.floor(Math.random() * enemy.lootTable.length);
+      const lootId = enemy.lootTable[lootIndex];
+      
+      // Add item to inventory
+      const itemTemplate = window.itemTemplates[lootId];
+      if (itemTemplate) {
+        window.addItemToInventory(itemTemplate);
+        lootMessages.push(`You found ${itemTemplate.name}!`);
+        this.addCombatMessage(`You found ${itemTemplate.name}!`);
+        lootGenerated = true;
+      }
+    });
+    
+    // If no specific loot was generated, add some coins
+    if (!lootGenerated) {
+      // Add money
+      const coins = Math.floor(Math.random() * 10 * this.state.enemies.length) + 5;
+      window.player.taelors += coins;
+      lootMessages.push(`You found ${coins} taelors!`);
+      this.addCombatMessage(`You found ${coins} taelors!`);
+      
+      // Small chance to also find repair kit
+      if (Math.random() < 0.15 && window.itemTemplates.repairKit) {
+        window.addItemToInventory(window.itemTemplates.repairKit);
+        lootMessages.push(`You also found an armor repair kit!`);
+        this.addCombatMessage(`You also found an armor repair kit!`);
+      }
+    }
+    
+    // Return a combined message for the conclusion modal
+    return lootMessages.join(" ");
   },
   
   // Apply durability damage to armor after combat
@@ -1705,339 +2479,93 @@ handleEnemyAttack: function(attackType, targetArea) {
     }
   },
   
-  // Generate loot based on enemy
-  generateLoot: function() {
-    const enemy = this.state.enemy;
-    
-    // Check if enemy has loot table
-    if (!enemy.lootTable || enemy.lootTable.length === 0) {
-      return;
-    }
-    
-    // Determine if loot drops
-    const lootChance = enemy.lootChance || 0.5;
-    if (Math.random() > lootChance) {
-      return;
-    }
-    
-    // Select a random item from loot table
-    const lootIndex = Math.floor(Math.random() * enemy.lootTable.length);
-    const lootId = enemy.lootTable[lootIndex];
-    
-    // Add item to inventory
-    const itemTemplate = window.itemTemplates[lootId];
-    if (itemTemplate) {
-      window.addItemToInventory(itemTemplate);
-      this.addCombatMessage(`You found ${itemTemplate.name}!`);
-    } else {
-      // Add money if item not found
-      const coins = Math.floor(Math.random() * 20) + 5;
-      window.player.taelors += coins;
-      this.addCombatMessage(`You found ${coins} taelors!`);
-      
-      // Small chance to also find repair kit
-      if (Math.random() < 0.15 && window.itemTemplates.repairKit) {
-        window.addItemToInventory(window.itemTemplates.repairKit);
-        this.addCombatMessage(`You also found an armor repair kit!`);
-      }
-    }
-  },
-  
-  // Render the combat interface
-  renderCombatInterface: function() {
-    // Create modal container if needed
-    let modalContainer = document.querySelector('.combat-modal');
-    if (!modalContainer) {
-      modalContainer = document.createElement('div');
-      modalContainer.className = 'combat-modal';
-      document.body.appendChild(modalContainer);
-      
-      // Move combat interface into modal
-      const combatInterface = document.getElementById('combatInterface');
-      modalContainer.appendChild(combatInterface);
-      
-      // Add a title to the combat interface
-      const titleElement = document.createElement('h2');
-      titleElement.className = 'combat-title';
-      titleElement.textContent = 'Combat Encounter';
-      combatInterface.insertBefore(titleElement, combatInterface.firstChild);
-      
-      // Adjust the actions container class for better styling
-      const actionsContainer = document.getElementById('combatActions');
-      actionsContainer.className = 'combat-actions';
-    }
-    
-    // Show the combat interface
-    const combatInterface = document.getElementById('combatInterface');
-    combatInterface.classList.remove('hidden');
-    modalContainer.style.display = 'flex';
-    
-    // Add combat styles
-    if (!document.getElementById('combat-styles')) {
-      const combatStyles = `
-      .combat-modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.85);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-      }
-      
-      #combatInterface {
-        width: 90%;
-        max-width: 800px;
-        background: #1a1a1a;
-        border: 2px solid #444;
-        border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
-      }
-      
-      .combat-title {
-        text-align: center;
-        margin-bottom: 10px;
-        color: #c9aa71;
-        font-size: 1.4em;
-      }
-      
-      .combat-actions {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
-        margin-top: 15px;
-      }
-      
-      @media (max-width: 600px) {
-        .combat-actions {
-          grid-template-columns: repeat(2, 1fr);
-        }
-      }
-      `;
-      
-      const styleElement = document.createElement('style');
-      styleElement.id = 'combat-styles';
-      styleElement.textContent = combatStyles;
-      document.head.appendChild(styleElement);
-    }
-    
-    // Update initial UI elements
-    this.updateCombatInterface();
-  },
-  
-  // Update combat UI elements
-  updateCombatInterface: function() {
-    // Update health displays
-    document.getElementById('playerHealthDisplay').textContent = `${Math.round(window.gameState.health)} HP`;
-    document.getElementById('playerCombatHealth').style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
-    
-    if (this.state.enemy) {
-      document.getElementById('enemyName').textContent = this.state.enemy.name;
-      document.getElementById('enemyHealthDisplay').textContent = `${Math.round(this.state.enemy.health)} HP`;
-      document.getElementById('enemyCombatHealth').style.width = `${(this.state.enemy.health / this.state.enemy.maxHealth) * 100}%`;
-      
-      // NEW: Add javelin count display if enemy has javelins
-      const enemyStatsElement = document.getElementById('enemyStats');
-      if (enemyStatsElement && this.state.enemy.ammunition && this.state.enemy.ammunition.javelin) {
-        const javelinCount = this.state.enemy.ammunition.javelin.current;
-        
-        // Check if javelin element already exists
-        let javelinElement = document.getElementById('enemyJavelinCount');
-        if (!javelinElement) {
-          // Create javelin count display
-          javelinElement = document.createElement('div');
-          javelinElement.id = 'enemyJavelinCount';
-          javelinElement.className = 'enemy-equipment';
-          enemyStatsElement.appendChild(javelinElement);
-        }
-        
-        // Update javelin count text
-        javelinElement.textContent = `Javelins: ${javelinCount}`;
-      }
-    }
-    
-    // Combat log is updated via addCombatMessage
-    
-    // Update action buttons based on phase and counter state
-    if (this.state.phase === "player") {
-      if (this.state.counterWindowOpen && this.state.lastCounterActor === "enemy") {
-        this.updateCounterOptions();
-      } else {
-        this.updateCombatOptions();
-      }
-    }
-  },
-  
-  // Update available combat options based on current state
-  updateCombatOptions: function() {
-    const actionsContainer = document.getElementById('combatActions');
-    actionsContainer.innerHTML = '';
-    
-    // Get equipped weapon
-    const weapon = window.player.equipment?.mainHand;
-    const weaponTemplate = weapon ? weapon.getTemplate() : null;
-    
-    // Add distance buttons
-    if (this.state.distance > 0) {
-      this.addCombatButton("Approach", () => this.handleCombatAction("change_distance", {change: -1}), actionsContainer);
-    }
-    if (this.state.distance < 3) {
-      this.addCombatButton("Retreat", () => this.handleCombatAction("change_distance", {change: 1}), actionsContainer);
-    }
-    
-    // Add stance buttons
-    if (this.state.playerStance !== "aggressive") {
-      this.addCombatButton("Aggressive Stance", () => this.handleCombatAction("change_stance", {stance: "aggressive"}), actionsContainer);
-    }
-    if (this.state.playerStance !== "defensive") {
-      this.addCombatButton("Defensive Stance", () => this.handleCombatAction("change_stance", {stance: "defensive"}), actionsContainer);
-    }
-    if (this.state.playerStance !== "neutral") {
-      this.addCombatButton("Neutral Stance", () => this.handleCombatAction("change_stance", {stance: "neutral"}), actionsContainer);
-    }
-    
-    // Add target area buttons
-    this.addCombatButton("Target Head", () => this.handleCombatAction("change_target", {target: "head"}), actionsContainer);
-    this.addCombatButton("Target Body", () => this.handleCombatAction("change_target", {target: "body"}), actionsContainer);
-    this.addCombatButton("Target Legs", () => this.handleCombatAction("change_target", {target: "legs"}), actionsContainer);
-    
-    // Add shield status if player has shield
-    const shield = window.player.equipment?.offHand;
-    if (shield && shield !== "occupied") {
-      const shieldTemplate = shield.getTemplate();
-      if (shieldTemplate.weaponType?.name === "Shield") {
-        let blockChance = shieldTemplate.blockChance || 0;
-        if (this.state.playerStance === "defensive") {
-          blockChance += 15; // +15% in defensive stance
-        }
-        this.addCombatButton(`Shield Block: ${blockChance}%`, () => {}, actionsContainer, true);
-      }
-    }
-    
-    // Show weapon durability if it has it
-    if (weapon && weapon.durability !== undefined) {
-      // Calculate durability percentage
-      const durabilityPercent = Math.round((weapon.durability / weaponTemplate.maxDurability) * 100);
-      let durabilityStatus = ""; 
-      
-      // Add status text based on percentage
-      if (durabilityPercent <= 0) durabilityStatus = " (Broken)";
-      else if (durabilityPercent < 20) durabilityStatus = " (Very Poor)";
-      else if (durabilityPercent < 40) durabilityStatus = " (Poor)";
-      else if (durabilityPercent < 60) durabilityStatus = " (Worn)";
-      
-      // Only show status if not in excellent condition
-      if (durabilityStatus) {
-        this.addCombatButton(`Weapon: ${durabilityPercent}%${durabilityStatus}`, () => {}, actionsContainer, true);
-      }
-      
-      // Disable attacks if weapon is broken
-      if (weapon.durability <= 0) {
-        this.addCombatButton("Weapon Broken!", () => {}, actionsContainer, true);
-        // Early return to skip attack options
-        this.addCombatButton("Attempt to Flee", () => this.handleCombatAction("flee"), actionsContainer);
-        return;
-      }
-    }
-    
-    // Get the effective weapon range
-    const weaponRange = weaponTemplate ? this.getWeaponRange(weaponTemplate) : 1;
-    
-    console.log(`Weapon: ${weaponTemplate?.name || 'none'}, Range: ${weaponRange}, Distance: ${this.state.distance}`);
-    
-    // Get all available attacks considering current weapon, ammo, and distance
-    let attacks = [];
-    
-    // If within weapon range, add weapon attacks
-    if (weaponTemplate && this.state.distance <= weaponRange) {
-      attacks = attacks.concat(this.getWeaponAttacks(weaponTemplate));
-    } else if (weaponTemplate) {
-      // Weapon out of range
-      this.addCombatButton(`Too far for ${weaponTemplate.name}`, () => {}, actionsContainer, true);
-    }
-    
-    // Always check for javelin attacks separately from main weapon
-    if (this.hasCompatibleAmmo(null, "javelin") && this.state.distance >= 1 && this.state.distance <= 2) {
-      // If no weapon or weapon is one-handed
-      if (!weaponTemplate || (weaponTemplate.hands && weaponTemplate.hands === 1)) {
-        if (!attacks.includes("Throw Javelin")) {
-          attacks.push("Throw Javelin");
-        }
-      }
-    }
-    
-    // Default to punch if no weapon and at melee range
-    if (attacks.length === 0 && this.state.distance === 0) {
-      attacks = ["Punch"];
-    }
-    
-    // Add buttons for each available attack
-    for (const attack of attacks) {
-      // Skip "No Arrows" etc. which are just informational
-      if (attack.startsWith("No ")) {
-        this.addCombatButton(attack, () => {}, actionsContainer, true);
-      } else {
-        this.addCombatButton(attack, () => this.handleCombatAction("attack", {attackType: attack}), actionsContainer);
-      }
-    }
-    
-    // Always add flee button
-    this.addCombatButton("Attempt to Flee", () => this.handleCombatAction("flee"), actionsContainer);
-  },
-  
-  // Update UI for counter options
-  updateCounterOptions: function() {
-    const actionsContainer = document.getElementById('combatActions');
-    actionsContainer.innerHTML = '';
-    
-    // Get equipped weapon
-    const weapon = window.player.equipment?.mainHand;
-    const weaponTemplate = weapon ? weapon.getTemplate() : null;
-    
-    // In a counter situation, only show attack options
-    if (weaponTemplate && weapon.durability > 0) {
-      // Get available attacks for weapon
-      const attacks = this.getWeaponAttacks(weaponTemplate);
-      
-      // Add button for each counter attack
-      for (const attack of attacks) {
-        this.addCombatButton(`Counter: ${attack}`, () => this.handleCombatAction("counter", {attackType: attack}), actionsContainer);
-      }
-    } else {
-      // No weapon or broken weapon - just basic counter
-      this.addCombatButton("Counter Punch", () => this.handleCombatAction("counter", {attackType: "Punch"}), actionsContainer);
-    }
-  },
-  
-  // Add a button to the combat interface
-  addCombatButton: function(label, onClick, container, disabled = false) {
-    const btn = document.createElement('button');
-    btn.className = 'action-btn';
-    if (disabled) btn.className += ' disabled';
-    btn.textContent = label;
-    if (!disabled) btn.onclick = onClick;
-    container.appendChild(btn);
-  },
-  
-  // Add a message to the combat log
+  // Add a message to the combat log (also notifies UI)
   addCombatMessage: function(message) {
     // Add to state log
     this.state.combatLog.push(message);
     
-    // Update UI log
-    const combatLog = document.getElementById('combatLog');
-    const newMessage = document.createElement('p');
-    newMessage.textContent = message;
-    combatLog.appendChild(newMessage);
-    
-    // Scroll to bottom
-    combatLog.scrollTop = combatLog.scrollHeight;
+    // Notify UI to update
+    if (window.combatUI && typeof window.combatUI.addCombatMessage === 'function') {
+      window.combatUI.addCombatMessage(message);
+    }
     
     console.log("Combat Log:", message);
+  },
+  
+  // Get random enemy attack
+  getRandomEnemyAttack: function(enemy) {
+    // Special shield attacks if enemy has a shield and we're at appropriate distance
+    if (enemy.hasShield) {
+      if (this.state.distance === 0) {
+        // At grappling range, chance to use shield shove
+        if (Math.random() < 0.4) {
+          return "ShieldShove";
+        }
+      }
+      
+      if (this.state.distance <= 1) {
+        // At close range, chance to use shield bash
+        if (Math.random() < 0.3) {
+          return "ShieldBash";
+        }
+      }
+    }
+    
+    // If no shield attack selected, use standard attacks
+    // Different attack options based on distance
+    if (this.state.distance <= 1) {
+      // Melee range attacks
+      const meleeAttacks = ["Strike", "Slash", "Stab"];
+      return meleeAttacks[Math.floor(Math.random() * meleeAttacks.length)];
+    } else if (this.state.distance === 2 && this.enemyHasAmmo(enemy, 'javelin')) {
+      // Medium range with javelins available
+      return "ThrowJavelin";
+    } else {
+      // Default attacks
+      const basicAttacks = ["Strike", "Slash", "Stab"];
+      return basicAttacks[Math.floor(Math.random() * basicAttacks.length)];
+    }
+  },
+  
+  // Get random ally attack
+  getRandomAllyAttack: function(ally) {
+    // Special shield attacks if ally has a shield and we're at appropriate distance
+    if (ally.hasShield) {
+      if (this.state.distance === 0) {
+        // At grappling range, chance to use shield shove
+        if (Math.random() < 0.3) {
+          return "ShieldShove";
+        }
+      }
+      
+      if (this.state.distance <= 1) {
+        // At close range, chance to use shield bash
+        if (Math.random() < 0.3) {
+          return "ShieldBash";
+        }
+      }
+    }
+    
+    // If no shield attack selected, use standard attacks
+    // Different attack options based on distance
+    if (this.state.distance <= 1) {
+      // Melee range attacks
+      const meleeAttacks = ["Strike", "Slash", "Stab"];
+      return meleeAttacks[Math.floor(Math.random() * meleeAttacks.length)];
+    } else if (this.state.distance === 2 && this.allyHasAmmo(ally, 'javelin')) {
+      // Medium range with javelins available
+      return "ThrowJavelin";
+    } else {
+      // Default attacks
+      const basicAttacks = ["Strike", "Slash", "Stab"];
+      return basicAttacks[Math.floor(Math.random() * basicAttacks.length)];
+    }
+  },
+  
+  // Get random target area
+  getRandomTargetArea: function() {
+    const areas = ["head", "body", "legs"];
+    return areas[Math.floor(Math.random() * areas.length)];
   },
   
   // Get weapon attacks based on weapon type
@@ -2046,7 +2574,6 @@ handleEnemyAttack: function(attackType, targetArea) {
     
     // Get current combat state info
     const distance = this.state.distance;
-    const ammo = window.player.equipment?.ammunition;
     
     // Initialize attacks array
     let availableAttacks = [];
@@ -2070,30 +2597,6 @@ handleEnemyAttack: function(attackType, targetArea) {
         case "Dagger":
           availableAttacks = ["Stab", "Slash"];
           break;
-        case "Bow":
-          // Check for arrows
-          if (this.hasCompatibleAmmo(weaponTemplate, "arrow")) {
-            availableAttacks = ["Shoot", "Aimed Shot"];
-          } else {
-            availableAttacks = ["No Arrows"];
-          }
-          break;
-        case "Crossbow":
-          // Check for bolts
-          if (this.hasCompatibleAmmo(weaponTemplate, "bolt")) {
-            availableAttacks = ["Shoot", "Aimed Shot"];
-          } else {
-            availableAttacks = ["No Bolts"];
-          }
-          break;
-        case "Rifle":
-          // Check for shot/bullets
-          if (this.hasCompatibleAmmo(weaponTemplate, "shot")) {
-            availableAttacks = ["Shoot", "Aimed Shot"];
-          } else {
-            availableAttacks = ["No Ammunition"];
-          }
-          break;
         case "Shield":
           availableAttacks = ["Bash"];
           break;
@@ -2109,61 +2612,103 @@ handleEnemyAttack: function(attackType, targetArea) {
       availableAttacks = ["Strike"];
     }
     
-    // Special case: Add javelin throw option if:
-    // 1. We have javelin ammunition
-    // 2. Current distance is appropriate (medium)
-    // 3. Main hand weapon isn't two-handed
-    if (this.hasCompatibleAmmo(null, "javelin") && 
-        distance >= 1 && distance <= 2 &&
-        (!weaponTemplate || weaponTemplate.hands !== 2)) {
-      availableAttacks.push("Throw Javelin");
-    }
-    
-    console.log("Available attacks:", availableAttacks, "Distance:", distance);
     return availableAttacks;
   },
   
-    // Get random enemy attack
-    getRandomEnemyAttack: function() {
-      const enemy = this.state.enemy;
-      
-      // Special shield attacks if enemy has a shield and we're at appropriate distance
-      if (enemy.hasShield) {
-        if (this.state.distance === 0) {
-          // At grappling range, chance to use shield shove
-          if (Math.random() < 0.4) {
-            return "ShieldShove";
-          }
-        }
-        
-        if (this.state.distance <= 1) {
-          // At close range, chance to use shield bash
-          if (Math.random() < 0.3) {
-            return "ShieldBash";
-          }
-        }
-      }
-      
-      // If no shield attack selected, use standard attacks
-      // Different attack options based on distance
-      if (this.state.distance <= 1) {
-        // Melee range attacks
-        const meleeAttacks = ["Strike", "Slash", "Stab"];
-        return meleeAttacks[Math.floor(Math.random() * meleeAttacks.length)];
-      } else if (this.state.distance === 2 && this.enemyHasAmmo('javelin')) {
-        // Medium range with javelins available
-        return "ThrowJavelin";
-      } else {
-        // Default attacks
-        const basicAttacks = ["Strike", "Slash", "Stab"];
-        return basicAttacks[Math.floor(Math.random() * basicAttacks.length)];
-      }
-    },
+  // Get weapon range
+  getWeaponRange: function(weaponTemplate) {
+    // Default to melee range if no weapon
+    if (!weaponTemplate) return 1;
+    
+    // First check explicit range property on weapon template
+    if (typeof weaponTemplate.range === 'number') {
+      return weaponTemplate.range;
+    }
+    
+    // Then check range from weapon type
+    if (weaponTemplate.weaponType && typeof weaponTemplate.weaponType.range === 'number') {
+      return weaponTemplate.weaponType.range;
+    }
+    
+    // Default to melee range (1)
+    return 1;
+  },
   
-  // Get random target area
-  getRandomTargetArea: function() {
-    const areas = ["head", "body", "legs"];
-    return areas[Math.floor(Math.random() * areas.length)];
+  // Helper function to check ammunition compatibility
+  hasCompatibleAmmo: function(weapon, ammoType) {
+    const ammo = window.player.equipment?.ammunition;
+    
+    // No ammo equipped
+    if (!ammo || ammo === "occupied" || !ammo.getTemplate) {
+      return false;
+    }
+    
+    // Ammo is empty
+    if (ammo.currentAmount <= 0) {
+      return false;
+    }
+    
+    // If asking for specific ammo type
+    if (ammoType) {
+      return ammo.ammoType === ammoType || 
+             ammo.getTemplate().ammoType === ammoType;
+    }
+    
+    // If checking for compatibility with a weapon
+    if (weapon) {
+      return window.checkWeaponAmmoCompatibility();
+    }
+    
+    // Default: ammo exists and isn't empty
+    return true;
+  },
+  
+  // Add a function to check enemy ammunition
+  enemyHasAmmo: function(enemy, ammoType) {
+    if (!enemy || !enemy.ammunition || !enemy.ammunition[ammoType]) {
+      return false;
+    }
+    
+    return enemy.ammunition[ammoType].current > 0;
+  },
+  
+  // Add a function to use enemy ammunition
+  useEnemyAmmo: function(enemy, ammoType) {
+    if (!this.enemyHasAmmo(enemy, ammoType)) {
+      return false;
+    }
+    
+    // Reduce ammo count
+    enemy.ammunition[ammoType].current--;
+    
+    // Log for debugging
+    console.log(`Enemy used 1 ${ammoType}. Remaining: ${enemy.ammunition[ammoType].current}`);
+    
+    return true;
+  },
+  
+  // Add a function to check ally ammunition
+  allyHasAmmo: function(ally, ammoType) {
+    if (!ally || !ally.ammunition || !ally.ammunition[ammoType]) {
+      return false;
+    }
+    
+    return ally.ammunition[ammoType].current > 0;
+  },
+  
+  // Add a function to use ally ammunition
+  useAllyAmmo: function(ally, ammoType) {
+    if (!this.allyHasAmmo(ally, ammoType)) {
+      return false;
+    }
+    
+    // Reduce ammo count
+    ally.ammunition[ammoType].current--;
+    
+    // Log for debugging
+    console.log(`Ally used 1 ${ammoType}. Remaining: ${ally.ammunition[ammoType].current}`);
+    
+    return true;
   },
   
   // Get attack damage multiplier based on attack type
@@ -2175,8 +2720,8 @@ handleEnemyAttack: function(attackType, targetArea) {
       case "Sweep": return 0.8;
       case "Hook": return 1.1;
       case "Bash": return 0.7;
-      case "Shoot": return 1.3;
-      case "Aimed Shot": return 1.8;
+      case "Strike": return 1.0;
+      case "Punch": return 0.5;
       default: return 1.0;
     }
   },
@@ -2190,17 +2735,18 @@ handleEnemyAttack: function(attackType, targetArea) {
       case "Sweep": return 1.1;
       case "Hook": return 0.85;
       case "Bash": return 0.9;
-      case "Shoot": return 0.8;
-      case "Aimed Shot": return 0.6;
+      case "Strike": return 1.0;
+      case "Punch": return 1.2;
       default: return 1.0;
     }
   },
   
-  // NARRATIVE GENERATION METHODS
+  // Narrative generation functions
   
   // Generate attack narrative
   generateAttackNarrative: function(weaponTemplate, attackType) {
-    const enemyName = this.state.enemy.name;
+    const enemy = this.getActiveEnemy();
+    const enemyName = enemy ? enemy.name : "enemy";
     const weaponName = weaponTemplate ? weaponTemplate.name : "fist";
     const targetArea = this.targetLabels[this.state.targetArea];
     
@@ -2221,15 +2767,10 @@ handleEnemyAttack: function(attackType, targetArea) {
         `With a mighty effort, you cleave downward at the ${enemyName}'s ${targetArea}.`,
         `You execute a heavy cleaving strike, aiming to split the ${enemyName}'s ${targetArea}.`
       ],
-      "Shoot": [
-        `You take aim with your ${weaponName}, targeting the ${enemyName}'s ${targetArea}.`,
-        `Steadying your ${weaponName}, you fire at the ${enemyName}'s ${targetArea}.`,
-        `You squeeze the trigger of your ${weaponName}, sending a projectile toward the ${enemyName}'s ${targetArea}.`
-      ],
-      "Aimed Shot": [
-        `You take careful aim with your ${weaponName}, focusing intently on the ${enemyName}'s ${targetArea}.`,
-        `Drawing a breath, you steady your ${weaponName} for a precise shot at the ${enemyName}'s ${targetArea}.`,
-        `With measured patience, you line up a perfect shot at the ${enemyName}'s ${targetArea}.`
+      "Punch": [
+        `You throw a quick punch at the ${enemyName}'s ${targetArea}.`,
+        `With clenched fist, you aim a punch at the ${enemyName}'s ${targetArea}.`,
+        `You swing your fist toward the ${enemyName}'s ${targetArea}.`
       ],
       "default": [
         `You attack the ${enemyName}'s ${targetArea} with your ${weaponName}.`,
@@ -2247,7 +2788,8 @@ handleEnemyAttack: function(attackType, targetArea) {
   
   // Generate hit narrative
   generateHitNarrative: function(weaponTemplate, attackType, damage) {
-    const enemyName = this.state.enemy.name;
+    const enemy = this.getActiveEnemy();
+    const enemyName = enemy ? enemy.name : "enemy";
     const weaponName = weaponTemplate ? weaponTemplate.name : "fist";
     const targetArea = this.targetLabels[this.state.targetArea];
     
@@ -2268,10 +2810,10 @@ handleEnemyAttack: function(attackType, targetArea) {
         `The weight of your blow crashes down, causing ${damage} damage.`,
         `Your cleaving strike connects, leaving a grievous wound for ${damage} damage.`
       ],
-      "Shoot": [
-        `Your shot strikes true, hitting the ${enemyName}'s ${targetArea} for ${damage} damage.`,
-        `The projectile finds its target, dealing ${damage} damage to the ${enemyName}.`,
-        `Your aim is impeccable, your shot hitting the ${enemyName} for ${damage} damage.`
+      "Punch": [
+        `Your fist connects solidly with the ${enemyName}'s ${targetArea}, dealing ${damage} damage.`,
+        `The impact of your punch staggers the ${enemyName}, causing ${damage} damage.`,
+        `Your punch lands with a satisfying thud, dealing ${damage} damage.`
       ],
       "default": [
         `Your attack lands solidly, dealing ${damage} damage.`,
@@ -2289,7 +2831,8 @@ handleEnemyAttack: function(attackType, targetArea) {
   
   // Generate miss narrative
   generateMissNarrative: function(weaponTemplate, attackType) {
-    const enemyName = this.state.enemy.name;
+    const enemy = this.getActiveEnemy();
+    const enemyName = enemy ? enemy.name : "enemy";
     
     // Templates for different attacks
     const narratives = {
@@ -2308,10 +2851,10 @@ handleEnemyAttack: function(attackType, targetArea) {
         `Your cleave is too slow, allowing the ${enemyName} to avoid it completely.`,
         `The ${enemyName} raises their weapon, catching your cleave before it lands.`
       ],
-      "Shoot": [
-        `Your shot goes wide, missing the ${enemyName}.`,
-        `The ${enemyName} ducks just as you fire, causing your shot to miss.`,
-        `The projectile whizzes past, failing to hit its target.`
+      "Punch": [
+        `The ${enemyName} leans away from your punch.`,
+        `Your fist swings through empty air as the ${enemyName} ducks.`,
+        `The ${enemyName} blocks your punch with their arm.`
       ],
       "default": [
         `The ${enemyName} evades your attack.`,
@@ -2329,7 +2872,8 @@ handleEnemyAttack: function(attackType, targetArea) {
   
   // Generate distance change narrative
   generateDistanceNarrative: function(direction) {
-    const enemyName = this.state.enemy.name;
+    const enemy = this.getActiveEnemy();
+    const enemyName = enemy ? enemy.name : "enemy";
     
     if (direction === "approach") {
       const templates = [
@@ -2376,7 +2920,8 @@ handleEnemyAttack: function(attackType, targetArea) {
   
   // Generate enemy reaction to distance change
   generateEnemyReactionToDistance: function() {
-    const enemyName = this.state.enemy.name;
+    const enemy = this.getActiveEnemy();
+    const enemyName = enemy ? enemy.name : "enemy";
     const distanceIndex = this.state.distance;
     
     // Different reactions based on current distance
@@ -2413,7 +2958,8 @@ handleEnemyAttack: function(attackType, targetArea) {
   
   // Generate enemy reaction to stance change
   generateEnemyReactionToStance: function() {
-    const enemyName = this.state.enemy.name;
+    const enemy = this.getActiveEnemy();
+    const enemyName = enemy ? enemy.name : "enemy";
     const playerStance = this.state.playerStance;
     
     if (playerStance === "aggressive") {
@@ -2440,77 +2986,10 @@ handleEnemyAttack: function(attackType, targetArea) {
     }
   },
   
-  // Generate victory narrative
-  generateVictoryNarrative: function() {
-    const enemyName = this.state.enemy.name;
-    
-    const templates = [
-      `The ${enemyName} collapses before you, defeated.`,
-      `With a final gasp, the ${enemyName} falls to the ground.`,
-      `Your attack proves decisive, and the ${enemyName} is vanquished.`,
-      `The battle ends as the ${enemyName} crumples beneath your assault.`
-    ];
-    
-    return templates[Math.floor(Math.random() * templates.length)];
-  },
-  
-  // Add getWeaponRange method to properly determine weapon range
-  getWeaponRange: function(weaponTemplate) {
-    // Default to melee range if no weapon
-    if (!weaponTemplate) return 1;
-    
-    // First check explicit range property on weapon template
-    if (typeof weaponTemplate.range === 'number') {
-      return weaponTemplate.range;
-    }
-    
-    // Then check range from weapon type
-    if (weaponTemplate.weaponType && typeof weaponTemplate.weaponType.range === 'number') {
-      return weaponTemplate.weaponType.range;
-    }
-    
-    // Default to melee range (1)
-    return 1;
-  },
-  
-  // Add helper function to check ammunition compatibility
-  hasCompatibleAmmo: function(weapon, ammoType) {
-    const ammo = window.player.equipment?.ammunition;
-    
-    // No ammo equipped
-    if (!ammo || ammo === "occupied" || !ammo.getTemplate) {
-      return false;
-    }
-    
-    // Ammo is empty
-    if (ammo.currentAmount <= 0) {
-      return false;
-    }
-    
-    // If asking for specific ammo type
-    if (ammoType) {
-      return ammo.ammoType === ammoType || 
-             ammo.getTemplate().ammoType === ammoType;
-    }
-    
-    // If checking for compatibility with a weapon
-    if (weapon) {
-      return window.checkWeaponAmmoCompatibility();
-    }
-    
-    // Default: ammo exists and isn't empty
-    return true;
-  },
-  
-  // Add the isEnemyDefeated helper method
-  isEnemyDefeated: function() {
-    return this.state.enemy && this.state.enemy.health <= 0;
-  },
-  
-  // Add a helper that stores and manages enemy action timeouts
+  // Override setTimeout for enemy actions with a wrapper that tracks the timeout ID
   _enemyActionTimeout: null,
   
-  // Override setTimeout for enemy actions with a wrapper that tracks the timeout ID
+  // Schedule enemy action with timeout
   scheduleEnemyAction: function(callback, delay) {
     // Clear any existing timeout
     if (this._enemyActionTimeout) {
@@ -2520,8 +2999,8 @@ handleEnemyAttack: function(attackType, targetArea) {
     // Create a new timeout and store its ID
     this._enemyActionTimeout = setTimeout(() => {
       // Check if enemy is defeated before executing the action
-      if (this.isEnemyDefeated()) {
-        console.log("Enemy already defeated, cancelling scheduled action");
+      if (this.state.enemies.every(e => e.health <= 0)) {
+        console.log("All enemies already defeated, cancelling scheduled action");
         this.enterPhase("resolution");
       } else {
         callback();
@@ -2530,137 +3009,6 @@ handleEnemyAttack: function(attackType, targetArea) {
     }, delay);
     
     return this._enemyActionTimeout;
-  },
-  
-  // Add a function to check enemy ammunition
-  enemyHasAmmo: function(ammoType) {
-    const enemy = this.state.enemy;
-    if (!enemy || !enemy.ammunition || !enemy.ammunition[ammoType]) {
-      return false;
-    }
-    
-    return enemy.ammunition[ammoType].current > 0;
-  },
-  
-  // Add a function to use enemy ammunition
-  useEnemyAmmo: function(ammoType) {
-    const enemy = this.state.enemy;
-    if (!this.enemyHasAmmo(ammoType)) {
-      return false;
-    }
-    
-    // Reduce ammo count
-    enemy.ammunition[ammoType].current--;
-    
-    // Log for debugging
-    console.log(`Enemy used 1 ${ammoType}. Remaining: ${enemy.ammunition[ammoType].current}`);
-    
-    return true;
-  }
-};
-
-// Define basic enemy templates
-window.ENEMY_TEMPLATES = {
-  ARRASI_VAELGORR: {
-    name: "Arrasi Vaelgorr",
-    description: "Chainmail wearing warriors who skirmish the enemy before a charge and fill in the shield wall. Known to use axes and shields, and carry several javelins or throwing spears.",
-    health: 90,
-    maxHealth: 90,
-    experienceValue: 20,
-    lootTable: ["legionShield", "rations"],
-    lootChance: 0.3,
-    
-    // Combat attributes
-    power: 9,
-    accuracy: 10,
-    speed: 8,
-    defense: 12,
-    counterSkill: 2,
-    hasShield: true,
-    blockChance: 20,
-    armorPenetration: 5,
-    
-    // Preferred tactics
-    preferredDistance: 2, // Starts at medium for javelin throws, then closes in
-    preferredStance: "neutral",
-    weaponRange: 2, // Can attack at medium range with thrown weapons
-    
-    // Equipment reference (for narrative purposes)
-    weapon: "War Axe and Javelin",
-    armor: "Chainmail and Shield",
-    ammunition: {
-      javelin: {
-        current: 3,
-        max: 3,
-        name: "Arrasi Javelin",
-        damageBonus: 2
-      }
-    }
-  },
-  
-  IMPERIAL_DESERTER: {
-    name: "Imperial Deserter",
-    description: "A former soldier of the Empire who has abandoned their post. Still equipped with military gear.",
-    health: 100,
-    maxHealth: 100,
-    experienceValue: 25,
-    lootTable: ["basic_sword", "legion_armor", "legion_helmet"],
-    lootChance: 0.4,
-    
-    // Combat attributes
-    power: 10,
-    accuracy: 8,
-    speed: 7,
-    defense: 10,
-    counterSkill: 1,
-    hasShield: true,
-    blockChance: 15,
-    armorPenetration: 0,
-    
-    // Preferred tactics
-    preferredDistance: 1,
-    preferredStance: "defensive",
-    weaponRange: 1,
-    
-    // Equipment reference
-    weapon: "Military Sword",
-    armor: "Legion Armor",
-    ammunition: {
-      javelin: {
-        current: 1,
-        max: 1,
-        name: "Light Javelin",
-        damageBonus: 0
-      }
-    }
-  },
-  
-  ARRASI_DRUSKARI: {
-    name: "Arrasi Druskari",
-    description: "Heavy shock infantry, often exiled or sworn clansmen who have pledged their lives to the battlefield. Wield large hewing swords. Have a reputation for fighting until they are literally hacked apart.",
-    health: 140,
-    maxHealth: 140,
-    experienceValue: 35,
-    lootTable: ["royalGreatsword", "staminaPotion"],
-    lootChance: 0.35,
-    
-    // Combat attributes
-    power: 14,
-    accuracy: 7,
-    speed: 6,
-    defense: 8,
-    counterSkill: 3,
-    hasShield: false,
-    armorPenetration: 20,
-    
-    // Preferred tactics
-    preferredDistance: 1,
-    preferredStance: "aggressive",
-    weaponRange: 1,
-    
-    // Equipment reference
-    weapon: "Massive Hewing Sword",
-    armor: "Heavy Plate"
   }
 };
 
@@ -2669,64 +3017,3 @@ window.addEventListener('DOMContentLoaded', function() {
   console.log("DOM loaded, initializing combat system");
   window.combatSystem.initialize();
 });
-
-// Combat styles are defined in combatUI.js
-
-// Function to update weapon ranges
-const updateWeaponRanges = function() {
-  // Only update if not already set
-  if (!window.WEAPON_TYPES.BOW.range) {
-    window.WEAPON_TYPES.SWORD.range = 1;
-    window.WEAPON_TYPES.GREATSWORD.range = 1;
-    window.WEAPON_TYPES.SPEAR.range = 2;
-    window.WEAPON_TYPES.AXE.range = 1;
-    window.WEAPON_TYPES.BATTLEAXE.range = 1;
-    window.WEAPON_TYPES.BOW.range = 3;
-    window.WEAPON_TYPES.CROSSBOW.range = 3;
-    window.WEAPON_TYPES.DAGGER.range = 1;
-    window.WEAPON_TYPES.SHIELD.range = 1;
-    window.WEAPON_TYPES.RIFLE.range = 3;
-    window.WEAPON_TYPES.THROWN.range = 2;
-    
-    console.log("Weapon ranges updated.");
-  }
-};
-
-// Fix initialization of ammunition to ensure correct capacity
-const fixJavelinCapacity = function() {
-  // Get equipped javelin pack if any
-  const ammo = window.player.equipment?.ammunition;
-  if (ammo && ammo.ammoType === 'javelin') {
-    // Make sure capacity is correct
-    const template = ammo.getTemplate();
-    if (template && template.capacity === 6) {
-      // Fix capacity if wrong
-      if (ammo.capacity !== 6) {
-        console.log(`Fixing javelin capacity from ${ammo.capacity} to 6`);
-        ammo.capacity = 6;
-      }
-      
-      // Initialize currentAmount if needed
-      if (ammo.currentAmount > 6 || ammo.currentAmount === null) {
-        console.log(`Fixing javelin count from ${ammo.currentAmount} to 6`);
-        ammo.currentAmount = 6;
-      }
-    }
-  }
-};
-
-// Function to apply all fixes
-window.applyRangedCombatFixes = function() {
-  console.log("Applying ranged combat fixes...");
-  
-  // Update weapon ranges
-  updateWeaponRanges();
-  
-  // Fix javelin capacity
-  fixJavelinCapacity();
-  
-  console.log("Ranged combat fixes applied successfully!");
-};
-
-// Automatically apply the fixes when this code runs
-window.applyRangedCombatFixes();

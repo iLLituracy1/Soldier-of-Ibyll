@@ -1,7 +1,7 @@
 // questRewards.js - Enhanced Quest Reward System
 // Adds detailed quest rewards, reward screen, and improved narrative integration
 
-// Enhanced quest rewards with expanded item definitions
+// Define enhanced quest rewards - allows for more complex reward structures
 window.enhancedQuestRewards = {
   // Enhanced rewards for the Raid the Frontier quest
   raid_frontier: {
@@ -19,8 +19,8 @@ window.enhancedQuestRewards = {
     
     // Conditional rewards based on player performance during the quest
     conditionalRewards: {
-      // If player completes the quest with high formation cohesion in the final battle
-      highCohesion: {
+      // If player completes the quest without taking too much damage in combat
+      flawlessCombat: {
         experience: 25, // Bonus XP
         taelors: 20,    // Bonus pay
         items: [
@@ -28,11 +28,11 @@ window.enhancedQuestRewards = {
         ]
       },
       
-      // If player completes the quest without taking casualties in the patrol encounter
-      noPatrolCasualties: {
+      // If player completes the quest quickly
+      timeEfficient: {
         experience: 15,
         items: [
-          { id: 'repairKit', quantity: 1, message: 'Bonus field supplies for minimizing casualties' }
+          { id: 'repairKit', quantity: 1, message: 'Bonus field supplies for quick operation' }
         ]
       }
     },
@@ -41,22 +41,41 @@ window.enhancedQuestRewards = {
     completionDialogue: 'The maps and intelligence you recovered will be invaluable for future operations in this sector. Your unit\'s performance was commendable, and you\'ve earned these spoils. The Arrasi blade is particularly fine - a mark of an officer. Keep it as a trophy of your victory.'
   },
   
-  // Template for additional quests to be added later
-  /* 
-  future_quest_id: {
-    experience: 0,
-    taelors: 0,
-    items: [],
-    conditionalRewards: {},
-    completionDialogue: ''
+  // Enhanced rewards for the Patrol Duty quest
+  patrol_duty: {
+    experience: 75,
+    taelors: 30,
+    
+    items: [
+      { id: 'health_potion', quantity: 1, message: 'Field medical supplies' },
+      { id: 'arrasi_dagger', quantity: 1, message: 'A small dagger taken from an Arrasi scout' }
+    ],
+    
+    conditionalRewards: {
+      // If player reports the ambush quickly
+      quickReport: {
+        experience: 15,
+        taelors: 10,
+        items: [
+          { id: 'scouting_map', quantity: 1, message: 'Updated patrol routes with marked danger zones' }
+        ]
+      }
+    },
+    
+    completionDialogue: 'Your patrol has provided valuable intelligence about Arrasi movements in the area. The speed of your report has helped us prepare defenses against their probing attacks. Good work, soldier.'
   }
-  */
 };
 
 // Custom item definitions for quest rewards
 window.createQuestRewardItems = function() {
   // Don't redefine items if they already exist
-  if (window.itemTemplates.arrasi_blade) return;
+  if (window.itemTemplates && window.itemTemplates.arrasi_blade) return;
+  
+  // Ensure we have item templates
+  if (!window.itemTemplates) {
+    console.error("Item templates not initialized. Cannot create quest reward items.");
+    return;
+  }
   
   // Create Arrasi Blade - officer's weapon as a trophy
   window.itemTemplates.arrasi_blade = window.createWeapon({
@@ -98,6 +117,37 @@ window.createQuestRewardItems = function() {
     rarity: window.ITEM_RARITIES.RARE,
     value: 75,
     weight: 0.2,
+    symbol: '🗺️',
+    stackable: false
+  });
+  
+  // Create Arrasi Dagger for patrol quest
+  window.itemTemplates.arrasi_dagger = window.createWeapon({
+    id: 'arrasi_dagger',
+    name: 'Arrasi Scout Dagger',
+    description: 'A lightweight dagger used by Arrasi scouts. The blade is thin and sharp, designed for silent kills rather than combat.',
+    weaponType: window.WEAPON_TYPES.DAGGER,
+    rarity: window.ITEM_RARITIES.UNCOMMON,
+    damage: 6,
+    value: 45,
+    stats: {
+      damage: 6,
+      speed: 9,
+      critChance: 10,
+      intimidation: 2
+    },
+    maxDurability: 80
+  });
+  
+  // Create Scouting Map for patrol quest conditional reward
+  window.itemTemplates.scouting_map = window.createItemTemplate({
+    id: 'scouting_map',
+    name: 'Annotated Scouting Map',
+    description: 'A detailed map of local terrain with patrol routes and danger zones marked. Useful for avoiding Arrasi scouts in the future.',
+    category: window.ITEM_CATEGORIES.QUEST,
+    rarity: window.ITEM_RARITIES.UNCOMMON,
+    value: 40,
+    weight: 0.1,
     symbol: '🗺️',
     stackable: false
   });
@@ -209,22 +259,43 @@ window.applyQuestRewards = function(quest) {
     
     // Apply conditional rewards based on quest-specific conditions
     if (enhancedRewards.conditionalRewards) {
-      // Check for high cohesion in formation battles
-      if (enhancedRewards.conditionalRewards.highCohesion && 
-          window.shieldwallSystem && 
-          window.shieldwallSystem.state && 
-          window.shieldwallSystem.state.cohesion && 
-          window.shieldwallSystem.state.cohesion.current > 60) {
+      // Example conditional rewards
+      
+      // For flawless combat condition - check if player maintained high health
+      if (enhancedRewards.conditionalRewards.flawlessCombat && 
+          window.gameState.health > window.gameState.maxHealth * 0.8) {
         
-        applyConditionalReward(enhancedRewards.conditionalRewards.highCohesion, rewardSummary, 'Formation Cohesion Bonus');
+        applyConditionalReward(
+          enhancedRewards.conditionalRewards.flawlessCombat, 
+          rewardSummary, 
+          'Flawless Combat Bonus'
+        );
       }
       
-      // Check for no casualties during patrol encounter
-      if (enhancedRewards.conditionalRewards.noPatrolCasualties && 
-          quest.userData && 
-          quest.userData.patrolCasualties === 0) {
+      // For time efficient condition - check if quest completed quickly
+      const questDuration = window.gameDay - quest.assignmentDay;
+      if (enhancedRewards.conditionalRewards.timeEfficient && 
+          questDuration <= 1) {
         
-        applyConditionalReward(enhancedRewards.conditionalRewards.noPatrolCasualties, rewardSummary, 'Perfect Patrol Bonus');
+        applyConditionalReward(
+          enhancedRewards.conditionalRewards.timeEfficient, 
+          rewardSummary, 
+          'Efficiency Bonus'
+        );
+      }
+      
+      // For quick report in patrol quest
+      if (questId === 'patrol_duty' && 
+          enhancedRewards.conditionalRewards.quickReport &&
+          quest.userData && 
+          quest.userData.reportTime && 
+          quest.userData.reportTime < 120) { // Less than 2 hours
+        
+        applyConditionalReward(
+          enhancedRewards.conditionalRewards.quickReport, 
+          rewardSummary, 
+          'Quick Report Bonus'
+        );
       }
     }
   }
@@ -479,116 +550,12 @@ function addRewardScreenStyles() {
   document.head.appendChild(styleElement);
 }
 
-// Enhanced handleReturnToCamp function to integrate better with the reward system
-window.enhancedHandleReturnToCamp = function(quest) {
-  // Track performance data for conditional rewards
-  if (!quest.userData) quest.userData = {};
-  
-  // Get battle cohesion from shieldwall system if available
-  if (window.shieldwallSystem && window.shieldwallSystem.state) {
-    quest.userData.formationCohesion = window.shieldwallSystem.state.cohesion.current;
-  }
-  
-  // Set narrative for the quest conclusion
-  window.setNarrative(`
-    <p>Your Spear Host returns to camp victorious, bearing captured supplies and valuable intelligence. The elimination of the Arrasi outpost represents a significant blow to enemy operations in the region.</p>
-    
-    <p>Later that evening, the Vayren calls for you. "Report to the Sarkein's tent," he orders. "Apparently, he wants to hear about the scouting mission from someone who was there."</p>
-    
-    <p>When you arrive at the command tent, Sarkein Reval is studying the captured maps. He acknowledges your salute with a nod.</p>
-    
-    <p>"Your Squad performed well today," he says. "The intelligence your unit recovered will help us plan our next moves in this sector."</p>
-    
-    <p>The Sarkein gestures to a collection of items laid out on a corner of the table - spoils from the raid allocated to your unit.</p>
-    
-    <p>"These are yours by right of conquest," he continues. "The officer's blade is particularly fine - Arrasi steel, but with a balance superior to their typical work. Take it with my compliments."</p>
-    
-    <p>He studies the maps thoughtfully. "Tell your Vayren that I'll be looking to his unit for future operations. The Empire needs soldiers who can think and act decisively."</p>
-    
-    <p>As you leave the Sarkein's tent with your share of the spoils, there's a new respect in the eyes of your fellow soldiers. Your Squad's actions today have made a difference, and your reputation within the Kasvaari has grown.</p>
-  `);
-  
-  // Create a continue button that will trigger rewards and quest completion
-  const actionsContainer = document.getElementById('questActions');
-  if (actionsContainer) {
-    actionsContainer.innerHTML = '';
-    
-    const continueButton = document.createElement('button');
-    continueButton.className = 'quest-action-btn';
-    continueButton.textContent = 'Collect Rewards';
-    continueButton.onclick = function() {
-      // Complete the quest, which will trigger our enhanced reward system
-      window.completeQuest(quest.id);
-    };
-    
-    actionsContainer.appendChild(continueButton);
-  } else {
-    // If actions container isn't available, complete quest directly
-    setTimeout(() => {
-      window.completeQuest(quest.id);
-    }, 2000);
-  }
-};
-
-// Function to safely modify the original completeQuest function
-window.enhanceCompleteQuest = function() {
-  // Store the original function safely
-  if (!window._originalCompleteQuest && window.completeQuest) {
-    window._originalCompleteQuest = window.completeQuest;
-    
-    // Create the new enhanced version that uses our reward system
-    window.completeQuest = function(questId) {
-      const questIndex = window.quests.findIndex(q => q.id === questId);
-      if (questIndex === -1) {
-        console.error(`Quest "${questId}" not found`);
-        return false;
-      }
-      
-      const quest = window.quests[questIndex];
-      quest.status = window.QUEST_STATUS.COMPLETED;
-      quest.completionDay = window.gameDay;
-      
-      // Reset quest sequence flag
-      window.gameState.inQuestSequence = false;
-      window.gameState.awaitingQuestResponse = false;
-      
-      // Apply enhanced rewards instead of original rewards
-      window.applyQuestRewards(quest);
-      
-      // Update quest log if visible
-      window.renderQuestLog();
-      
-      // Exit quest scene if we're in it
-      if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
-        window.exitQuestScene();
-      }
-      
-      return true;
-    };
-    
-    console.log("Enhanced completeQuest function installed");
-  }
-};
-
-// Apply the enhancement to handleReturnToCamp function
-window.enhanceHandleReturnToCamp = function() {
-  if (!window._originalHandleReturnToCamp && window.handleReturnToCamp) {
-    window._originalHandleReturnToCamp = window.handleReturnToCamp;
-    window.handleReturnToCamp = window.enhancedHandleReturnToCamp;
-    console.log("Enhanced handleReturnToCamp function installed");
-  }
-};
-
 // Initialize quest reward system
 window.initializeQuestRewardSystem = function() {
   console.log("Initializing enhanced quest reward system...");
   
   // Create quest reward items
   window.createQuestRewardItems();
-  
-  // Enhance quest system functions
-  window.enhanceCompleteQuest();
-  window.enhanceHandleReturnToCamp();
   
   console.log("Quest reward system initialized");
 };

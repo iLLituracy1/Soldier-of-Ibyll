@@ -663,9 +663,9 @@ window.itemTemplates.quiver = window.createAmmunition({
 window.itemTemplates.javelinPack = window.createAmmunition({
   id: 'javelin_pack',
   name: 'Javelin Pack',
-  description: 'A harness designed to carry up to 6 throwing javelins. These lightweight spears are perfect for engaging enemies from a distance before closing to melee combat.',
+  description: 'A harness designed to carry up to 3 throwing javelins. These lightweight spears are perfect for engaging enemies from a distance before closing to melee combat.',
   ammoType: 'javelin',
-  capacity: 6,
+  capacity: 3,
   symbol: '🔱',
   value: 30,
   weight: 3.0,
@@ -1037,7 +1037,7 @@ window.itemTemplates.cartridgePouch = window.createAmmunition({
   window.itemTemplates.imperialPilum = window.createWeapon({
     id: 'imperial_pilum',
     name: 'Imperial Pilum',
-    description: 'A heavy javelin used by Paanic legions, designed to pierce armor and then bend, preventing it from being thrown back.',
+    description: 'A heavy javelin used by Paanic legions.',
     weaponType: window.WEAPON_TYPES.THROWN,
     rarity: window.ITEM_RARITIES.UNCOMMON,
     damage: 15,
@@ -1055,9 +1055,9 @@ window.itemTemplates.cartridgePouch = window.createAmmunition({
   window.itemTemplates.pilumBundle = window.createAmmunition({
     id: 'pilum_bundle',
     name: 'Pilum Bundle',
-    description: 'A set of 4 heavy Imperial pilums, standard issue for legionnaires. Each pilum is designed to penetrate armor and shield, then bend on impact to prevent reuse.',
+    description: 'A set of 2 heavy Imperial pilums, standard issue for legionnaires.',
     ammoType: 'javelin',
-    capacity: 4,
+    capacity: 2,
     symbol: '🔱',
     value: 45,
     weight: 4.0,
