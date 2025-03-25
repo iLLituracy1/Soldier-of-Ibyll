@@ -978,8 +978,8 @@ window.combatUI = {
     
     // Always check for javelin attacks separately from main weapon
     if (window.combatSystem.hasCompatibleAmmo(null, "javelin") && 
-        window.combatSystem.state.distance >= 1 && 
-        window.combatSystem.state.distance <= 2) {
+        window.combatSystem.state.distance >= 2 && 
+        window.combatSystem.state.distance <= 3) {
       // If no weapon or weapon is one-handed
       if (!weaponTemplate || (weaponTemplate.hands && weaponTemplate.hands === 1)) {
         if (!attacks.includes("Throw Javelin")) {

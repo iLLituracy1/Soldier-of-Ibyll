@@ -829,8 +829,11 @@ window.combatSystem = {
   
   // Process a player action during combat
   handleCombatAction: function(action, params = {}) {
-    if (!this.state.active || this.state.phase !== "player") {
-      console.warn("Cannot handle combat action - not in player phase");
+    // Allow counter actions during counter window regardless of phase
+    if (!this.state.active || 
+        (this.state.phase !== "player" && 
+         !(this.state.counterWindowOpen && action === "counter"))) {
+      console.warn("Cannot handle combat action - not in player phase or not a valid counter");
       return;
     }
     
@@ -1205,8 +1208,8 @@ window.combatSystem = {
   // Implementation of javelin throwing as a specialized attack
   handleJavelinThrow: function(enemy) {
     // Check if at correct distance for javelin throw (medium range, distance 2)
-    if (this.state.distance !== 2) {
-      this.addCombatMessage("You can only throw javelins at medium range!");
+    if (this.state.distance < 2 || this.state.distance > 3) {
+      this.addCombatMessage("You can only throw javelins at medium or far range!");
       return;
     }
 
