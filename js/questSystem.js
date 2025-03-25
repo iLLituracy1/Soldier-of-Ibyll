@@ -181,8 +181,12 @@ window.handleQuestStageAction = function(quest, stage) {
         if (!quest.userData) quest.userData = {};
         quest.userData[`${stage.id}_start`] = true;
         
-        // Initiate combat with specified enemy
-        window.combatSystem.initiateCombat(stage.enemyType);
+        // When initiating combat
+        window.combatSystem.initiateCombat(
+        stage.enemyType, 
+        [], 
+        stage.combatOptions || { requireDefeat: true }
+      );
         
         // Store the original end combat function
         const originalEndCombat = window.combatSystem.endCombat;

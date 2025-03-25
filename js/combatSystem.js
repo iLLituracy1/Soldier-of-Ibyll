@@ -63,12 +63,20 @@ window.combatSystem = {
   },
   
   // Start combat with enemy(ies) and optional ally(ies)
-  initiateCombat: function(enemyTypes, allyTypes = []) {
+  initiateCombat: function(enemyTypes, allyTypes = [], options = {}) {
+    // Default options
+    const combatOptions = {
+      requireDefeat: true,  // Combat continues until one side is defeated by default
+      maxTurns: 30,         // Maximum number of turns before combat ends
+      ...options            // Allow overriding default options
+    };
+    
     // Reset combat state
     this.state = {
       active: true,
       turn: 0,
-      maxTurns: 30,
+      maxTurns: combatOptions.maxTurns,
+      requireDefeat: combatOptions.requireDefeat,
       phase: "initial",
       distance: 2,
       playerStance: "neutral",
@@ -369,50 +377,52 @@ window.combatSystem = {
         this.scheduleEnemyAction(() => this.processEnemyTurn(), 1000);
         break;
         
-      case "resolution":
-        // Check if all enemies are defeated
-        if (this.areAllEnemiesDefeated()) {
-          this.endCombat(true); // Player victory
-          return;
-        }
+        case "resolution":
+          // Check if combat requires defeat
+          if (this.state.requireDefeat) {
+            // Check if all enemies are defeated
+            if (this.areAllEnemiesDefeated()) {
+              this.endCombat(true); // Player victory
+              return;
+            }
+            
+            // Check if player is defeated
+            if (window.gameState.health <= 0) {
+              this.endCombat(false); // Player defeat
+              return;
+            }
         
-        // Check if player is defeated
-        if (window.gameState.health <= 0) {
-          this.endCombat(false); // Player defeat
-          return;
-        }
-        
-        // Check if maximum turns reached
-        if (this.state.turn >= this.state.maxTurns) {
-          this.endCombatEarly();
-          return;
-        }
-        
-        // Combat continues - increment turn counter
-        this.state.turn++;
-        
-        // Update turn counter in UI
-        if (window.combatUI) {
-          window.combatUI.updateTurnCounter();
-        }
-        
-        // Restore player's target if needed
-        if (this._playerTargetIndex !== undefined) {
-          // Ensure the target is still valid
-          if (this._playerTargetIndex < this.state.enemies.length && 
-              this.state.enemies[this._playerTargetIndex] && 
-              this.state.enemies[this._playerTargetIndex].health > 0) {
-            this.state.activeEnemyIndex = this._playerTargetIndex;
+            // IMPORTANT: When requireDefeat is true, IGNORE turn limit
+            // Combat continues regardless of turns
           } else {
-            // If original target is invalid, find the first valid enemy
-            this.state.activeEnemyIndex = this.state.enemies.findIndex(e => e.health > 0);
-            if (this.state.activeEnemyIndex === -1) this.state.activeEnemyIndex = 0;
+            // If NOT requiring defeat (default behavior)
+            // Check if maximum turns reached
+            if (this.state.turn >= this.state.maxTurns) {
+              this.endCombatEarly();
+              return;
+            }
           }
-        }
-        
-        // Return to player phase
-        this.enterPhase("player");
-        break;
+          
+          // Combat continues - increment turn counter
+          this.state.turn++;
+          
+          // Restore player's target if needed
+          if (this._playerTargetIndex !== undefined) {
+            // Ensure the target is still valid
+            if (this._playerTargetIndex < this.state.enemies.length && 
+                this.state.enemies[this._playerTargetIndex] && 
+                this.state.enemies[this._playerTargetIndex].health > 0) {
+              this.state.activeEnemyIndex = this._playerTargetIndex;
+            } else {
+              // If original target is invalid, find the first valid enemy
+              this.state.activeEnemyIndex = this.state.enemies.findIndex(e => e.health > 0);
+              if (this.state.activeEnemyIndex === -1) this.state.activeEnemyIndex = 0;
+            }
+          }
+          
+          // Return to player phase
+          this.enterPhase("player");
+          break;
     }
     
     console.log(`Combat phase changed: ${previousPhase} -> ${phase}`);

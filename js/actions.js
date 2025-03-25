@@ -146,7 +146,7 @@ window.handleAction = function(action) {
     window.setNarrative(patrolText); // Use setNarrative instead of addToNarrative
 
     // Chance of combat during patrol
-    if (Math.random() < 0.9) { // 30% chance of combat
+    if (Math.random() < .99 ) { // 30% chance of combat
       window.addToNarrative("During your patrol, you encounter a hostile figure...");
       
       // Determine enemy type based on location/level

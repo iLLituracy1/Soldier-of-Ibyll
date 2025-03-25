@@ -82,7 +82,11 @@ window.questTemplates = {
         objective: 'Deal with the patrol.',
         action: 'combat',
         battleType: 'individual',
-        enemyType: "ARRASI_VAELGORR",
+        enemyType: ["ARRASI_VAELGORR", "ARRASI_VAELGORR"],
+        combatOptions: {
+          requireDefeat: true 
+        },
+
         narrative: `<p>Your scouting party exchanges urgent signals as the patrol approaches. There are four Arrasi soldiers - too many to let pass, too many to ambush without risk of raising the alarm.</p>
           
           <p>You ready your weapons as the patrol draws closer, hearts pounding, knowing that the success of the entire mission now hinges on silencing these men quickly and quietly...</p>`,
@@ -151,7 +155,7 @@ window.questTemplates = {
     baseReward: {
       experience: 100,
       taelors: 50,
-      items: ['healthPotion', 'arrasi_blade', 'arrasi_pendant', 'captured_maps']
+      items: ['health_Potion', 'arrasi_blade', 'arrasi_pendant', 'captured_maps']
     },
     minDayToTrigger: 2,         // Only available after day 2
     chanceTrigger: 1,        // 25% chance of triggering when conditions are met
