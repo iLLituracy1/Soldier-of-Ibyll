@@ -682,6 +682,117 @@ window.combatUI = {
 .primary-hp-display {
   display: none;
 }
+
+// Add these styles to the styleElement.textContent in the applyStyles function in combatUI.js
+// Insert after the existing styles but before the closing backtick
+.enemy-info-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  background: #c9aa71;
+  border: none;
+  border-radius: 50%;
+  color: #1a1a1a;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2;
+}
+
+.enemy-info-btn:hover {
+  background: #e0be82;
+}
+
+.enemy-stats-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 350px;
+  background: #1a1a1a;
+  border: 2px solid #c9aa71;
+  border-radius: 8px;
+  padding: 15px;
+  z-index: 2001;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  color: #e0e0e0;
+}
+
+.enemy-stats-header {
+  border-bottom: 1px solid #c9aa71;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.enemy-stats-title {
+  font-size: 1.2em;
+  color: #c9aa71;
+  margin: 0;
+}
+
+.enemy-stats-close {
+  background: none;
+  border: none;
+  color: #c9aa71;
+  font-size: 1.5em;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.enemy-stats-body {
+  font-size: 0.9em;
+}
+
+.enemy-stats-description {
+  font-style: italic;
+  margin-bottom: 15px;
+  color: #aaa;
+}
+
+.enemy-stats-section {
+  margin-bottom: 10px;
+}
+
+.enemy-stats-section-title {
+  font-weight: bold;
+  color: #c9aa71;
+  margin-bottom: 5px;
+}
+
+.enemy-stats-attr {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+.enemy-stats-attr-label {
+  color: #aaa;
+}
+
+.enemy-stats-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 2000;
+}
+
+/* Make combat-health-container position relative for absolute positioning */
+.combat-health-container {
+  position: relative;
+}
     `;
     
     document.head.appendChild(styleElement);
@@ -860,6 +971,17 @@ updateTurnCounter: function() {
         javelinCount.textContent = `Javelins: ${enemy.ammunition.javelin.current}`;
         enemyDiv.appendChild(javelinCount);
       }
+
+            // Add info button
+      const infoBtn = document.createElement('button');
+      infoBtn.className = 'enemy-info-btn';
+      infoBtn.innerHTML = 'i';
+      infoBtn.title = 'View enemy information';
+      infoBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent selecting the enemy when clicking info button
+        window.combatUI.showEnemyStats(enemy);
+      });
+      enemyDiv.appendChild(infoBtn);
       
       // Add to container
       enemyContainer.appendChild(enemyDiv);
@@ -1279,7 +1401,181 @@ updateTurnCounter: function() {
     
     // Scroll to bottom
     combatLog.scrollTop = combatLog.scrollHeight;
+  },
+
+  // Add this function to the combatUI object in combatUI.js
+// Add it before the closing brace of the window.combatUI object
+
+// Show enemy stats in a modal
+showEnemyStats: function(enemy) {
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'enemy-stats-overlay';
+  document.body.appendChild(overlay);
+  
+  // Create modal
+  const modal = document.createElement('div');
+  modal.className = 'enemy-stats-modal';
+  
+  // Create header
+  const header = document.createElement('div');
+  header.className = 'enemy-stats-header';
+  
+  const title = document.createElement('h3');
+  title.className = 'enemy-stats-title';
+  title.textContent = enemy.name;
+  header.appendChild(title);
+  
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'enemy-stats-close';
+  closeBtn.innerHTML = '&times;';
+  closeBtn.addEventListener('click', () => {
+    document.body.removeChild(overlay);
+    document.body.removeChild(modal);
+  });
+  header.appendChild(closeBtn);
+  
+  modal.appendChild(header);
+  
+  // Create body
+  const body = document.createElement('div');
+  body.className = 'enemy-stats-body';
+  
+  // Add description if available
+  if (enemy.description) {
+    const description = document.createElement('div');
+    description.className = 'enemy-stats-description';
+    description.textContent = enemy.description;
+    body.appendChild(description);
   }
+  
+  // Add combat attributes section
+  const combatSection = document.createElement('div');
+  combatSection.className = 'enemy-stats-section';
+  
+  const combatTitle = document.createElement('div');
+  combatTitle.className = 'enemy-stats-section-title';
+  combatTitle.textContent = 'Combat Attributes';
+  combatSection.appendChild(combatTitle);
+  
+  const attributes = [
+    { label: 'Health', value: `${Math.round(enemy.health)} / ${enemy.maxHealth}` },
+    { label: 'Power', value: enemy.power || 'N/A' },
+    { label: 'Accuracy', value: enemy.accuracy || 'N/A' },
+    { label: 'Speed', value: enemy.speed || 'N/A' },
+    { label: 'Defense', value: enemy.defense || 'N/A' },
+    { label: 'Counter Skill', value: enemy.counterSkill || 'N/A' }
+  ];
+  
+  attributes.forEach(attr => {
+    const attrDiv = document.createElement('div');
+    attrDiv.className = 'enemy-stats-attr';
+    
+    const label = document.createElement('span');
+    label.className = 'enemy-stats-attr-label';
+    label.textContent = attr.label + ':';
+    attrDiv.appendChild(label);
+    
+    const value = document.createElement('span');
+    value.className = 'enemy-stats-attr-value';
+    value.textContent = attr.value;
+    attrDiv.appendChild(value);
+    
+    combatSection.appendChild(attrDiv);
+  });
+  
+  body.appendChild(combatSection);
+  
+  // Add equipment section
+  const equipSection = document.createElement('div');
+  equipSection.className = 'enemy-stats-section';
+  
+  const equipTitle = document.createElement('div');
+  equipTitle.className = 'enemy-stats-section-title';
+  equipTitle.textContent = 'Equipment';
+  equipSection.appendChild(equipTitle);
+  
+  const equipment = [
+    { label: 'Weapon', value: enemy.weapon || 'Unarmed' },
+    { label: 'Armor', value: enemy.armor || 'Unarmored' },
+    { label: 'Shield', value: enemy.hasShield ? 'Yes' : 'No' }
+  ];
+  
+  if (enemy.hasShield) {
+    equipment.push({ label: 'Block Chance', value: `${enemy.blockChance || 0}%` });
+  }
+  
+  if (enemy.ammunition && enemy.ammunition.javelin) {
+    equipment.push({ 
+      label: 'Javelins', 
+      value: `${enemy.ammunition.javelin.current}/${enemy.ammunition.javelin.max}`
+    });
+  }
+  
+  equipment.forEach(item => {
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'enemy-stats-attr';
+    
+    const label = document.createElement('span');
+    label.className = 'enemy-stats-attr-label';
+    label.textContent = item.label + ':';
+    itemDiv.appendChild(label);
+    
+    const value = document.createElement('span');
+    value.className = 'enemy-stats-attr-value';
+    value.textContent = item.value;
+    itemDiv.appendChild(value);
+    
+    equipSection.appendChild(itemDiv);
+  });
+  
+  body.appendChild(equipSection);
+  
+  // Additional special abilities section if needed
+  if (enemy.armorPenetration) {
+    const specialSection = document.createElement('div');
+    specialSection.className = 'enemy-stats-section';
+    
+    const specialTitle = document.createElement('div');
+    specialTitle.className = 'enemy-stats-section-title';
+    specialTitle.textContent = 'Special Abilities';
+    specialSection.appendChild(specialTitle);
+    
+    const abilities = [
+      { label: 'Armor Penetration', value: enemy.armorPenetration }
+    ];
+    
+    abilities.forEach(ability => {
+      const abilityDiv = document.createElement('div');
+      abilityDiv.className = 'enemy-stats-attr';
+      
+      const label = document.createElement('span');
+      label.className = 'enemy-stats-attr-label';
+      label.textContent = ability.label + ':';
+      abilityDiv.appendChild(label);
+      
+      const value = document.createElement('span');
+      value.className = 'enemy-stats-attr-value';
+      value.textContent = ability.value;
+      abilityDiv.appendChild(value);
+      
+      specialSection.appendChild(abilityDiv);
+    });
+    
+    body.appendChild(specialSection);
+  }
+  
+  modal.appendChild(body);
+  
+  // Add modal to the body
+  document.body.appendChild(modal);
+  
+  // Add click event to overlay to close the modal
+  overlay.addEventListener('click', () => {
+    document.body.removeChild(overlay);
+    document.body.removeChild(modal);
+  });
+},
 };
 
 // Initialize the combat UI system when DOM is ready
