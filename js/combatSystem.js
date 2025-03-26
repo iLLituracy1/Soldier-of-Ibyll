@@ -338,10 +338,13 @@ window.combatSystem = {
         break;
         
       case "enemy":
-        // Reset enemy index if needed
-        if (this.state.activeEnemyIndex >= this.state.enemies.length) {
-          this.state.activeEnemyIndex = 0;
-        }
+            // Reset enemy index when entering from a non-enemy phase
+      if (previousPhase !== "enemy") {
+        this.state.activeEnemyIndex = 0;
+      } else if (this.state.activeEnemyIndex >= this.state.enemies.length) {
+        // If entering from enemy phase but index is out of bounds, reset to 0
+        this.state.activeEnemyIndex = 0;
+      }
         
         // Check if all enemies are defeated
         if (this.areAllEnemiesDefeated()) {
