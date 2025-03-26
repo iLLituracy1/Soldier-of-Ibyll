@@ -9,13 +9,13 @@ window.combatSystem = {
     turn: 0,
     maxTurns: 10, // Maximum turns before combat shifts
     phase: "initial", // initial, player, ally, enemy, resolution
-    distance: 2, // 0:Grappling, 1:Close, 2:Medium, 3:Far
+    globalDistance: 2, // FOR BACKWARD COMPATIBILITY
     playerStance: "neutral", // neutral, aggressive, defensive
     targetArea: "body", // head, body, legs
     combatLog: [],
     
     // Multi-combat properties
-    enemies: [], // Array of enemy objects
+    enemies: [], // Array of enemy objects (now includes individual distances)
     allies: [],  // Array of ally objects
     activeEnemyIndex: 0, // Current enemy taking action
     activeAllyIndex: 0,  // Current ally taking action
@@ -78,7 +78,7 @@ window.combatSystem = {
       maxTurns: combatOptions.maxTurns,
       requireDefeat: combatOptions.requireDefeat,
       phase: "initial",
-      distance: 2,
+      globalDistance: 2,  // Keep this for backward compatibility
       playerStance: "neutral",
       enemyStance: "neutral", // For backward compatibility with combatUI.js
       targetArea: "body",
@@ -97,7 +97,8 @@ window.combatSystem = {
       lastCounterActor: null,
       
       // Backward compatibility
-      enemy: null
+      enemy: null,
+      distance: 2 // For backwards compatibility
     };
     
     // Create enemy instances
@@ -181,7 +182,8 @@ window.combatSystem = {
         description: "A mysterious opponent.",
         health: 50,
         maxHealth: 50,
-        stats: { power: 5, defense: 5, speed: 5 }
+        stats: { power: 5, defense: 5, speed: 5 },
+        distance: 2 // Default distance
       };
     }
     
@@ -190,7 +192,8 @@ window.combatSystem = {
       ...template,
       id: `enemy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       currentStance: template.preferredStance || "neutral",
-      nextAction: null
+      nextAction: null,
+      distance: template.preferredDistance || 2 // Initialize individual distance
     };
     
     // Properly clone ammunition data if present
@@ -373,6 +376,9 @@ window.combatSystem = {
         // Backward compatibility with combatUI.js - update enemyStance 
         this.state.enemyStance = activeEnemy.currentStance;
         
+        // Update global distance for backward compatibility
+        this.updateGlobalDistance();
+        
         // Process enemy turn
         this.scheduleEnemyAction(() => this.processEnemyTurn(), 1000);
         break;
@@ -433,9 +439,24 @@ window.combatSystem = {
     }
   },
   
+  // Update global distance based on active enemy's distance (for backward compatibility)
+  updateGlobalDistance: function() {
+    const activeEnemy = this.getActiveEnemy();
+    if (activeEnemy) {
+      this.state.globalDistance = activeEnemy.distance;
+      this.state.distance = activeEnemy.distance; // For backward compatibility
+    }
+  },
+  
   // Helper function to get the active enemy
   getActiveEnemy: function() {
     return this.state.enemies[this.state.activeEnemyIndex];
+  },
+  
+  // Helper function to get the current active enemy's distance
+  getActiveEnemyDistance: function() {
+    const activeEnemy = this.getActiveEnemy();
+    return activeEnemy ? activeEnemy.distance : 2; // Default to medium if no active enemy
   },
   
   // Helper function to check if all enemies are defeated
@@ -578,7 +599,7 @@ window.combatSystem = {
     // Process the chosen action
     switch(action.type) {
       case "distance":
-        this.handleEnemyDistanceChange(action.value);
+        this.handleEnemyDistanceChange(enemy, action.value);
         break;
       
       case "stance":
@@ -670,7 +691,7 @@ window.combatSystem = {
   
   // Determine enemy's next action based on AI logic
   determineEnemyAction: function(enemy) {
-    const distanceDiff = this.state.distance - enemy.preferredDistance;
+    const distanceDiff = enemy.distance - enemy.preferredDistance;
     
     // Probabilities based on situation
     let actionProbabilities = {
@@ -693,7 +714,7 @@ window.combatSystem = {
     }
     
     // Prioritize javelin throws at medium range if ammo available
-    if (this.state.distance === 2 && this.enemyHasAmmo(enemy, 'javelin')) {
+    if (enemy.distance === 2 && this.enemyHasAmmo(enemy, 'javelin')) {
       // At medium range with javelins, more likely to attack
       actionProbabilities.attack = 0.8;
       actionProbabilities.distance = 0.1;
@@ -724,7 +745,7 @@ window.combatSystem = {
         let newStance = "neutral";
         if (this.state.playerStance === "aggressive") {
           newStance = "defensive";
-        } else if (this.state.playerStance === "defensive" && this.state.distance <= 1) {
+        } else if (this.state.playerStance === "defensive" && enemy.distance <= 1) {
           newStance = "aggressive";
         }
         return {
@@ -734,7 +755,7 @@ window.combatSystem = {
       
       case "attack":
         // Check for javelin throw opportunity at medium range
-        if (this.state.distance === 2 && this.enemyHasAmmo(enemy, 'javelin')) {
+        if (enemy.distance === 2 && this.enemyHasAmmo(enemy, 'javelin')) {
           return {
             type: "attack",
             attackType: "ThrowJavelin",
@@ -743,7 +764,7 @@ window.combatSystem = {
         }
         
         // Can only attack if in range
-        if (this.state.distance > (enemy.weaponRange || 1)) {
+        if (enemy.distance > (enemy.weaponRange || 1)) {
           // Too far, adjust distance instead
           return {
             type: "distance",
@@ -774,8 +795,11 @@ window.combatSystem = {
       };
     }
     
+    // Get the target enemy's distance
+    const enemyDistance = targetEnemy.distance;
+    
     // Probabilities based on situation (similar to enemy logic but targeting enemies)
-    const distanceDiff = this.state.distance - ally.preferredDistance;
+    const distanceDiff = enemyDistance - ally.preferredDistance;
     
     // Distance adjustment is more important
     if (Math.abs(distanceDiff) > 1) {
@@ -786,7 +810,7 @@ window.combatSystem = {
     }
     
     // Prioritize javelin throws at medium range if ammo available
-    if (this.state.distance === 2 && this.allyHasAmmo(ally, 'javelin')) {
+    if (enemyDistance === 2 && this.allyHasAmmo(ally, 'javelin')) {
       return {
         type: "attack",
         attackType: "ThrowJavelin",
@@ -796,7 +820,7 @@ window.combatSystem = {
     }
     
     // If in preferred range, attack
-    if (this.state.distance <= ally.weaponRange) {
+    if (enemyDistance <= ally.weaponRange) {
       return {
         type: "attack",
         attackType: this.getRandomAllyAttack(ally),
@@ -888,16 +912,26 @@ window.combatSystem = {
     
     this.addCombatMessage(`You focus your attention on the ${enemy.name}.`);
     
+    // Update global distance for backward compatibility
+    this.updateGlobalDistance();
+    
     // Update UI
     if (window.combatUI) {
       window.combatUI.updateCombatInterface();
     }
   },
   
-  // Handle player changing distance
+  // Handle player changing distance to active enemy
   handleDistanceChange: function(change) {
-    const oldDistance = this.state.distance;
-    this.state.distance = Math.max(0, Math.min(3, this.state.distance + change));
+    const activeEnemy = this.getActiveEnemy();
+    if (!activeEnemy) return;
+    
+    const oldDistance = activeEnemy.distance;
+    activeEnemy.distance = Math.max(0, Math.min(3, activeEnemy.distance + change));
+    
+    // Update global distance properties for backward compatibility
+    this.state.globalDistance = activeEnemy.distance;
+    this.state.distance = activeEnemy.distance;
     
     // Generate appropriate narrative
     if (change < 0) {
@@ -915,16 +949,28 @@ window.combatSystem = {
     }
   },
   
-  // Handle ally changing distance
+  // Handle ally changing distance to active enemy
   handleAllyDistanceChange: function(ally, change) {
-    const oldDistance = this.state.distance;
-    this.state.distance = Math.max(0, Math.min(3, this.state.distance + change));
+    // Get active enemy for this ally's action
+    const targetIndex = this.findBestEnemyTarget();
+    const targetEnemy = this.state.enemies[targetIndex];
+    
+    if (!targetEnemy) return; // No valid target
+    
+    // Allies adjust their position relative to their target enemy
+    const oldDistance = targetEnemy.distance;
+    targetEnemy.distance = Math.max(0, Math.min(3, targetEnemy.distance + change));
+    
+    // Update global distance if this is the player's active enemy
+    if (targetIndex === this.state.activeEnemyIndex) {
+      this.updateGlobalDistance();
+    }
     
     // Generate appropriate narrative
     if (change < 0) {
-      this.addCombatMessage(`${ally.name} advances, closing the distance.`);
+      this.addCombatMessage(`${ally.name} advances toward the ${targetEnemy.name}, closing the distance.`);
     } else {
-      this.addCombatMessage(`${ally.name} falls back, increasing the gap.`);
+      this.addCombatMessage(`${ally.name} falls back from the ${targetEnemy.name}, increasing the gap.`);
     }
     
     // Update UI
@@ -1052,7 +1098,7 @@ window.combatSystem = {
     
     if (hitSuccess) {
       // Calculate damage
-      const damage = this.calculateDamage(weaponTemplate, attackType);
+      const damage = this.calculateDamage(weaponTemplate, attackType, enemy);
       
       // Apply damage to enemy
       enemy.health = Math.max(0, enemy.health - damage);
@@ -1208,7 +1254,7 @@ window.combatSystem = {
   // Implementation of javelin throwing as a specialized attack
   handleJavelinThrow: function(enemy) {
     // Check if at correct distance for javelin throw (medium range, distance 2)
-    if (this.state.distance < 2 || this.state.distance > 3) {
+    if (enemy.distance < 2 || enemy.distance > 3) {
       this.addCombatMessage("You can only throw javelins at medium or far range!");
       return;
     }
@@ -1417,7 +1463,10 @@ window.combatSystem = {
     
     if (success) {
       // Increase distance by 1
-      this.state.distance = Math.min(3, this.state.distance + 1);
+      enemy.distance = Math.min(3, enemy.distance + 1);
+      
+      // Update global distance for backward compatibility
+      this.updateGlobalDistance();
       
       this.addCombatMessage(`You successfully push the ${enemy.name} back!`);
       
@@ -1526,7 +1575,7 @@ window.combatSystem = {
     
     if (hitSuccess) {
       // Calculate damage with bonus for counters
-      const damage = this.calculateDamage(weaponTemplate, attackType) * 1.5;
+      const damage = this.calculateDamage(weaponTemplate, attackType, enemy) * 1.5;
       
       // Apply damage to enemy
       enemy.health = Math.max(0, enemy.health - damage);
@@ -1579,14 +1628,17 @@ window.combatSystem = {
     }
   },
   
-  // Handle enemy changing distance
-  handleEnemyDistanceChange: function(change) {
-    const oldDistance = this.state.distance;
-    this.state.distance = Math.max(0, Math.min(3, this.state.distance + change));
+  // Handle enemy changing distance - now modifies the specific enemy's distance
+  handleEnemyDistanceChange: function(enemy, change) {
+    const oldDistance = enemy.distance;
+    enemy.distance = Math.max(0, Math.min(3, enemy.distance + change));
+    
+    // Update global distance property for backward compatibility
+    if (enemy === this.getActiveEnemy()) {
+      this.updateGlobalDistance();
+    }
     
     // Generate appropriate narrative
-    const enemy = this.getActiveEnemy();
-    
     if (change < 0) {
       this.addCombatMessage(`The ${enemy.name} advances toward you, closing the distance.`);
     } else {
@@ -1605,7 +1657,9 @@ window.combatSystem = {
     enemy.currentStance = newStance;
     
     // For backward compatibility
-    this.state.enemyStance = newStance;
+    if (enemy === this.getActiveEnemy()) {
+      this.state.enemyStance = newStance;
+    }
     
     // Generate appropriate narrative
     if (newStance === "aggressive") {
@@ -1638,8 +1692,13 @@ window.combatSystem = {
       const success = roll <= successChance;
       
       if (success) {
-        // Increase distance by 1
-        this.state.distance = Math.min(3, this.state.distance + 1);
+        // Increase distance by 1 (enemy moving away from player)
+        enemy.distance = Math.min(3, enemy.distance + 1);
+        
+        // Update global distance if this is active enemy
+        if (enemy === this.getActiveEnemy()) {
+          this.updateGlobalDistance();
+        }
         
         this.addCombatMessage(`The ${enemy.name} successfully pushes you back!`);
         
@@ -1722,7 +1781,7 @@ window.combatSystem = {
     // Javelin throw handling
     if (attackType === "ThrowJavelin") {
       // Check if enemy has javelins and is at a valid range
-      if (!this.enemyHasAmmo(enemy, 'javelin') || this.state.distance !== 2) {
+      if (!this.enemyHasAmmo(enemy, 'javelin') || enemy.distance !== 2) {
         // Fallback to standard attack if can't throw javelin
         this.addCombatMessage(`The ${enemy.name} reaches for a javelin but has none left.`);
         attackType = this.getRandomEnemyAttack(enemy);
@@ -2113,9 +2172,9 @@ window.combatSystem = {
     return Math.round(damage);
   },
   
-  // Calculate player damage based on weapon and attack
-  calculateDamage: function(weaponTemplate, attackType) {
-    const baseDamage = weaponTemplate.stats.damage || 5;
+  // Calculate player damage based on weapon and attack - now with enemy parameter
+  calculateDamage: function(weaponTemplate, attackType, enemy) {
+    const baseDamage = weaponTemplate ? (weaponTemplate.stats?.damage || 5) : 5;
     const damageMultiplier = this.getAttackDamageMultiplier(attackType);
     
     // Add skill bonuses
@@ -2145,7 +2204,7 @@ window.combatSystem = {
     }
     
     // Get current weapon durability and apply reduction if almost broken
-    if (weaponTemplate.hasOwnProperty('durability') && weaponTemplate.durability !== undefined) {
+    if (weaponTemplate && weaponTemplate.hasOwnProperty('durability') && weaponTemplate.durability !== undefined) {
       // Get current weapon instance
       const weapon = window.player.equipment?.mainHand;
       
@@ -2160,19 +2219,20 @@ window.combatSystem = {
     }
     
     // Apply armor penetration against enemy defense
-    const armorPenetration = weaponTemplate.stats.armorPenetration || 0;
-    const enemy = this.getActiveEnemy();
-    const enemyDefense = enemy ? (enemy.defense || 0) : 0;
-    const effectiveDefense = Math.max(0, enemyDefense - armorPenetration);
-    
-    // Reduce damage based on enemy defense
-    if (effectiveDefense > 0) {
-      damage = Math.max(1, damage - (effectiveDefense * 0.3));
-    }
-    
-    // Apply enemy stance defense
-    if (enemy && enemy.currentStance === "defensive") {
-      damage *= 0.7; // Enemy takes less damage in defensive stance
+    if (enemy) {
+      const armorPenetration = weaponTemplate?.stats?.armorPenetration || 0;
+      const enemyDefense = enemy.defense || 0;
+      const effectiveDefense = Math.max(0, enemyDefense - armorPenetration);
+      
+      // Reduce damage based on enemy defense
+      if (effectiveDefense > 0) {
+        damage = Math.max(1, damage - (effectiveDefense * 0.3));
+      }
+      
+      // Apply enemy stance defense
+      if (enemy.currentStance === "defensive") {
+        damage *= 0.7; // Enemy takes less damage in defensive stance
+      }
     }
     
     // Round to nearest integer
@@ -2195,10 +2255,10 @@ window.combatSystem = {
     // Apply accuracy multiplier from attack type
     hitChance *= accuracyMultiplier;
     
-    // Adjust based on distance
-    if (this.state.distance === 0) {
+    // Adjust based on enemy's distance
+    if (enemy.distance === 0) {
       hitChance += 20; // Easier to hit at grappling range
-    } else if (this.state.distance === 3) {
+    } else if (enemy.distance === 3) {
       hitChance -= 20; // Harder to hit at far range
     }
     
@@ -2250,9 +2310,12 @@ window.combatSystem = {
     let fleeChance = 0.3;
     
     // Adjust based on distance
-    if (this.state.distance >= 2) {
+    const activeEnemy = this.getActiveEnemy();
+    const enemyDistance = activeEnemy ? activeEnemy.distance : 2;
+    
+    if (enemyDistance >= 2) {
       fleeChance += 0.3; // Easier to flee from a distance
-    } else if (this.state.distance === 0) {
+    } else if (enemyDistance === 0) {
       fleeChance -= 0.2; // Very hard to flee while grappling
     }
     
@@ -2509,14 +2572,14 @@ window.combatSystem = {
   getRandomEnemyAttack: function(enemy) {
     // Special shield attacks if enemy has a shield and we're at appropriate distance
     if (enemy.hasShield) {
-      if (this.state.distance === 0) {
+      if (enemy.distance === 0) {
         // At grappling range, chance to use shield shove
         if (Math.random() < 0.4) {
           return "ShieldShove";
         }
       }
       
-      if (this.state.distance <= 1) {
+      if (enemy.distance <= 1) {
         // At close range, chance to use shield bash
         if (Math.random() < 0.3) {
           return "ShieldBash";
@@ -2526,11 +2589,11 @@ window.combatSystem = {
     
     // If no shield attack selected, use standard attacks
     // Different attack options based on distance
-    if (this.state.distance <= 1) {
+    if (enemy.distance <= 1) {
       // Melee range attacks
       const meleeAttacks = ["Strike", "Slash", "Stab"];
       return meleeAttacks[Math.floor(Math.random() * meleeAttacks.length)];
-    } else if (this.state.distance === 2 && this.enemyHasAmmo(enemy, 'javelin')) {
+    } else if (enemy.distance === 2 && this.enemyHasAmmo(enemy, 'javelin')) {
       // Medium range with javelins available
       return "ThrowJavelin";
     } else {
@@ -2586,7 +2649,8 @@ window.combatSystem = {
     if (!weaponTemplate) return ["Punch"];
     
     // Get current combat state info
-    const distance = this.state.distance;
+    const activeEnemy = this.getActiveEnemy();
+    const distance = activeEnemy ? activeEnemy.distance : 2;
     
     // Initialize attacks array
     let availableAttacks = [];
@@ -2935,7 +2999,7 @@ window.combatSystem = {
   generateEnemyReactionToDistance: function() {
     const enemy = this.getActiveEnemy();
     const enemyName = enemy ? enemy.name : "enemy";
-    const distanceIndex = this.state.distance;
+    const distanceIndex = enemy ? enemy.distance : 2;
     
     // Different reactions based on current distance
     if (distanceIndex === 0) {
@@ -3022,6 +3086,40 @@ window.combatSystem = {
     }, delay);
     
     return this._enemyActionTimeout;
+  },
+  
+  // Helper function to get the distance to an enemy for UI display
+  getEnemyDistance: function(enemyIndex) {
+    const enemy = this.state.enemies[enemyIndex];
+    return enemy ? enemy.distance : 2; // Default to medium range if enemy not found
+  },
+  
+  // Get a descriptive phrase for the enemy's distance
+  getEnemyDistanceDescription: function(enemyIndex) {
+    const enemy = this.state.enemies[enemyIndex];
+    if (!enemy) return "at medium range";
+    
+    switch(enemy.distance) {
+      case 0: return "at grappling distance";
+      case 1: return "at close range";
+      case 2: return "at medium range";
+      case 3: return "at far range";
+      default: return "at medium range";
+    }
+  },
+  
+  // Get all enemy distances for UI display
+  getAllEnemyDistances: function() {
+    return this.state.enemies.map((enemy, index) => ({
+      index,
+      name: enemy.name,
+      distance: enemy.distance,
+      distanceLabel: this.distanceLabels[enemy.distance],
+      health: enemy.health,
+      maxHealth: enemy.maxHealth,
+      defeated: enemy.health <= 0,
+      selected: index === this.state.activeEnemyIndex
+    }));
   }
 };
 

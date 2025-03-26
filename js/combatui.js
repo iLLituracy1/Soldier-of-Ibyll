@@ -1,4 +1,4 @@
-// combatUI.js - COMBAT USER INTERFACE MODULE
+// combatUI.js - ENHANCED COMBAT USER INTERFACE MODULE
 // Handles all UI rendering and interaction for the combat system
 
 // Combat UI object with interface methods for the core combat system
@@ -356,6 +356,23 @@ window.combatUI = {
       margin-top: 2px;
     }
     
+    /* Individual enemy distance indicators */
+    .enemy-distance-tag {
+      display: inline-block;
+      font-size: 0.75em;
+      padding: 1px 5px;
+      background: rgba(201, 170, 113, 0.2);
+      border-radius: 3px;
+      margin-left: 5px;
+    }
+    
+    /* For the main HP display at top */
+    .primary-hp-display {
+      margin-bottom: 15px;
+      border-bottom: 1px solid #333;
+      padding-bottom: 5px;
+    }
+    
     @media (max-width: 700px) {
       .combat-actions {
         grid-template-columns: repeat(3, 1fr);
@@ -619,6 +636,35 @@ window.combatUI = {
   createCombatantContainers: function() {
     const combatHeader = document.getElementById('combatHeader');
     
+    // Create the player/main enemy display at the top
+    if (!document.getElementById('primaryCombatDisplay')) {
+      const primaryDisplay = document.createElement('div');
+      primaryDisplay.id = 'primaryCombatDisplay';
+      primaryDisplay.className = 'primary-hp-display';
+      
+      // Use existing layout for backward compatibility
+      primaryDisplay.innerHTML = `
+        <div class="player-container">
+          <div class="combat-health-container">
+            <div id="playerHealthText">You: <span id="playerHealthDisplay">${window.gameState.health} HP</span></div>
+            <div class="combat-health-bar">
+              <div id="playerCombatHealth" style="width:${(window.gameState.health / window.gameState.maxHealth) * 100}%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="enemy-container">
+          <div class="combat-health-container">
+            <div id="enemyHealthText">Enemy: <span id="enemyHealthDisplay">100 HP</span></div>
+            <div class="combat-health-bar">
+              <div id="enemyCombatHealth" style="width:100%"></div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      combatHeader.appendChild(primaryDisplay);
+    }
+    
     // Create enemy container
     if (!document.getElementById('enemyContainer')) {
       const enemyContainer = document.createElement('div');
@@ -661,9 +707,24 @@ window.combatUI = {
   updateCombatInterface: function() {
     if (!window.combatSystem.state.active) return;
     
-    // Update player health display
-    document.getElementById('playerHealthDisplay').textContent = `${Math.round(window.gameState.health)} HP`;
-    document.getElementById('playerCombatHealth').style.width = `${(window.gameState.health / window.gameState.maxHealth) * 100}%`;
+    // Update player health display in both locations
+    const playerHealth = Math.round(window.gameState.health);
+    const playerMaxHealth = window.gameState.maxHealth;
+    
+    // Update main player health display in top bar
+    document.getElementById('playerHealthDisplay').textContent = `${playerHealth} HP`;
+    document.getElementById('playerCombatHealth').style.width = `${(playerHealth / playerMaxHealth) * 100}%`;
+    
+    // Update main enemy display in top bar to show active enemy
+    const activeEnemy = window.combatSystem.getActiveEnemy();
+    if (activeEnemy) {
+      const activeEnemyHealth = Math.round(activeEnemy.health);
+      const activeEnemyMaxHealth = activeEnemy.maxHealth;
+      
+      document.getElementById('enemyHealthDisplay').textContent = `${activeEnemyHealth} HP`;
+      document.getElementById('enemyCombatHealth').style.width = `${(activeEnemyHealth / activeEnemyMaxHealth) * 100}%`;
+      document.getElementById('enemyHealthText').textContent = `${activeEnemy.name}: `;
+    }
     
     // Update enemy containers
     this.updateEnemyDisplay();
@@ -723,6 +784,9 @@ window.combatUI = {
       // Enemy name and health text
       const enemyNameDisplay = document.createElement('div');
       let nameText = enemy.name;
+      
+      // Add distance to enemy name
+      nameText += ` <span class="enemy-distance-tag">${window.combatSystem.distanceLabels[enemy.distance]}</span>`;
       
       // Add status indicators
       if (enemy.stunned) nameText += " (Stunned)";
@@ -875,7 +939,10 @@ window.combatUI = {
           if (index === window.combatSystem.state.activeEnemyIndex) {
             enemyButton.classList.add('selected');
           }
-          enemyButton.textContent = enemy.name;
+          
+          // Include distance in button text
+          enemyButton.innerHTML = `${enemy.name} <small>(${window.combatSystem.distanceLabels[enemy.distance]})</small>`;
+          
           enemyButton.onclick = () => window.combatSystem.handleCombatAction("select_enemy", {enemyIndex: index});
           enemySelectorDiv.appendChild(enemyButton);
         }
@@ -888,11 +955,19 @@ window.combatUI = {
     const weapon = window.player.equipment?.mainHand;
     const weaponTemplate = weapon ? weapon.getTemplate() : null;
     
-    // Add distance buttons
-    if (window.combatSystem.state.distance > 0) {
+    // Get active enemy
+    const activeEnemy = window.combatSystem.getActiveEnemy();
+    
+    if (!activeEnemy) {
+      this.addCombatButton("No valid targets", () => {}, actionsContainer, true);
+      return;
+    }
+    
+    // Add distance buttons - now specific to active enemy
+    if (activeEnemy.distance > 0) {
       this.addCombatButton("Approach", () => window.combatSystem.handleCombatAction("change_distance", {change: -1}), actionsContainer);
     }
-    if (window.combatSystem.state.distance < 3) {
+    if (activeEnemy.distance < 3) {
       this.addCombatButton("Retreat", () => window.combatSystem.handleCombatAction("change_distance", {change: 1}), actionsContainer);
     }
     
@@ -924,12 +999,12 @@ window.combatUI = {
         this.addCombatButton(`Shield Block: ${blockChance}%`, () => {}, actionsContainer, true);
         
         // Shield attack options
-        if (window.combatSystem.state.distance <= 1) {
+        if (activeEnemy.distance <= 1) {
           // Shield bash is only available at close range (0 or 1)
           this.addCombatButton("Shield Bash", () => window.combatSystem.handleCombatAction("attack", {attackType: "Shield Bash"}), actionsContainer);
         }
         
-        if (window.combatSystem.state.distance === 0) {
+        if (activeEnemy.distance === 0) {
           // Shove is only available at grappling range (0)
           this.addCombatButton("Shove", () => window.combatSystem.handleCombatAction("attack", {attackType: "Shove"}), actionsContainer);
         }
@@ -965,11 +1040,11 @@ window.combatUI = {
     // Get the effective weapon range
     const weaponRange = weaponTemplate ? window.combatSystem.getWeaponRange(weaponTemplate) : 1;
     
-    // Get all available attacks considering current weapon, ammo, and distance
+    // Get all available attacks considering current weapon, ammo, and distance to active enemy
     let attacks = [];
     
     // If within weapon range, add weapon attacks
-    if (weaponTemplate && window.combatSystem.state.distance <= weaponRange) {
+    if (weaponTemplate && activeEnemy.distance <= weaponRange) {
       attacks = attacks.concat(window.combatSystem.getWeaponAttacks(weaponTemplate));
     } else if (weaponTemplate) {
       // Weapon out of range
@@ -978,8 +1053,8 @@ window.combatUI = {
     
     // Always check for javelin attacks separately from main weapon
     if (window.combatSystem.hasCompatibleAmmo(null, "javelin") && 
-        window.combatSystem.state.distance >= 2 && 
-        window.combatSystem.state.distance <= 3) {
+        activeEnemy.distance >= 2 && 
+        activeEnemy.distance <= 3) {
       // If no weapon or weapon is one-handed
       if (!weaponTemplate || (weaponTemplate.hands && weaponTemplate.hands === 1)) {
         if (!attacks.includes("Throw Javelin")) {
@@ -989,7 +1064,7 @@ window.combatUI = {
     }
     
     // Default to punch if no weapon and at melee range
-    if (attacks.length === 0 && window.combatSystem.state.distance === 0) {
+    if (attacks.length === 0 && activeEnemy.distance === 0) {
       attacks = ["Punch"];
     }
     
@@ -1027,18 +1102,22 @@ window.combatUI = {
       }
     }
     
+    // Get the active enemy for distance display
+    const activeEnemy = window.combatSystem.getActiveEnemy();
+    const activeEnemyDistance = activeEnemy ? activeEnemy.distance : 2;
+    
     // Update the content
     statusContainer.innerHTML = `
       <!-- Distance indicator -->
       <div class="combat-status-item">
         <div class="status-label">Distance</div>
         <div class="distance-indicator">
-          <div class="distance-dot ${window.combatSystem.state.distance === 0 ? 'active' : ''}"></div>
-          <div class="distance-dot ${window.combatSystem.state.distance === 1 ? 'active' : ''}"></div>
-          <div class="distance-dot ${window.combatSystem.state.distance === 2 ? 'active' : ''}"></div>
-          <div class="distance-dot ${window.combatSystem.state.distance === 3 ? 'active' : ''}"></div>
+          <div class="distance-dot ${activeEnemyDistance === 0 ? 'active' : ''}"></div>
+          <div class="distance-dot ${activeEnemyDistance === 1 ? 'active' : ''}"></div>
+          <div class="distance-dot ${activeEnemyDistance === 2 ? 'active' : ''}"></div>
+          <div class="distance-dot ${activeEnemyDistance === 3 ? 'active' : ''}"></div>
         </div>
-        <div class="status-value">${window.combatSystem.distanceLabels[window.combatSystem.state.distance]}</div>
+        <div class="status-value">${window.combatSystem.distanceLabels[activeEnemyDistance]}</div>
       </div>
       
       <!-- Player stance -->
@@ -1145,7 +1224,7 @@ window.combatUI = {
       statSpan.textContent = statValue;
       btn.appendChild(statSpan);
     } else {
-      btn.textContent = label;
+      btn.innerHTML = label;
     }
     
     if (!disabled) btn.onclick = onClick;
