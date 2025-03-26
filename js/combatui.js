@@ -96,11 +96,22 @@ window.combatUI = {
       background: linear-gradient(to right, #8E0E00, #1F1C18);
     }
     
-    .combat-actions {
+        .combat-actions {
       display: grid;
       grid-template-columns: repeat(4, 1fr); /* 4 columns instead of 3 */
       gap: 5px; /* Smaller gap */
       margin-top: 10px; /* Reduced margin */
+    }
+
+    /* Override main layout styles for combat buttons */
+    .combat-actions .action-btn {
+      width: auto; /* Override the 100% width from main layout */
+      text-align: center; /* Center text instead of left alignment */
+      margin: 0; /* Remove bottom margin from main layout */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
     
     /* Status indicators styles - more compact */
@@ -386,6 +397,13 @@ window.combatUI = {
       .combat-actions {
         grid-template-columns: repeat(2, 1fr);
       }
+    }
+
+        .combat-btn {
+      width: auto !important; /* Force override */
+      text-align: center !important; /* Force center alignment */
+      margin: 0 !important; /* Remove bottom margin */
+      flex-direction: column !important; /* Force column layout */
     }
     `;
     
@@ -1159,14 +1177,7 @@ updateTurnCounter: function() {
           ${window.combatSystem.targetLabels[window.combatSystem.state.targetArea]}
         </div>
       </div>
-      
-      <!-- Turn counter -->
-      <div class="combat-status-item">
-        <div class="status-label">Turn</div>
-        <div class="status-value">
-          ${window.combatSystem.state.turn + 1}/${window.combatSystem.state.maxTurns}
-        </div>
-      </div>
+    
     `;
     
     // Add ammunition status if player has javelins
@@ -1210,7 +1221,7 @@ updateTurnCounter: function() {
     const isDurability = label.includes('Weapon:') && label.includes('%');
     
     const btn = document.createElement('button');
-    btn.className = 'action-btn';
+    btn.className = 'action-btn combat-btn';
     
     // Add special classes for stance buttons
     if (label.includes('Aggressive Stance')) {

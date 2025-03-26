@@ -91,11 +91,8 @@ window.WEAPON_TYPES = {
   SPEAR: { name: 'Spear', symbol: window.ITEM_SYMBOLS.SPEAR, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2, range: 2 },
   AXE: { name: 'Axe', symbol: window.ITEM_SYMBOLS.AXE, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1 },
   BATTLEAXE: { name: 'Battle Axe', symbol: window.ITEM_SYMBOLS.AXE, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2 },
-  BOW: { name: 'Bow', symbol: window.ITEM_SYMBOLS.BOW, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2, range: 3 },
-  CROSSBOW: { name: 'Crossbow', symbol: window.ITEM_SYMBOLS.CROSSBOW, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2, range: 3 },
   DAGGER: { name: 'Dagger', symbol: window.ITEM_SYMBOLS.DAGGER, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1 },
   SHIELD: { name: 'Shield', symbol: window.ITEM_SYMBOLS.SHIELD, slot: window.EQUIPMENT_SLOTS.OFF_HAND, hands: 1 },
-  RIFLE: { name: 'Rifle', symbol: window.ITEM_SYMBOLS.RIFLE, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2, range: 3 },
   THROWN: { name: 'Thrown Weapon', symbol: window.ITEM_SYMBOLS.SPEAR, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1, range: 2 }
 };
 
@@ -164,10 +161,39 @@ window.createItemInstance = function(template, quantity = 1) {
     currentAmount: template.capacity || null,
     compatibleWeapons: template.compatibleWeapons || [],
 
-     // Add method to use ammunition
-     useAmmo: function(amount = 1) {
+    useAmmo: function(amount = 1) {
       if (this.currentAmount !== null) {
         this.currentAmount = Math.max(0, this.currentAmount - amount);
+        
+        // Check if ammunition is depleted, remove from inventory if equipped
+        if (this.currentAmount <= 0) {
+          console.log(`Ammunition depleted: ${this.getTemplate().name}`);
+          
+          // Unequip the empty ammunition
+          if (window.player.equipment && 
+              window.player.equipment.ammunition && 
+              window.player.equipment.ammunition.instanceId === this.instanceId) {
+            
+            // Remove from equipment
+            window.player.equipment.ammunition = null;
+            
+            // Remove from inventory if it exists there
+            for (let i = 0; i < window.player.inventory.length; i++) {
+              if (window.player.inventory[i].instanceId === this.instanceId) {
+                window.player.inventory.splice(i, 1);
+                break;
+              }
+            }
+            
+            window.showNotification(`Your ${this.getTemplate().name} is depleted!`, 'warning');
+            
+            // Update UI if inventory is open
+            if (typeof window.updateInventoryDisplayIfOpen === 'function') {
+              window.updateInventoryDisplayIfOpen();
+            }
+          }
+        }
+        
         return this.currentAmount > 0;
       }
       return true; // If not ammunition, always return true
@@ -573,44 +599,6 @@ window.initializeItemTemplates = function() {
     maxDurability: 120
   });
 
-  // Ranged
-  
-  window.itemTemplates.matchlockRifle = window.createWeapon({
-    id: 'matchlock_rifle',
-    name: 'Nesian Matchlock Rifle',
-    description: 'A firearm from Nesia, re-engineered from ancient Immortal designs. Powerful but slow to reload.',
-    weaponType: window.WEAPON_TYPES.RIFLE,
-    rarity: window.ITEM_RARITIES.UNCOMMON,
-    damage: 25,
-    value: 220,
-    stats: {
-      damage: 25,
-      range: 40,
-      speed: -20,
-      armorPenetration: 15
-    },
-    requirements: {
-      minMen: 2
-    },
-    maxDurability: 70
-  });
-  
-  window.itemTemplates.hunterBow = window.createWeapon({
-    id: 'hunter_bow',
-    name: 'Wyrd Hunter\'s Bow',
-    description: 'A recurve bow crafted by the hunters of the Wyrdplains. Fast to draw and deadly accurate.',
-    weaponType: window.WEAPON_TYPES.BOW,
-    rarity: window.ITEM_RARITIES.UNCOMMON,
-    damage: 12,
-    value: 120,
-    stats: {
-      damage: 12,
-      range: 30,
-      critChance: 10,
-      armorPenetration: 5
-    },
-    maxDurability: 60
-  });
 
   window.itemTemplates.throwingJavelin = window.createWeapon({
     id: 'throwing_javelin',
@@ -648,17 +636,6 @@ window.initializeItemTemplates = function() {
     maxDurability: 85
   });
 
-  // Ammunition items
-window.itemTemplates.quiver = window.createAmmunition({
-  id: 'quiver',
-  name: 'Arrow Quiver',
-  description: 'A sturdy quiver that holds up to 32 arrows for bows.',
-  ammoType: 'arrow',
-  capacity: 32,
-  symbol: '🏹',
-  value: 15,
-  compatibleWeapons: ['hunter_bow']
-});
 
 window.itemTemplates.javelinPack = window.createAmmunition({
   id: 'javelin_pack',
@@ -672,16 +649,6 @@ window.itemTemplates.javelinPack = window.createAmmunition({
   compatibleWeapons: ['throwing_javelin']
 });
 
-window.itemTemplates.cartridgePouch = window.createAmmunition({
-  id: 'cartridge_pouch',
-  name: 'Powder & Shot Pouch',
-  description: 'A leather pouch containing powder, shot, and supplies for up to 60 firearm loads.',
-  ammoType: 'shot',
-  capacity: 60,
-  symbol: '💼',
-  value: 40,
-  compatibleWeapons: ['matchlock_rifle']
-});
   
   // SHIELDS - Updated with blockChance values
   window.itemTemplates.legionShield = window.createWeapon({
