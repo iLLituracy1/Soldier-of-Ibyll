@@ -52,6 +52,17 @@ img, video {
   border-radius: 4px;
 }
 
+/* Make action buttons consistent in size */
+.action-btn {
+  width: 100%; /* Full width of the container */
+  text-align: left; /* Align text to the left */
+  padding: 12px 15px; /* Consistent padding */
+  margin: 0 0 5px 0; /* Bottom margin only */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .menu-button:hover, .action-btn:hover {
   background: #555;
   transform: translateY(-2px);
@@ -85,16 +96,19 @@ input[type="text"], input[type="number"] {
 /* Game layout */
 .game-layout {
   display: grid;
-  grid-template-columns: 1fr 200px;
-  grid-template-rows: auto auto 1fr;
+  grid-template-columns: 230px minmax(400px, 1fr) 250px; /* Control minimum narrative width */
+  grid-template-rows: auto 1fr;
   grid-template-areas:
-    "header header"
-    "narrative side-panel"
-    "actions side-panel";
+    "header header header"
+    "actions narrative side-panel";
   gap: 15px;
-  max-width: 100%; /* Ensure it doesn't overflow the screen */
-  min-height: 100vh; /* Use viewport height */
-  box-sizing: border-box; /* Include padding in the width calculation */
+  max-width: 100%;
+  width: 100%; /* Ensure full width usage */
+  min-height: 100vh;
+  max-height: 100vh; /* Prevent vertical overflow */
+  overflow: hidden; /* Prevent layout overflow */
+  box-sizing: border-box;
+  padding: 15px; /* Consistent padding */
 }
 
 /* ---- HEADER STYLES ---- */
@@ -107,6 +121,8 @@ input[type="text"], input[type="number"] {
   border-radius: 8px;
   padding: 10px;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  overflow: hidden; /* Prevent content from breaking layout */
 }
 
 #location {
@@ -114,6 +130,9 @@ input[type="text"], input[type="number"] {
   font-weight: bold;
   color: #a0a0ff;
   margin-bottom: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Handle long location names */
 }
 
 .time-display-container {
@@ -150,8 +169,9 @@ input[type="text"], input[type="number"] {
   border: 1px solid #333;
   background: #1e293b;
   padding: 15px;
-  min-height: 150px;
-  max-height: 40vh; /* Limit height relative to viewport */
+  min-height: 300px; /* Lower minimum height */
+  height: auto; /* Let it size naturally */
+  max-height: calc(100vh - 180px); /* Ensure it fits in viewport */
   overflow-y: auto;
   border-radius: 8px;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
@@ -168,6 +188,8 @@ input[type="text"], input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 15px;
+  max-height: calc(100vh - 180px); /* Match other sections */
+  overflow-y: auto; /* Allow scrolling */
 }
 
 /* Game controls */
@@ -244,13 +266,15 @@ input[type="text"], input[type="number"] {
 #actions {
   grid-area: actions;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
+  flex-direction: column; /* Stack buttons vertically */
+  gap: 10px; /* Consistent spacing between buttons */
   background: #1a1a1a;
   padding: 15px;
   border-radius: 8px;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  max-height: calc(100vh - 180px); /* Match narrative height */
+  overflow-y: auto; /* Allow scrolling if many buttons */
+  align-self: start;
 }
 
 /* ---- PANELS ---- */
@@ -523,17 +547,19 @@ input[type="text"], input[type="number"] {
 /* Quest Scene Styling */
 .quest-scene-layout {
   display: grid;
-  grid-template-columns: 1fr 250px;
+  grid-template-columns: 230px minmax(400px, 1fr) 250px;
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
-    "header header"
-    "narrative side-panel"
-    "actions side-panel";
+    "header header header"
+    "actions narrative side-panel"
+    "actions narrative side-panel";
   gap: 15px;
   min-height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
   max-width: 100%;
   margin: 0;
-  padding: 20px;
+  padding: 15px;
   box-sizing: border-box;
 }
 
@@ -545,6 +571,8 @@ input[type="text"], input[type="number"] {
   margin-bottom: 10px;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
   border-bottom: 2px solid #c9aa71;
+  width: 100%;
+  overflow: hidden;
 }
 
 .quest-header h1 {
@@ -565,9 +593,8 @@ input[type="text"], input[type="number"] {
   border: 1px solid #333;
   padding: 20px;
   border-radius: 8px;
-  height: auto; /* Remove fixed height */
-  min-height: 200px;
-  max-height: 50vh; /* Use viewport height instead */
+  min-height: 300px;
+  max-height: calc(100vh - 180px);
   overflow-y: auto;
   line-height: 1.7;
   font-size: 1.05em;
@@ -576,13 +603,15 @@ input[type="text"], input[type="number"] {
 .quest-actions {
   grid-area: actions;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 15px;
+  flex-direction: column;
+  gap: 10px;
   background: #1a1a1a;
   padding: 15px;
   border-radius: 8px;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  align-self: start;
 }
 
 .quest-side-panel {
@@ -594,6 +623,8 @@ input[type="text"], input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
 }
 
 .quest-status-panel {
@@ -680,18 +711,22 @@ input[type="text"], input[type="number"] {
 }
 
 .quest-action-btn {
+  width: 100%;
   background: #2a3a4a;
   border: none;
   color: #e0e0e0;
-  padding: 12px 24px;
+  padding: 12px 15px;
   cursor: pointer;
   transition: all 0.3s;
   border-radius: 5px;
-  min-width: 200px;
+  text-align: left;
   font-size: 1.1em;
   position: relative;
   overflow: hidden;
   border-left: 4px solid #c9aa71;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  margin-bottom: 5px;
 }
 
 .quest-action-btn:hover {
@@ -1090,53 +1125,86 @@ input[type="text"], input[type="number"] {
 }
 
 /* Enhanced responsive styles */
+/* Extra large screens */
+@media (min-width: 1921px) {
+  .game-layout, .quest-scene-layout {
+    max-width: 1920px; /* Cap width on ultra-wide screens */
+    margin: 0 auto; /* Center the layout */
+  }
+}
+
+/* Large screens */
+@media (max-width: 1366px) {
+  .game-layout, .quest-scene-layout {
+    grid-template-columns: 200px minmax(350px, 1fr) 220px;
+    gap: 10px;
+    padding: 10px;
+  }
+}
+
+/* Medium screens */
+@media (max-width: 1024px) {
+  .game-layout, .quest-scene-layout {
+    grid-template-columns: 180px minmax(300px, 1fr) 200px;
+    gap: 10px;
+  }
+  
+  .action-btn, .quest-action-btn {
+    padding: 10px 12px;
+    font-size: 0.9em;
+  }
+}
+
+/* Tablet/Small screens */
 @media (max-width: 768px) {
   .game-layout {
     grid-template-columns: 1fr;
     grid-template-areas:
       "header"
       "side-panel"
-      "narrative"
-      "actions";
-    gap: 10px; /* Reduce gap on smaller screens */
-  }
-  
-  .side-panel {
-    order: 2;
-  }
-  
-  #narrative {
-    max-height: 50vh; /* Allow more height on mobile */
+      "actions"
+      "narrative";
+    gap: 10px;
+    max-height: none; /* Remove height constraint */
+    overflow: visible;
+    padding: 10px;
   }
   
   .quest-scene-layout {
     grid-template-columns: 1fr;
     grid-template-areas:
       "header"
-      "narrative"
+      "side-panel"
       "actions"
-      "side-panel";
+      "narrative";
     gap: 10px;
+    max-height: none;
+    overflow: visible;
     padding: 10px;
   }
   
-  .quest-side-panel {
-    flex-direction: column;
-    padding: 10px;
+  #narrative, #actions, .side-panel, .quest-narrative, .quest-actions, .quest-side-panel {
+    max-height: none;
+    height: auto;
   }
   
-  .quest-status-panel, 
-  .quest-progress {
-    flex: 1 1 300px;
+  #narrative, .quest-narrative {
+    min-height: 250px;
+    max-height: 50vh;
   }
   
-  #profile, #inventory, #questLog {
-    width: 95%;
-    padding: 15px;
+  #actions, .quest-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
   }
   
-  .panel-header {
-    padding: 8px 10px;
+  .action-btn, .quest-action-btn {
+    width: auto;
+    flex: 1 1 45%;
+    text-align: center;
+    margin: 5px;
+    white-space: normal; /* Allow text wrapping on mobile */
   }
   
   .skills-grid {
@@ -1148,40 +1216,34 @@ input[type="text"], input[type="number"] {
   }
 }
 
+/* Small mobile screens */
 @media (max-width: 480px) {
   body {
-    padding: 10px; /* Reduce padding on very small screens */
+    padding: 5px;
   }
   
-  .game-header {
+  .game-layout, .quest-scene-layout {
+    gap: 8px;
+    padding: 5px;
+  }
+  
+  .action-btn, .quest-action-btn {
+    flex: 1 1 100%; /* Full width buttons on very small screens */
+    padding: 10px 8px;
+    font-size: 0.85em;
+  }
+  
+  #narrative, .quest-narrative {
+    min-height: 200px;
+    padding: 10px;
+  }
+  
+  .game-header, .quest-header {
     padding: 8px;
   }
   
-  #actions {
-    padding: 10px;
-  }
-  
-  .action-btn {
-    padding: 8px 12px;
-    font-size: 0.9em;
-  }
-  
-  .quest-header {
-    padding: 10px;
-  }
-  
-  .quest-header h1 {
+  .game-header h1, .quest-header h1 {
     font-size: 1.3em;
-  }
-  
-  #questObjective {
-    font-size: 1em;
-  }
-  
-  .quest-action-btn {
-    padding: 10px 20px;
-    min-width: auto; /* Remove minimum width */
-    width: 100%; /* Full width on very small screens */
   }
   
   #profile, #inventory, #questLog {
