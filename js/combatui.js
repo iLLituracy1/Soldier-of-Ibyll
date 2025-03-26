@@ -627,6 +627,40 @@ window.combatUI = {
           font-size: 1em;
         }
       }
+
+      
+      // Add these rules to your styleElement.textContent in applyStyles
+.combat-header-flex {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.player-container {
+  width: 48%;
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+.enemy-container {
+  width: 48%;
+  display: flex;
+  flex-direction: column;
+}
+
+.ally-container {
+  width: 48%;
+  margin-top: 10px;
+  clear: left;
+}
+
+/* Hide the duplicate display that was at the top */
+.primary-hp-display {
+  display: none;
+}
     `;
     
     document.head.appendChild(styleElement);
@@ -636,49 +670,39 @@ window.combatUI = {
   createCombatantContainers: function() {
     const combatHeader = document.getElementById('combatHeader');
     
-    // Create the player/main enemy display at the top
-    if (!document.getElementById('primaryCombatDisplay')) {
-      const primaryDisplay = document.createElement('div');
-      primaryDisplay.id = 'primaryCombatDisplay';
-      primaryDisplay.className = 'primary-hp-display';
-      
-      // Use existing layout for backward compatibility
-      primaryDisplay.innerHTML = `
-        <div class="player-container">
-          <div class="combat-health-container">
-            <div id="playerHealthText">You: <span id="playerHealthDisplay">${window.gameState.health} HP</span></div>
-            <div class="combat-health-bar">
-              <div id="playerCombatHealth" style="width:${(window.gameState.health / window.gameState.maxHealth) * 100}%"></div>
-            </div>
-          </div>
-        </div>
-        <div class="enemy-container">
-          <div class="combat-health-container">
-            <div id="enemyHealthText">Enemy: <span id="enemyHealthDisplay">100 HP</span></div>
-            <div class="combat-health-bar">
-              <div id="enemyCombatHealth" style="width:100%"></div>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      combatHeader.appendChild(primaryDisplay);
-    }
+    // Clear the header first to avoid duplications
+    combatHeader.innerHTML = '';
     
-    // Create enemy container
-    if (!document.getElementById('enemyContainer')) {
-      const enemyContainer = document.createElement('div');
-      enemyContainer.id = 'enemyContainer';
-      enemyContainer.className = 'enemy-container';
-      combatHeader.appendChild(enemyContainer);
-    }
+    // Create flex container with proper styling
+    combatHeader.className = 'combat-header-flex';
     
-    // Create ally container if needed
-    if (!document.getElementById('allyContainer') && window.combatSystem.state.allies.length > 0) {
+    // Create player container on left side
+    const playerContainer = document.createElement('div');
+    playerContainer.id = 'playerContainer';
+    playerContainer.className = 'player-container';
+    playerContainer.innerHTML = `
+      <div class="combat-health-container">
+        <div id="playerHealthText">You: <span id="playerHealthDisplay">${window.gameState.health} HP</span></div>
+        <div class="combat-health-bar">
+          <div id="playerCombatHealth" style="width:${(window.gameState.health / window.gameState.maxHealth) * 100}%"></div>
+        </div>
+      </div>
+    `;
+    combatHeader.appendChild(playerContainer);
+    
+    // Create enemy container on right side
+    const enemyContainer = document.createElement('div');
+    enemyContainer.id = 'enemyContainer';
+    enemyContainer.className = 'enemy-container';
+    combatHeader.appendChild(enemyContainer);
+    
+    // Create ally container if needed (below player)
+    if (window.combatSystem.state.allies.length > 0) {
       const allyContainer = document.createElement('div');
       allyContainer.id = 'allyContainer';
       allyContainer.className = 'ally-container';
-      combatHeader.appendChild(allyContainer);
+      // Explicitly insert it after player container
+      playerContainer.parentNode.insertBefore(allyContainer, playerContainer.nextSibling);
     }
   },
   
@@ -696,35 +720,24 @@ window.combatUI = {
   },
   
   // Update turn counter display
-  updateTurnCounter: function() {
-    const turnCounter = document.getElementById('turnCounter');
-    if (turnCounter) {
-      turnCounter.textContent = `Turn ${window.combatSystem.state.turn + 1} of ${window.combatSystem.state.maxTurns}`;
-    }
-  },
+updateTurnCounter: function() {
+  const turnCounter = document.getElementById('turnCounter');
+  if (turnCounter) {
+    // Changed from "Turn X of Y" to just "Turn ##"
+    turnCounter.textContent = `Turn ${window.combatSystem.state.turn + 1}`;
+  }
+},
   
   // Update combat UI elements
   updateCombatInterface: function() {
     if (!window.combatSystem.state.active) return;
     
-    // Update player health display in both locations
+    // Update player health display
     const playerHealth = Math.round(window.gameState.health);
     const playerMaxHealth = window.gameState.maxHealth;
     
-    // Update main player health display in top bar
     document.getElementById('playerHealthDisplay').textContent = `${playerHealth} HP`;
     document.getElementById('playerCombatHealth').style.width = `${(playerHealth / playerMaxHealth) * 100}%`;
-    
-    // Update main enemy display in top bar to show active enemy
-    const activeEnemy = window.combatSystem.getActiveEnemy();
-    if (activeEnemy) {
-      const activeEnemyHealth = Math.round(activeEnemy.health);
-      const activeEnemyMaxHealth = activeEnemy.maxHealth;
-      
-      document.getElementById('enemyHealthDisplay').textContent = `${activeEnemyHealth} HP`;
-      document.getElementById('enemyCombatHealth').style.width = `${(activeEnemyHealth / activeEnemyMaxHealth) * 100}%`;
-      document.getElementById('enemyHealthText').textContent = `${activeEnemy.name}: `;
-    }
     
     // Update enemy containers
     this.updateEnemyDisplay();
