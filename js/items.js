@@ -561,7 +561,7 @@ window.initializeItemTemplates = function() {
     weaponType: window.WEAPON_TYPES.SWORD,
     damage: 8,
     value: 25,
-    maxDurability: 75
+    maxDurability: 175
   });
   
   window.itemTemplates.nobleSword = window.createWeapon({
@@ -576,7 +576,7 @@ window.initializeItemTemplates = function() {
       damage: 10,
       critChance: 5
     },
-    maxDurability: 90,
+    maxDurability: 190,
     armorPenetration: 5
   });
   
@@ -596,7 +596,7 @@ window.initializeItemTemplates = function() {
     requirements: {
       minPhy: 8
     },
-    maxDurability: 120
+    maxDurability: 320
   });
 
 
@@ -615,7 +615,7 @@ window.initializeItemTemplates = function() {
       range: 2,
       armorPenetration: 10
     },
-    maxDurability: 50
+    maxDurability: 25
   });
 
   // One-handed axe for Marauders
@@ -633,7 +633,7 @@ window.initializeItemTemplates = function() {
       critChance: 7,
       armorPenetration: 5
     },
-    maxDurability: 85
+    maxDurability: 185
   });
 
 
@@ -663,7 +663,7 @@ window.itemTemplates.javelinPack = window.createAmmunition({
       damage: 2,
       defense: 15
     },
-    maxDurability: 120,
+    maxDurability: 160,
     blockChance: 30 // Added block chance
   });
   
@@ -681,7 +681,7 @@ window.itemTemplates.javelinPack = window.createAmmunition({
       defense: 25,
       speed: -15
     },
-    maxDurability: 180,
+    maxDurability: 280,
     blockChance: 45, // Higher block chance
     requirements: {
       minPhy: 6
@@ -702,7 +702,7 @@ window.itemTemplates.javelinPack = window.createAmmunition({
       speed: 5,
       critChance: 5
     },
-    maxDurability: 90,
+    maxDurability: 190,
     blockChance: 20 // Lower block chance but other benefits
   });
   
@@ -720,7 +720,7 @@ window.itemTemplates.javelinPack = window.createAmmunition({
       speed: -10,
       armorPenetration: 5
     },
-    maxDurability: 200,
+    maxDurability: 300,
     blockChance: 40, // High block chance
     requirements: {
       minPhy: 8
@@ -736,7 +736,7 @@ window.itemTemplates.javelinPack = window.createAmmunition({
     armorType: window.ARMOR_TYPES.MEDIUM,
     defense: 5,
     value: 30,
-    maxDurability: 85
+    maxDurability: 185
   });
   
   window.itemTemplates.legionArmor = window.createArmor({
@@ -747,7 +747,7 @@ window.itemTemplates.javelinPack = window.createAmmunition({
     armorType: window.ARMOR_TYPES.MEDIUM,
     defense: 12,
     value: 75,
-    maxDurability: 100
+    maxDurability: 200
   });
   
   window.itemTemplates.cavalryArmor = window.createArmor({
@@ -767,7 +767,7 @@ window.itemTemplates.javelinPack = window.createAmmunition({
     requirements: {
       minPhy: 1
     },
-    maxDurability: 145
+    maxDurability: 345
   });
   
   window.itemTemplates.scoutArmor = window.createArmor({
@@ -783,7 +783,7 @@ window.itemTemplates.javelinPack = window.createAmmunition({
       speed: 10,
       stealth: 15
     },
-    maxDurability: 80
+    maxDurability: 180
   });
   
   // NEW: Heavy armor option
@@ -824,7 +824,7 @@ window.itemTemplates.javelinPack = window.createAmmunition({
     requirements: {
       minPhy: 6
     },
-    maxDurability: 180
+    maxDurability: 280
   });
   
   // ACCESSORIES

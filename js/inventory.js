@@ -629,7 +629,7 @@ window.addStartingItems = function() {
             speed: -5,
             critChance: 10
           },
-          maxDurability: 80
+          maxDurability: 180
         });
         window.addItemToInventory(window.itemTemplates.basicAxe);
       }
@@ -684,7 +684,7 @@ window.addStartingItems = function() {
             speed: 0,
             critChance: 7
           },
-          maxDurability: 85
+          maxDurability: 185
         });
       }
       

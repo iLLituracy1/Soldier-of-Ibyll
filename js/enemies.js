@@ -10,11 +10,11 @@
 window.ENEMY_TEMPLATES = {
   ARRASI_VAELGORR: {
     name: "Arrasi Vaelgorr",
-    description: "Chainmail wearing warriors who skirmish the enemy before a charge and fill in the shield wall. Known to use axes and shields, and carry several javelins or throwing spears.",
+    description: "Chainmail wearing warriors who skirmish the enemy before a charge and fill in the shield wall. Known to use spears and shields, and carry several javelins or throwing spears.",
     health: 90,
     maxHealth: 90,
     experienceValue: 20,
-    lootTable: ["legionShield", "rations"],
+    lootTable: ["legionShield", "rations", "repair_kit"],
     lootChance: 0.3,
     
     // Combat attributes
@@ -33,7 +33,7 @@ window.ENEMY_TEMPLATES = {
     weaponRange: 2, // Can attack at medium range with thrown weapons
     
     // Equipment reference (for narrative purposes)
-    weapon: "War Axe and Javelin",
+    weapon: "Thrusting Spear, Javelins",
     armor: "Chainmail and Shield",
     ammunition: {
       javelin: {
@@ -70,7 +70,7 @@ window.ENEMY_TEMPLATES = {
     weaponRange: 1,
     
     // Equipment reference
-    weapon: "Military Sword",
+    weapon: "Paanic Military Sword",
     armor: "Legion Armor",
     ammunition: {
       javelin: {
@@ -88,7 +88,7 @@ window.ENEMY_TEMPLATES = {
     health: 140,
     maxHealth: 140,
     experienceValue: 35,
-    lootTable: ["royalGreatsword", "staminaPotion"],
+    lootTable: ["royalGreatsword", "staminaPotion", "health_potion", "repair_kit"],
     lootChance: 0.35,
     
     // Combat attributes
@@ -103,10 +103,10 @@ window.ENEMY_TEMPLATES = {
     // Preferred tactics
     preferredDistance: 1,
     preferredStance: "aggressive",
-    weaponRange: 1,
+    weaponRange: 2,
     
     // Equipment reference
     weapon: "Massive Hewing Sword",
-    armor: "Heavy Plate"
+    armor: "Druskari Plate"
   }
 };

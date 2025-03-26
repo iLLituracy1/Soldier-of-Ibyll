@@ -649,150 +649,155 @@ window.combatUI = {
         }
       }
 
-      
-      // Add these rules to your styleElement.textContent in applyStyles
-.combat-header-flex {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  margin-bottom: 10px;
-}
+    .combat-header-flex {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-bottom: 10px;
+    }
 
-.player-container {
-  width: 48%;
-  background: rgba(0,0,0,0.2);
-  border-radius: 4px;
-  padding: 8px;
-  margin-bottom: 10px;
-}
+    .player-container {
+      width: 48%;
+      background: rgba(0,0,0,0.2);
+      border-radius: 4px;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
 
-.enemy-container {
-  width: 48%;
-  display: flex;
-  flex-direction: column;
-}
+    .enemy-container {
+      width: 48%;
+      display: flex;
+      flex-direction: column;
+    }
 
-.ally-container {
-  width: 48%;
-  margin-top: 10px;
-  clear: left;
-}
+    .ally-container {
+      width: 48%;
+      margin-top: 10px;
+      clear: left;
+    }
 
-/* Hide the duplicate display that was at the top */
-.primary-hp-display {
-  display: none;
-}
 
-// Add these styles to the styleElement.textContent in the applyStyles function in combatUI.js
-// Insert after the existing styles but before the closing backtick
-.enemy-info-btn {
+  .primary-hp-display {
+    display: none;
+  }
+
+  .enemy-info-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 20px;
+    height: 20px;
+    background: #c9aa71;
+    border: none;
+    border-radius: 50%;
+    color: #1a1a1a;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2;
+  }
+
+  .enemy-info-btn:hover {
+    background: #e0be82;
+  }
+
+  .enemy-stats-window {
   position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 20px;
-  height: 20px;
-  background: #c9aa71;
-  border: none;
-  border-radius: 50%;
-  color: #1a1a1a;
-  font-size: 12px;
-  font-weight: bold;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2;
-}
-
-.enemy-info-btn:hover {
-  background: #e0be82;
-}
-
-.enemy-stats-modal {
-  position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 90%;
+  width: 80%;
   max-width: 350px;
-  background: #1a1a1a;
+  max-height: 80%;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.9); /* Darker, slightly transparent background */
   border: 2px solid #c9aa71;
   border-radius: 8px;
   padding: 15px;
-  z-index: 2001;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  box-shadow: 0 0 30px rgba(201, 170, 113, 0.4); /* Golden glow similar to conclusion modal */
   color: #e0e0e0;
 }
 
-.enemy-stats-header {
-  border-bottom: 1px solid #c9aa71;
-  padding-bottom: 10px;
-  margin-bottom: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.enemy-stats-title {
-  font-size: 1.2em;
-  color: #c9aa71;
-  margin: 0;
-}
-
-.enemy-stats-close {
-  background: none;
-  border: none;
-  color: #c9aa71;
-  font-size: 1.5em;
-  cursor: pointer;
-  line-height: 1;
-}
-
-.enemy-stats-body {
-  font-size: 0.9em;
-}
-
-.enemy-stats-description {
-  font-style: italic;
-  margin-bottom: 15px;
-  color: #aaa;
-}
-
-.enemy-stats-section {
-  margin-bottom: 10px;
-}
-
-.enemy-stats-section-title {
-  font-weight: bold;
-  color: #c9aa71;
-  margin-bottom: 5px;
-}
-
-.enemy-stats-attr {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 3px;
-}
-
-.enemy-stats-attr-label {
-  color: #aaa;
-}
 
 .enemy-stats-overlay {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.7);
-  z-index: 2000;
+  background: rgba(0, 0, 0, 0.5); /* Semi-transparent black overlay */
+  z-index: 99; /* Just below the stats window */
 }
 
-/* Make combat-health-container position relative for absolute positioning */
-.combat-health-container {
-  position: relative;
+  /* Enhance the header */
+.enemy-stats-header {
+  border-bottom: 2px solid #c9aa71; /* Thicker border */
+  padding-bottom: 12px;
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(to right, rgba(201, 170, 113, 0.3), transparent); /* Gradient background */
+  margin: -15px -15px 15px -15px; /* Extend to edges */
+  padding: 15px;
+  border-radius: 6px 6px 0 0;
 }
+
+  .enemy-stats-title {
+  font-size: 1.4em;
+  color: #c9aa71;
+  margin: 0;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7); /* Text shadow for depth */
+}
+
+  .enemy-stats-close {
+    background: none;
+    border: none;
+    color: #c9aa71;
+    font-size: 1.5em;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .enemy-stats-body {
+    font-size: 0.9em;
+  }
+
+  .enemy-stats-description {
+    font-style: italic;
+    margin-bottom: 15px;
+    color: #aaa;
+  }
+
+  /* Enhance the section styles */
+.enemy-stats-section {
+  margin-bottom: 15px;
+  background: rgba(40, 40, 40, 0.6); /* Slightly lighter background for sections */
+  border-radius: 4px;
+  padding: 10px;
+  border-left: 3px solid #c9aa71;
+}
+
+  .enemy-stats-section-title {
+    font-weight: bold;
+    color: #c9aa71;
+    margin-bottom: 5px;
+  }
+
+  .enemy-stats-attr {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+  }
+
+  .enemy-stats-attr-label {
+    color: #aaa;
+  }
     `;
     
     document.head.appendChild(styleElement);
@@ -1284,14 +1289,6 @@ updateTurnCounter: function() {
         </div>
       </div>
       
-      <!-- Enemy stance -->
-      <div class="combat-status-item">
-        <div class="status-label">Enemy Stance</div>
-        <div class="stance-indicator stance-${window.combatSystem.state.enemyStance}">
-          ${window.combatSystem.state.enemyStance.charAt(0).toUpperCase() + window.combatSystem.state.enemyStance.slice(1)}
-        </div>
-      </div>
-      
       <!-- Target area -->
       <div class="combat-status-item">
         <div class="status-label">Target</div>
@@ -1403,39 +1400,58 @@ updateTurnCounter: function() {
     combatLog.scrollTop = combatLog.scrollHeight;
   },
 
-  // Add this function to the combatUI object in combatUI.js
-// Add it before the closing brace of the window.combatUI object
 
 // Show enemy stats in a modal
+
 showEnemyStats: function(enemy) {
-  // Create overlay
-  const overlay = document.createElement('div');
-  overlay.className = 'enemy-stats-overlay';
-  document.body.appendChild(overlay);
+    // Get combat modal container
+    const combatModalContainer = document.querySelector('.combat-modal');
   
-  // Create modal
-  const modal = document.createElement('div');
-  modal.className = 'enemy-stats-modal';
-  
-  // Create header
-  const header = document.createElement('div');
-  header.className = 'enemy-stats-header';
-  
-  const title = document.createElement('h3');
-  title.className = 'enemy-stats-title';
-  title.textContent = enemy.name;
-  header.appendChild(title);
-  
-  const closeBtn = document.createElement('button');
-  closeBtn.className = 'enemy-stats-close';
-  closeBtn.innerHTML = '&times;';
-  closeBtn.addEventListener('click', () => {
-    document.body.removeChild(overlay);
-    document.body.removeChild(modal);
-  });
-  header.appendChild(closeBtn);
-  
-  modal.appendChild(header);
+    // Check if an enemy stats modal already exists and remove it
+    const existingModal = document.getElementById('enemy-stats-window');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
+    // Check if overlay exists and remove it
+    const existingOverlay = document.getElementById('enemy-stats-overlay');
+    if (existingOverlay) {
+      existingOverlay.remove();
+    }
+    
+    // Create overlay first
+    const overlay = document.createElement('div');
+    overlay.id = 'enemy-stats-overlay';
+    overlay.className = 'enemy-stats-overlay';
+    overlay.addEventListener('click', () => {
+      overlay.remove();
+      modal.remove();
+    });
+    
+    // Create modal window
+    const modal = document.createElement('div');
+    modal.id = 'enemy-stats-window';
+    modal.className = 'enemy-stats-window';
+    
+    // Create header with decorative elements
+    const header = document.createElement('div');
+    header.className = 'enemy-stats-header';
+    
+    const title = document.createElement('h3');
+    title.className = 'enemy-stats-title';
+    title.textContent = enemy.name;
+    header.appendChild(title);
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'enemy-stats-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.addEventListener('click', () => {
+      overlay.remove();
+      modal.remove();
+    });
+    header.appendChild(closeBtn);
+    
+    modal.appendChild(header);
   
   // Create body
   const body = document.createElement('div');
@@ -1567,14 +1583,9 @@ showEnemyStats: function(enemy) {
   
   modal.appendChild(body);
   
-  // Add modal to the body
-  document.body.appendChild(modal);
-  
-  // Add click event to overlay to close the modal
-  overlay.addEventListener('click', () => {
-    document.body.removeChild(overlay);
-    document.body.removeChild(modal);
-  });
+  // Append the modal to the combat modal container instead of body
+  combatModalContainer.appendChild(overlay);
+  combatModalContainer.appendChild(modal);
 },
 };
 
