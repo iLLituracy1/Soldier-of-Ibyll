@@ -73,27 +73,82 @@ window.questTemplates = {
           
           <p>Your trio holds position while you take turns crawling forward to a better vantage point. From here, you can see movement within the compound - perhaps fifteen to twenty soldiers moving with the casual confidence of men who don't expect trouble.</p>
           
-          <p>As you're about to retreat and report your findings, you hear voices approaching. An Arrasi patrol is coming your way, following a path that will take them directly past your position!</p>`,
-        nextStage: 'stage_ambush'
+          <p>As you're about to retreat and report your findings, your instincts warn you of potential danger nearby...</p>`,
+        
+        // Add a stat check for spotting the patrol
+        statCheck: {
+          type: 'skill',
+          stat: 'survival',
+          attribute: 'men', // Add mental attribute to survival skill
+          difficulty: 15,
+          successText: `<p>Your heightened senses and training alert you to subtle signs - disturbed vegetation, a faint metallic glint in the distance. You signal your companions to freeze as you scan the area more carefully.</p>
+            
+            <p>Through the brush, you spot an Arrasi patrol of four soldiers moving along a path that will take them directly past your position. They haven't noticed you yet.</p>`,
+          failureText: `<p>Despite your best efforts, you fail to notice the approaching patrol until it's almost too late. The sound of voices and boots on gravel alerts you to their presence.</p>
+            
+            <p>An Arrasi patrol of four soldiers is heading directly toward your position, and they're close - too close to retreat without being seen.</p>`
+        },  // Define different outcomes based on the check
+        outcomes: {
+          success: {
+            nextStage: 'stage_ambush_advantage', // New stage for successful detection
+            narrativeAddition: `<p>With enough warning, you and your companions have time to prepare an ambush. You quickly find concealed positions and ready your weapons, waiting for the perfect moment to strike.</p>`,
+            rewards: {
+              experience: 15,
+              skillImprovements: {
+                survival: 0.1
+              }
+            }
+          },
+          failure: {
+            nextStage: 'stage_ambush', // Original stage where you face two enemies
+            narrativeAddition: `<p>With no time to prepare, you and your companions must face the patrol at a disadvantage. You huddle lower, hoping to at least gain the element of surprise as they pass by.</p>`,
+            penalties: {
+              stamina: -10
+            }
+          }
+        }
       },
-      {
-        id: 'stage_ambush',
-        description: 'While scouting, you encounter an Arrasi patrol. The element of surprise is compromised.',
-        objective: 'Deal with the patrol.',
-        action: 'combat',
-        battleType: 'individual',
-        enemyType: ["ARRASI_VAELGORR", "ARRASI_VAELGORR"],
-        combatOptions: {
-          requireDefeat: true 
-        },
+     // Add a new stage for the advantage path
+{
+  id: 'stage_ambush_advantage',
+  description: 'Having spotted the patrol early, you prepare an effective ambush.',
+  objective: 'Ambush the Arrasi patrol from an advantageous position.',
+  action: 'combat',
+  battleType: 'individual',
+  enemyType: "ARRASI_VAELGORR", // Only one enemy instead of two
+  combatOptions: {
+    requireDefeat: true
+  },
+  narrative: `<p>From your concealed positions, you and your companions watch as the Arrasi patrol approaches. The soldiers move with the casual confidence of men on routine duty, completely unaware of the danger.</p>
+    
+    <p>You signal to your companions, coordinating your attack for maximum effect. As the patrol passes by, your companions strike from the sides, quickly eliminating three of the Arrasi soldiers before they can react.</p>
+    
+    <p>The remaining soldier - a more alert guard at the rear of the patrol - manages to draw his weapon as he realizes what's happening. He turns to face you, his eyes wide with the sudden understanding that he is alone.</p>`,
+  successText: "With the advantage of your well-executed ambush, you dispatch the final Arrasi soldier before he can raise an alarm. The patrol has been eliminated with impressive efficiency.",
+  failureText: "Despite your advantageous position, the remaining Arrasi soldier proves more skilled than anticipated. You lay in the dirt, listening to your comrades fighting as your consciousness fades away.",
+  nextStage: 'stage_patrol_report'
+},
 
-        narrative: `<p>Your scouting party exchanges urgent signals as the patrol approaches. There are four Arrasi soldiers - too many to let pass, too many to ambush without risk of raising the alarm.</p>
-          
-          <p>You ready your weapons as the patrol draws closer, hearts pounding, knowing that the success of the entire mission now hinges on silencing these men quickly and quietly...</p>`,
-        successText: "The last Arrasi soldier falls, and your scouting party quickly drags the bodies into the underbrush. The three of you need to report back to the Sarkein quickly.",
-        failureText: "You find yourself overwhelmed by the Arrasi patrol. As consciousness fades, you hear shouts of alarm being raised.",
-        nextStage: 'stage_patrol_report'
-      },
+// Original ambush stage remains (for the failure path)
+{
+  id: 'stage_ambush',
+  description: 'While scouting, you encounter an Arrasi patrol. The element of surprise is compromised.',
+  objective: 'Deal with the patrol.',
+  action: 'combat',
+  battleType: 'individual',
+  enemyType: ["ARRASI_VAELGORR", "ARRASI_VAELGORR"],
+  combatOptions: {
+    requireDefeat: true 
+  },
+  narrative: `<p>Your scouting party exchanges urgent signals as the patrol approaches. There are four Arrasi soldiers - too many to let pass, too many to ambush without risk of raising the alarm.</p>
+    
+    <p>Without the advantage of preparation, you must face multiple opponents at once. You ready your weapons as the patrol draws closer, hearts pounding, knowing that the success of the entire mission now hinges on silencing these men quickly.</p>
+    
+    <p>Two of the Arrasi soldiers notice your movement and call out an alarm. The element of surprise is lost as they draw their weapons and charge toward your position!</p>`,
+  successText: "The last Arrasi soldier falls, and your scouting party quickly drags the bodies into the underbrush. The three of you need to report back to the Sarkein quickly.",
+  failureText: "You find yourself overwhelmed by the Arrasi patrol. As consciousness fades, you hear shouts of alarm being raised.",
+  nextStage: 'stage_patrol_report'
+},
       {
         id: 'stage_patrol_report',
         description: 'Having eliminated the patrol, you must report back to the main force.',

@@ -238,6 +238,133 @@ window.handleQuestStageAction = function(quest, stage) {
   }
 };
 
+// Function to perform a stat check
+function performStatCheck(statCheck) {
+  let statValue = 0;
+  let description = "";
+  
+  // Get the appropriate stat value based on the check type
+  if (statCheck.type === 'attribute') {
+    // Check an attribute (phy or men)
+    statValue = window.player[statCheck.stat] || 0;
+    description = `${statCheck.stat.toUpperCase()} check`;
+  } else if (statCheck.type === 'skill') {
+    // Check a skill
+    statValue = window.player.skills[statCheck.stat] || 0;
+    description = `${statCheck.stat} check`;
+    
+    // If an attribute is specified, add it to the check
+    // This allows for checks like "mental + survival"
+    if (statCheck.attribute) {
+      statValue += window.player[statCheck.attribute] || 0;
+      description = `${statCheck.attribute.toUpperCase()} + ${statCheck.stat} check`;
+    }
+  } else if (statCheck.type === 'combined') {
+    // Combined check that adds multiple skills and/or attributes
+    statValue = 0;
+    let checkParts = [];
+    
+    if (statCheck.attributes) {
+      statCheck.attributes.forEach(attr => {
+        statValue += window.player[attr] || 0;
+        checkParts.push(attr.toUpperCase());
+      });
+    }
+    
+    if (statCheck.skills) {
+      statCheck.skills.forEach(skill => {
+        statValue += window.player.skills[skill] || 0;
+        checkParts.push(skill);
+      });
+    }
+    
+    description = checkParts.join(' + ') + ' check';
+  }
+  
+  // Generate a random modifier for some randomness in the check
+  const randomFactor = Math.random() * 5; // 0-5 random bonus
+  
+  // Compare the stat value against the difficulty
+  const checkTotal = statValue + randomFactor;
+  const success = checkTotal >= statCheck.difficulty;
+  
+  // Log the check details for debugging
+  console.log(`Stat check: ${description} (value: ${statValue.toFixed(1)}) + random(${randomFactor.toFixed(1)}) = ${checkTotal.toFixed(1)} vs difficulty ${statCheck.difficulty} - ${success ? 'SUCCESS' : 'FAILURE'}`);
+  
+  // Show notification to the player about the check
+  window.showNotification(`${description} (DC ${statCheck.difficulty}): ${success ? 'Success!' : 'Failed!'}`, success ? 'success' : 'warning');
+  
+  // Return the check result and the values for potential use
+  return {
+    success: success,
+    statValue: statValue,
+    randomFactor: randomFactor,
+    total: checkTotal,
+    difficulty: statCheck.difficulty,
+    description: description
+  };
+};
+
+// Function to apply rewards from a successful outcome
+function applyOutcomeRewards(rewards) {
+  if (rewards.experience) {
+    window.gameState.experience += rewards.experience;
+    window.showNotification(`+${rewards.experience} XP for successful check`, 'success');
+  }
+  
+  if (rewards.taelors) {
+    window.player.taelors += rewards.taelors;
+    window.showNotification(`+${rewards.taelors} taelors for successful check`, 'success');
+  }
+  
+  if (rewards.health) {
+    window.gameState.health = Math.min(window.gameState.maxHealth, window.gameState.health + rewards.health);
+    window.showNotification(`+${rewards.health} health for successful check`, 'success');
+  }
+  
+  if (rewards.stamina) {
+    window.gameState.stamina = Math.min(window.gameState.maxStamina, window.gameState.stamina + rewards.stamina);
+    window.showNotification(`+${rewards.stamina} stamina for successful check`, 'success');
+  }
+  
+  // Handle skill improvements
+  if (rewards.skillImprovements) {
+    for (const [skill, value] of Object.entries(rewards.skillImprovements)) {
+      if (window.player.skills[skill] !== undefined) {
+        window.player.skills[skill] += value;
+        window.showNotification(`+${value} to ${skill} skill for successful check`, 'success');
+      }
+    }
+  }
+  
+  // Update UI
+  window.updateStatusBars();
+  window.updateProfileIfVisible();
+};
+
+// Function to apply penalties from a failed outcome
+function applyOutcomePenalties(penalties) {
+  if (penalties.health) {
+    window.gameState.health = Math.max(0, window.gameState.health + penalties.health); // penalties should be negative
+    window.showNotification(`${penalties.health} health from failed check`, 'warning');
+  }
+  
+  if (penalties.stamina) {
+    window.gameState.stamina = Math.max(0, window.gameState.stamina + penalties.stamina); // penalties should be negative
+    window.showNotification(`${penalties.stamina} stamina from failed check`, 'warning');
+  }
+  
+  if (penalties.morale) {
+    window.gameState.morale = Math.max(0, window.gameState.morale + penalties.morale);
+    window.showNotification(`${penalties.morale} morale from failed check`, 'warning');
+  }
+  
+  // Update UI
+  window.updateStatusBars();
+  window.updateProfileIfVisible();
+};
+
+
 // Progress a quest to the next stage
 window.progressQuest = function(questId, action) {
   console.log(`Progressing quest ${questId} with action ${action}`);
@@ -263,8 +390,77 @@ window.progressQuest = function(questId, action) {
   // Clear awaiting response flag - player has responded to the quest
   window.gameState.awaitingQuestResponse = false;
   
-  // Advance to next stage if there is one
-  if (currentStage.nextStage) {
+  // CHECK FOR STAT CHECK AND BRANCHING PATHS
+  if (currentStage.statCheck && currentStage.outcomes) {
+    // Perform the stat check
+    const checkResult = performStatCheck(currentStage.statCheck);
+    
+    // Get the appropriate outcome based on check result
+    const outcome = checkResult.success ? currentStage.outcomes.success : currentStage.outcomes.failure;
+    
+    // Display appropriate narrative text based on the outcome
+    const narrativeText = checkResult.success ? 
+      currentStage.statCheck.successText || "You succeed!" :
+      currentStage.statCheck.failureText || "You fail.";
+    
+    window.addToNarrative(narrativeText);
+    
+    // If there's additional narrative for the outcome, add it
+    if (outcome.narrativeAddition) {
+      window.addToNarrative(outcome.narrativeAddition);
+    }
+    
+    // Apply rewards or penalties if defined
+    if (checkResult.success && outcome.rewards) {
+      applyOutcomeRewards(outcome.rewards);
+    } else if (!checkResult.success && outcome.penalties) {
+      applyOutcomePenalties(outcome.penalties);
+    }
+    
+    // Store the check result in quest userData for potential later use
+    if (!quest.userData) quest.userData = {};
+    quest.userData[`${currentStage.id}_check`] = checkResult;
+    
+    // Determine the next stage based on the outcome
+    const nextStageId = outcome.nextStage;
+    
+    if (nextStageId) {
+      const nextStageIndex = quest.stages.findIndex(s => s.id === nextStageId);
+      if (nextStageIndex !== -1) {
+        quest.currentStageIndex = nextStageIndex;
+        
+        // Show notification
+        window.showQuestNotification(quest, 'updated');
+        
+        // Update quest log if visible
+        window.renderQuestLog();
+        
+        // Update quest UI elements
+        if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
+          // Update progress steps
+          window.updateQuestProgressSteps(quest);
+          
+          // Update action buttons
+          window.updateQuestActionButtons(quest);
+          
+          // Update quest objective
+          const newCurrentStage = quest.stages[quest.currentStageIndex];
+          document.getElementById('questObjective').textContent = newCurrentStage.objective;
+        }
+        
+        // Handle the new stage
+        window.handleQuestStageAction(quest, quest.stages[quest.currentStageIndex]);
+        
+        console.log(`Advanced to branching stage: ${quest.stages[nextStageIndex].id}`);
+        
+        return true;
+      } else {
+        console.error(`Next stage "${nextStageId}" not found`);
+      }
+    }
+  }
+  // CONTINUE WITH ORIGINAL LINEAR PROGRESSION
+  else if (currentStage.nextStage) {
     const nextStageIndex = quest.stages.findIndex(s => s.id === currentStage.nextStage);
     if (nextStageIndex !== -1) {
       quest.currentStageIndex = nextStageIndex;
