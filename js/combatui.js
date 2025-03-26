@@ -46,6 +46,8 @@ window.combatUI = {
     #combatInterface {
       width: 90%;
       max-width: 800px;
+      max-height: 90vh;
+      ovrflow-y: auto;
       background: #1a1a1a;
       border: 2px solid #444;
       border-radius: 8px;
@@ -193,7 +195,8 @@ window.combatUI = {
       background: #1a1a1a;
       border: 1px solid #333;
       padding: 8px; /* Reduced padding */
-      height: 350px; /* Fixed height instead of max-height for more consistent display */
+      height: 25vh; 
+      max-height: 250px;
       overflow-y: auto;
       margin: 10px 0; /* Reduced margin */
       border-radius: 4px;
