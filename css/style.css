@@ -866,8 +866,8 @@ input[type="text"], input[type="number"] {
     "actions side-panel";
   gap: 15px;
   height: 100vh;
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: 100%; /* Change from 1200px to 100% */
+  margin: 0;       /* Remove auto margins */
   padding: 20px;
 }
 
@@ -934,11 +934,9 @@ input[type="text"], input[type="number"] {
   border-radius: 6px;
 }
 
+/* In css/style.css */
 .quest-progress {
-  background: #1e293b;
-  padding: 15px;
-  border-radius: 6px;
-  flex-grow: 1;
+  display: none; /* Hide the entire quest progress section */
 }
 
 .quest-progress-track {
