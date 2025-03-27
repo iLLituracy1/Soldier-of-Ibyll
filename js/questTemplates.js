@@ -121,7 +121,7 @@ window.questTemplates = {
             nextStage: 'stage_ambush_advantage', // New stage for successful detection
             narrativeAddition: `<p>With enough warning, you and your companions have time to prepare an ambush. You quickly find concealed positions and ready your weapons, waiting for the perfect moment to strike.</p>`,
             rewards: {
-              experience: 15,
+              deeds: 1,
               skillImprovements: {
                 survival: 0.1
               }
@@ -237,7 +237,7 @@ window.questTemplates = {
 
     ],
     baseReward: {
-      experience: 100,
+      deeds: 100,
       taelors: 150,
       items: ['health_Potion', 'arrasi_blade', 'arrasi_pendant',]
     },

@@ -133,7 +133,7 @@ window.addActionButton = function(label, action, container) {
 };
 
 // Function to handle profile panel display
-// Updated handleProfile function with fixed sizing
+// Updated handleProfile function with rank display
 window.handleProfile = function() {
   const profileDiv = document.getElementById('profile');
   const profileText = document.getElementById('profileText');
@@ -177,6 +177,10 @@ window.handleProfile = function() {
     originColor = "#99cc66"; // Green
   }
   
+  // Get rank information
+  const currentRank = window.getCurrentRank ? window.getCurrentRank() : { title: 'Sai\'Lun', description: 'Recruit' };
+  const nextRank = window.getNextRank ? window.getNextRank() : null;
+  
   // Create the modern profile UI - simplified for better fit
   profileText.innerHTML = `
     <div class="profile-container">
@@ -192,13 +196,15 @@ window.handleProfile = function() {
           <h2>${window.player.name}</h2>
           <div class="profile-subtitle">${origin} ${career}</div>
           
-          <div class="profile-stats">
-            <div class="stat-pill">Level ${window.gameState.level}</div>
-            <div class="stat-pill">XP: ${window.gameState.experience}/${window.gameState.level * 100}</div>
-            <div class="stat-pill">Skill Points: ${window.gameState.skillPoints}</div>
-          </div>
-        </div>
-      </div>
+              <div class="profile-rank">
+      <span>${currentRank.title}</span> 
+      <small>(${currentRank.description})</small>
+    </div>
+
+    <div class="profile-stats">
+      <div class="stat-pill">Commendations: ${window.gameState.commendations}</div>
+      <div class="stat-pill">Deeds: ${window.gameState.deeds}${nextRank ? '/' + nextRank.deedsRequired : ''}</div>
+    </div>
       
       <div class="profile-attributes">
         <div class="attribute-box">

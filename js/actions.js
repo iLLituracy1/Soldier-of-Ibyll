@@ -77,6 +77,14 @@ window.handleAction = function(action) {
     window.updateActionButtons();
     return;
   }
+
+  if (action === 'feats') {
+    // Show feats panel
+    if (typeof window.showFeatsPanel === 'function') {
+      window.showFeatsPanel();
+    }
+    return;
+  }
   
   // Game actions that advance time
   if (action === 'rest') {
@@ -146,7 +154,7 @@ window.handleAction = function(action) {
     window.setNarrative(patrolText); // Use setNarrative instead of addToNarrative
 
     // Chance of combat during patrol
-    if (Math.random() < .99 ) { // 30% chance of combat
+    if (Math.random() < .05 ) { // 5% chance of combat
       window.addToNarrative("During your patrol, you encounter a hostile figure...");
       
       // Determine enemy type based on location/level
@@ -161,7 +169,7 @@ window.handleAction = function(action) {
     // Update game state
     window.gameState.stamina = Math.max(0, window.gameState.stamina - 25);
     window.gameState.dailyPatrolDone = true;
-    window.gameState.experience += 10;
+  
     
     // Small chance to improve survival skill
     const survivalImprovement = parseFloat((Math.random() * 0.03 + 0.02).toFixed(2));
@@ -187,7 +195,7 @@ window.handleAction = function(action) {
     window.updateTimeAndDay(120); // 2 hours
     
     // Show notification
-    window.showNotification("Patrol complete! +10 XP", 'success');
+    window.showNotification("Patrol complete!", 'success');
 
   } else if (action === 'mess') {
     // Mess hall action
@@ -235,7 +243,7 @@ window.handleAction = function(action) {
     
     // Update game state
     window.gameState.stamina = Math.max(0, window.gameState.stamina - 20);
-    window.gameState.experience += 8;
+ 
     
     // Chance to improve discipline or tactics skill
     const skillImprovement = parseFloat((Math.random() * 0.04 + 0.06).toFixed(2));
@@ -257,7 +265,7 @@ window.handleAction = function(action) {
     window.updateTimeAndDay(180); // 3 hours
     
     // Show notification
-    window.showNotification("Guard duty complete! +8 XP", 'success');
+    window.showNotification("Guard duty complete!", 'success');
   }
   
   // Check for level up after actions
@@ -298,7 +306,6 @@ window.handleTraining = function(trainingType) {
   
   // Get appropriate training text and stat improvements based on type
   let trainingText = "";
-  let experienceGain = 5;
   let staminaLoss = 20;
   let skillImprovements = [];
   
@@ -558,7 +565,7 @@ const largeImprovement = Number(Math.max(0.05, Math.random() * 0.05 + 0.10)); //
         skillImprovements.push(`Discipline +${actualImprovement.toFixed(2)}`);
       }
       
-      experienceGain = 7; // Extra XP for team exercises
+    
       break;
   }
   
@@ -575,7 +582,7 @@ const largeImprovement = Number(Math.max(0.05, Math.random() * 0.05 + 0.10)); //
   window.gameState.stamina = Math.max(0, window.gameState.stamina - staminaLoss);
   window.gameState.trainingProgress += 1;
   window.gameState.dailyTrainingCount += 1;
-  window.gameState.experience += experienceGain;
+ 
   
   // Show skill improvement notifications if applicable
   if (skillImprovements.length > 0) {
@@ -592,7 +599,7 @@ const largeImprovement = Number(Math.max(0.05, Math.random() * 0.05 + 0.10)); //
   window.updateTimeAndDay(60); // 1 hour for training
   
   // Show notification
-  window.showNotification(`Training complete! +${experienceGain} XP`, 'success');
+  window.showNotification("Training complete!", 'success');
   
   // Go back to main actions
   window.updateActionButtons();
@@ -863,8 +870,7 @@ window.handleBrawl = function(action) {
     outcome = `You put up a good fight but ultimately lost the match. You take ${healthLoss} damage and lose ${staminaLoss} stamina, but gain respect for your courage.`;
     window.showNotification(`Lost the fight! -${healthLoss} health`, 'warning');
     
-    // Still gain some experience for trying
-    window.gameState.experience += 15;
+
   } else if (roll > winChance - 0.2) {
     // Win a regular match
     const staminaLoss = Math.floor(Math.random() * 10) + 10;
@@ -879,7 +885,7 @@ window.handleBrawl = function(action) {
     outcome = `You win the match after a tough fight! You take ${healthLoss} damage and lose ${staminaLoss} stamina, but earn ${taelorsWon} taelors and the respect of your fellow soldiers.`;
     window.showNotification(`Won the fight! +${taelorsWon} taelors`, 'success');
     
-    window.gameState.experience += 25;
+
     
     // Improve physical attribute (small chance)
     if (Math.random() < 0.2) {
@@ -924,7 +930,6 @@ window.handleBrawl = function(action) {
     outcome = `You deliver a spectacular performance, defeating your opponent with skill and precision! The crowd goes wild. You take minimal damage (${healthLoss}), lose ${staminaLoss} stamina, and earn a hefty prize of ${taelorsWon} taelors.`;
     window.showNotification(`Spectacular victory! +${taelorsWon} taelors`, 'success');
     
-    window.gameState.experience += 35;
     
     // Guaranteed physical attribute improvement
     const maxPhy = window.player.men > 0 ? Math.min(15, Math.ceil(window.player.men / 0.6)) : 15;

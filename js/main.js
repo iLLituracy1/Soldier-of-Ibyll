@@ -158,6 +158,12 @@ window.startGameAdventure = function() {
     console.log("Initializing ammunition system");
     window.initializeAmmunition();
   }
+
+    // Phase 5.5: Initialize feats system
+  if (window.initializeFeatsSystem) {
+    console.log("Initializing feats system");
+    window.initializeFeatsSystem();
+  }
   
   // Phase 6: Add and equip starting items
   if (window.addStartingItems) {
@@ -404,7 +410,7 @@ function proceedWithNormalPatrol() {
   // Update game state
   window.gameState.stamina = Math.max(0, window.gameState.stamina - 25);
   window.gameState.dailyPatrolDone = true;
-  window.gameState.experience += 10;
+
   
   // Small chance to improve survival skill
   const survivalImprovement = parseFloat((Math.random() * 0.03 + 0.02).toFixed(2));
@@ -428,7 +434,7 @@ function proceedWithNormalPatrol() {
   window.updateTimeAndDay(120); // 2 hours
   
   // Show notification
-  window.showNotification("Patrol complete! +10 XP", 'success');
+  window.showNotification("Patrol complete!", 'success');
 }
 
 // Action handler for mess hall
@@ -480,8 +486,7 @@ function handleGuardAction() {
   
   // Update game state
   window.gameState.stamina = Math.max(0, window.gameState.stamina - 20);
-  window.gameState.experience += 8;
-  
+
   // Chance to improve discipline or tactics skill
   const skillImprovement = parseFloat((Math.random() * 0.04 + 0.06).toFixed(2));
   const mentalSkillCap = Math.floor(window.player.men / 1.5);
@@ -502,7 +507,7 @@ function handleGuardAction() {
   window.updateTimeAndDay(180); // 3 hours
   
   // Show notification
-  window.showNotification("Guard duty complete! +8 XP", 'success');
+  window.showNotification("Guard duty complete!", 'success');
 }
 
 // ================= GAME INITIALIZATION BOOTSTRAP =================

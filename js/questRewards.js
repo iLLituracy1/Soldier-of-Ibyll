@@ -152,12 +152,24 @@ window.applyQuestRewards = function(quest) {
     items: []
   };
   
-  // Apply base experience
   if (rewardsToApply.experience) {
-    const expAmount = rewardsToApply.experience;
-    window.gameState.experience += expAmount;
-    rewardSummary.experience += expAmount;
-    console.log(`Added ${expAmount} experience`);
+    const deedsAmount = rewardsToApply.experience;
+    
+    // Use new feats system if available
+    if (typeof window.awardDeeds === 'function') {
+      window.awardDeeds(deedsAmount, window.DEEDS_SOURCES.QUEST, `Completed quest: ${quest.title}`);
+    } else {
+      // Fallback to old system
+      window.gameState.deeds += deedsAmount;
+    }
+    
+    // Track in reward summary (rename to deeds)
+    rewardSummary.deeds = (rewardSummary.deeds || 0) + deedsAmount;
+    
+    // Record quest feat
+    if (typeof window.recordQuestFeat === 'function') {
+      window.recordQuestFeat(quest.templateId, quest.title);
+    }
   }
   
   // Apply base currency
@@ -345,7 +357,7 @@ window.showQuestRewardScreen = function(quest, rewards) {
       <h3 class="quest-name">${quest.title}</h3>
       
       <div class="reward-summary">
-        ${rewards.experience > 0 ? `<div class="reward-item"><span class="reward-label">Experience:</span> <span class="reward-value">+${rewards.experience} XP</span></div>` : ''}
+        ${rewards.deeds > 0 ? `<div class="reward-item"><span class="reward-label">Deeds:</span> <span class="reward-value">+${rewards.deeds}</span></div>` : ''}
         ${rewards.taelors > 0 ? `<div class="reward-item"><span class="reward-label">Taelors:</span> <span class="reward-value">+${rewards.taelors}</span></div>` : ''}
         
         ${rewards.items.length > 0 ? `

@@ -512,8 +512,7 @@ shouldEndCombatWithVictory: function() {
   endCombatEarly: function() {
     // Create narrative about the battle shifting
     const narrativeText = [
-      "The battle shifts! Reinforcements arrive on both sides, forcing your engagement to end as the larger conflict swallows your skirmish.",
-      "You disengage from your opponents, regrouping with your allies as the battlefield churns with fresh combatants."
+      "The battle shifts, forcing your engagement to end as the larger conflict swallows your skirmish!",
     ];
     
     // Add messages to combat log
@@ -2438,23 +2437,36 @@ spawnNextWave: function() {
         "You stand victorious, your weapons slick with the blood of your foes."
       ];
       
-      let totalExp = 0;
+      let totalDeeds = 0;
       
-      // Calculate total experience from all enemies
-      this.state.enemies.forEach(enemy => {
-        if (enemy.health <= 0) {
-          totalExp += enemy.experienceValue || 10;
-        } else {
-          // Partial XP for damaged enemies
-          const damagePercent = (enemy.maxHealth - enemy.health) / enemy.maxHealth;
-          totalExp += Math.floor((enemy.experienceValue || 10) * damagePercent * 0.5);
-        }
-      });
+        // Calculate total deeds from all enemies
+  this.state.enemies.forEach(enemy => {
+    if (enemy.health <= 0) {
+      // Record combat feat for each defeated enemy
+      if (typeof window.recordCombatFeat === 'function') {
+        window.recordCombatFeat(enemy.name);
+      }
       
-      window.gameState.experience += totalExp;
-      
-      // Add experience gain to narrative
-      narrativeText.push(`You've earned ${totalExp} experience from this encounter.`);
+      // Award deeds based on enemy type (experienceValue becomes deed value)
+      totalDeeds += enemy.experienceValue || 10;
+    } else {
+      // Partial deeds for damaged enemies
+      const damagePercent = (enemy.maxHealth - enemy.health) / enemy.maxHealth;
+      totalDeeds += Math.floor((enemy.experienceValue || 10) * damagePercent * 0.5);
+    }
+  });
+  
+  // Award deeds instead of experience
+  if (typeof window.awardDeeds === 'function') {
+    window.awardDeeds(totalDeeds, window.DEEDS_SOURCES.COMBAT, `Defeated ${this.state.enemies.length} enemies`);
+  } else {
+    // Fallback to old system if feats system isn't loaded
+    window.gameState.deeds += totalDeeds;
+  }
+  
+  // Add deeds gain to narrative
+  narrativeText.push(`You've earned ${totalDeeds} deeds from this encounter.`);
+
       
       // Generate loot from all defeated enemies
       const lootMessage = this.generateLootFromAll();
@@ -2467,24 +2479,6 @@ spawnNextWave: function() {
         window.gameState.combatVictoryAchieved = true;
         window.showAchievement('first_blood');
       }
-      
-      // Slightly damage player's armor during combat
-      this.applyArmorDurabilityDamage();
-    } else if (outcome === "draw") {
-      // Combat ended early (turn limit) - narrative is handled in endCombatEarly
-      let partialExp = 0;
-      
-      // Calculate partial experience based on damage dealt to enemies
-      this.state.enemies.forEach(enemy => {
-        const damageDealt = enemy.maxHealth - enemy.health;
-        const percentDamage = damageDealt / enemy.maxHealth;
-        partialExp += Math.floor((enemy.experienceValue || 10) * percentDamage * 0.5);
-      });
-      
-      window.gameState.experience += partialExp;
-      
-      // Add to the narrative
-      narrativeText.push(`You earned ${partialExp} experience for your efforts before the battle shifted.`);
       
       // Minor armor durability damage
       this.applyArmorDurabilityDamage(0.75);
@@ -2529,7 +2523,7 @@ spawnNextWave: function() {
       
       // Show notification based on outcome
       if (outcome === true) {
-        window.showNotification(`Victory! +${totalExp} XP`, 'success');
+        window.showNotification(`Victory!`, 'success');
       } else if (outcome === "draw") {
         window.showNotification(`Combat ended in a draw.`, 'info');
       } else if (outcome === "retreat") {

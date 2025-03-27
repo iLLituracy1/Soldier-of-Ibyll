@@ -8,8 +8,10 @@ window.gameDay = 1;
 // Game state object
 window.gameState = {
   // Character progression 
-  experience: 0,
-  level: 1,
+  deeds: 0,                     // Renamed from experience
+  commendations: 0,             // New property for tracking rank achievements
+  rankIndex: 0,                 // Index into RANKS array
+  level: 1,                     // Keep level for backward compatibility
   skillPoints: 0,
   health: 100,
   maxHealth: 100,
@@ -50,29 +52,10 @@ window.gameState = {
   
   // Discovered locations
   discoveredBrawlerPits: false,
-  discoveredGamblingTent: false
-};
-
-// Global player state
-window.player = {
-  origin: null,
-  career: null,
-  name: "",
-  phy: 0,
-  men: 0,
-  skills: {
-    melee: 0,
-    marksmanship: 0,
-    survival: 0,
-    command: 0,
-    discipline: 0,
-    tactics: 0,
-    organization: 0,
-    arcana: 0
-  },
-  inventory: [],
-  taelors: 25, // Changed from coins to taelors
-  events: []
+  discoveredGamblingTent: false,
+  
+  // Feats system storage
+  feats: null // Will be initialized by featsSystem.js
 };
 
 // Initialize game state function
@@ -97,13 +80,18 @@ window.initializeGameState = function() {
 
 // Function to check for level up
 window.checkLevelUp = function() {
-  // Experience required for next level = current level * 100
+  // Use the new commendation system if available
+  if (typeof window.checkCommendation === 'function') {
+    return window.checkCommendation();
+  }
+  
+  // Fallback legacy code if featsSystem is not loaded
   const requiredExp = window.gameState.level * 100;
   
-  if (window.gameState.experience >= requiredExp) {
+  if (window.gameState.deeds >= requiredExp) {
     // Level up!
     window.gameState.level++;
-    window.gameState.experience -= requiredExp;
+    window.gameState.deeds -= requiredExp;
     window.gameState.skillPoints += 1;
     
     // Increase max health and stamina
@@ -121,7 +109,7 @@ window.checkLevelUp = function() {
     window.showNotification(`Level up! You are now level ${window.gameState.level}!`, 'level-up');
     
     // Check for veteran achievement
-    if (window.achievements && window.gameState.level >= 5 && !window.achievements.find(a => a.id === 'veteran').unlocked) {
+    if (window.achievements && window.gameState.level >= 25 && !window.achievements.find(a => a.id === 'veteran').unlocked) {
       window.showAchievement('veteran');
     }
     
