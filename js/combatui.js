@@ -412,6 +412,9 @@ window.combatUI = {
   
   // Render the combat interface
   renderCombatInterface: function() {
+    // Clear the combat log for the new encounter
+    this.clearCombatLog();
+    
     // Create modal container if needed
     let modalContainer = document.querySelector('.combat-modal');
     if (!modalContainer) {
@@ -429,16 +432,16 @@ window.combatUI = {
       titleElement.textContent = 'Combat Encounter';
       combatInterface.insertBefore(titleElement, combatInterface.firstChild);
       
-      // Create containers for enemies and allies
-      this.createCombatantContainers();
-      
-      // Add turn counter display
-      this.createTurnCounter();
-      
       // Adjust the actions container class for better styling
       const actionsContainer = document.getElementById('combatActions');
       actionsContainer.className = 'combat-actions';
     }
+    
+    // Always recreate containers for enemies and allies (regardless of if modalContainer exists)
+    this.createCombatantContainers();
+    
+    // Always recreate turn counter
+    this.createTurnCounter();
     
     // Show the combat interface
     const combatInterface = document.getElementById('combatInterface');
@@ -925,7 +928,9 @@ updateTurnCounter: function() {
       const enemyDiv = document.createElement('div');
       enemyDiv.className = 'combat-health-container';
       enemyDiv.classList.add(index === window.combatSystem.state.activeEnemyIndex ? 'active-combatant' : 'inactive-combatant');
-      
+      enemyDiv.style.position = 'relative';
+
+    
       // Add click handler to select this enemy
       enemyDiv.addEventListener('click', () => {
         window.combatSystem.handleCombatAction('select_enemy', { enemyIndex: index });
@@ -1400,60 +1405,73 @@ updateTurnCounter: function() {
     combatLog.scrollTop = combatLog.scrollHeight;
   },
 
+  // Clear combat log messages
+clearCombatLog: function() {
+  const combatLog = document.getElementById('combatLog');
+  if (combatLog) {
+    combatLog.innerHTML = '';
+  }
+},
+
 
 // Show enemy stats in a modal
 
 showEnemyStats: function(enemy) {
-    // Get combat modal container
-    const combatModalContainer = document.querySelector('.combat-modal');
+  // ALWAYS get the combat modal container
+  const combatModalContainer = document.querySelector('.combat-modal');
   
-    // Check if an enemy stats modal already exists and remove it
-    const existingModal = document.getElementById('enemy-stats-window');
-    if (existingModal) {
-      existingModal.remove();
-    }
-    
-    // Check if overlay exists and remove it
-    const existingOverlay = document.getElementById('enemy-stats-overlay');
-    if (existingOverlay) {
-      existingOverlay.remove();
-    }
-    
-    // Create overlay first
-    const overlay = document.createElement('div');
-    overlay.id = 'enemy-stats-overlay';
-    overlay.className = 'enemy-stats-overlay';
-    overlay.addEventListener('click', () => {
-      overlay.remove();
-      modal.remove();
-    });
-    
-    // Create modal window
-    const modal = document.createElement('div');
-    modal.id = 'enemy-stats-window';
-    modal.className = 'enemy-stats-window';
-    
-    // Create header with decorative elements
-    const header = document.createElement('div');
-    header.className = 'enemy-stats-header';
-    
-    const title = document.createElement('h3');
-    title.className = 'enemy-stats-title';
-    title.textContent = enemy.name;
-    header.appendChild(title);
-    
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'enemy-stats-close';
-    closeBtn.innerHTML = '&times;';
-    closeBtn.addEventListener('click', () => {
-      overlay.remove();
-      modal.remove();
-    });
-    header.appendChild(closeBtn);
-    
-    modal.appendChild(header);
+  if (!combatModalContainer) {
+    console.error("Combat modal container not found");
+    return; // Exit if no container found
+  }
   
-  // Create body
+  // Check if an enemy stats modal already exists and remove it
+  const existingModal = document.getElementById('enemy-stats-window');
+  if (existingModal) {
+    existingModal.remove();
+  }
+  
+  // Check if overlay exists and remove it
+  const existingOverlay = document.getElementById('enemy-stats-overlay');
+  if (existingOverlay) {
+    existingOverlay.remove();
+  }
+  
+  // Create overlay first
+  const overlay = document.createElement('div');
+  overlay.id = 'enemy-stats-overlay';
+  overlay.className = 'enemy-stats-overlay';
+  overlay.addEventListener('click', () => {
+    overlay.remove();
+    modal.remove();
+  });
+  
+  // Create modal window
+  const modal = document.createElement('div');
+  modal.id = 'enemy-stats-window';
+  modal.className = 'enemy-stats-window';
+  
+  // Create header with decorative elements
+  const header = document.createElement('div');
+  header.className = 'enemy-stats-header';
+  
+  const title = document.createElement('h3');
+  title.className = 'enemy-stats-title';
+  title.textContent = enemy.name;
+  header.appendChild(title);
+  
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'enemy-stats-close';
+  closeBtn.innerHTML = '&times;';
+  closeBtn.addEventListener('click', () => {
+    overlay.remove();
+    modal.remove();
+  });
+  header.appendChild(closeBtn);
+  
+  modal.appendChild(header);
+  
+  // Create body (rest of content as before)
   const body = document.createElement('div');
   body.className = 'enemy-stats-body';
   
@@ -1465,7 +1483,7 @@ showEnemyStats: function(enemy) {
     body.appendChild(description);
   }
   
-  // Add combat attributes section
+  // Combat attributes section
   const combatSection = document.createElement('div');
   combatSection.className = 'enemy-stats-section';
   
@@ -1502,7 +1520,7 @@ showEnemyStats: function(enemy) {
   
   body.appendChild(combatSection);
   
-  // Add equipment section
+  // Equipment section
   const equipSection = document.createElement('div');
   equipSection.className = 'enemy-stats-section';
   
@@ -1524,7 +1542,7 @@ showEnemyStats: function(enemy) {
   if (enemy.ammunition && enemy.ammunition.javelin) {
     equipment.push({ 
       label: 'Javelins', 
-      value: `${enemy.ammunition.javelin.current}/${enemy.ammunition.javelin.max}`
+      value: `${enemy.ammunition.javelin.current}/${enemy.ammunition.javelin.max || 3}`
     });
   }
   
@@ -1547,7 +1565,7 @@ showEnemyStats: function(enemy) {
   
   body.appendChild(equipSection);
   
-  // Additional special abilities section if needed
+  // Special abilities section if needed
   if (enemy.armorPenetration) {
     const specialSection = document.createElement('div');
     specialSection.className = 'enemy-stats-section';
@@ -1583,10 +1601,11 @@ showEnemyStats: function(enemy) {
   
   modal.appendChild(body);
   
-  // Append the modal to the combat modal container instead of body
+  // ALWAYS append to the combat modal container instead of body or gameContainer
   combatModalContainer.appendChild(overlay);
   combatModalContainer.appendChild(modal);
 },
+
 };
 
 // Initialize the combat UI system when DOM is ready
