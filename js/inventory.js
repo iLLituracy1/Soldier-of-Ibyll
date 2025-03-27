@@ -626,7 +626,7 @@ window.addStartingItems = function() {
             speed: -5,
             critChance: 10
           },
-          maxDurability: 180
+          maxDurability: 250
         });
         window.addItemToInventory(window.itemTemplates.largecleaver);
       }

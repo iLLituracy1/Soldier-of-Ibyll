@@ -87,10 +87,10 @@ window.MOUNT_TYPES = {
 // Weapon Types
 window.WEAPON_TYPES = {
   SWORD: { name: 'Sword', symbol: window.ITEM_SYMBOLS.SWORD, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1 },
-  GREATSWORD: { name: 'Greatsword', symbol: window.ITEM_SYMBOLS.SWORD, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2 },
+  GREATSWORD: { name: 'Greatsword', symbol: window.ITEM_SYMBOLS.SWORD, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2, range: 2},
   SPEAR: { name: 'Spear', symbol: window.ITEM_SYMBOLS.SPEAR, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2, range: 2 },
   AXE: { name: 'Axe', symbol: window.ITEM_SYMBOLS.AXE, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1 },
-  BATTLEAXE: { name: 'Battle Axe', symbol: window.ITEM_SYMBOLS.AXE, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2 },
+  BATTLEAXE: { name: 'Battle Axe', symbol: window.ITEM_SYMBOLS.AXE, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 2, range: 2},
   DAGGER: { name: 'Dagger', symbol: window.ITEM_SYMBOLS.DAGGER, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1 },
   SHIELD: { name: 'Shield', symbol: window.ITEM_SYMBOLS.SHIELD, slot: window.EQUIPMENT_SLOTS.OFF_HAND, hands: 1 },
   THROWN: { name: 'Thrown Weapon', symbol: window.ITEM_SYMBOLS.SPEAR, slot: window.EQUIPMENT_SLOTS.MAIN_HAND, hands: 1, range: 2 }
@@ -597,6 +597,24 @@ window.initializeItemTemplates = function() {
       minPhy: 8
     },
     maxDurability: 320
+  });
+
+  window.itemTemplates.largecleaver = window.createWeapon({
+    id: 'large_cleaver',
+    name: 'Wyrd Cleaver',
+    description: 'A brutal two-handed cleaver favored by Wyrdman berserkers. Ideal for carving through enemies in a rage.',
+    weaponType: window.WEAPON_TYPES.GREATSWORD,
+    damage: 15,
+    value: 140,
+    stats: {
+      damage: 15,
+      speed: -5,
+      critChance: 10
+    },
+    requirements: {
+      minPhy: 3
+    },
+    maxDurability: 250
   });
 
 

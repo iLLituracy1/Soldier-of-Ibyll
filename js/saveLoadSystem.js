@@ -953,6 +953,14 @@ window.continueGame = function() {
       window.showNotification('Save data is corrupt.', 'error');
       return false;
     }
+
+     // Create a minimal player object for initialization purposes
+     window.player = {
+      inventory: [],
+      equipment: {},
+      career: saveData.player.career,  // Needed for equipment slots based on career
+      skills: {}
+    };
     
     // Reset and initialize game systems
     resetAndReinitializeGame();
@@ -981,7 +989,24 @@ window.continueGame = function() {
       },
       taelors: Number(saveData.player.taelors || 25),
       events: saveData.player.events || [],
-      inventoryCapacity: Number(saveData.player.inventoryCapacity || 20)
+      inventoryCapacity: Number(saveData.player.inventoryCapacity || 20),
+      inventory: [],  // Will be replaced with saved inventory
+      equipment: {},  // Will be replaced with saved equipment
+      equipmentStats: {
+        damage: 0,
+        defense: 0,
+        speed: 0,
+        critChance: 0,
+        blockChance: 0,
+        ranged: 0,
+        stealth: 0,
+        intimidation: 0,
+        charisma: 0,
+        command: 0,
+        armorPenetration: 0,
+        mobility: 0,
+        durability: 0
+      }
     };
     
     // Rebuild inventory and equipment

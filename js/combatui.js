@@ -1274,8 +1274,6 @@ updateTurnCounter: function() {
       // Disable attacks if weapon is broken
       if (weapon.durability <= 0) {
         this.addCombatButton("Weapon Broken!", () => {}, actionsContainer, true);
-        // Early return to skip attack options
-        this.addCombatButton("Attempt to Flee", () => window.combatSystem.handleCombatAction("flee"), actionsContainer);
         return;
       }
     }
@@ -1320,9 +1318,6 @@ updateTurnCounter: function() {
         this.addCombatButton(attack, () => window.combatSystem.handleCombatAction("attack", {attackType: attack}), actionsContainer);
       }
     }
-    
-    // Always add flee button
-    this.addCombatButton("Attempt to Flee", () => window.combatSystem.handleCombatAction("flee"), actionsContainer);
   },
   
   // Update combat status indicators

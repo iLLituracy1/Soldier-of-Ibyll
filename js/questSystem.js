@@ -37,12 +37,157 @@ window.initializeQuestSystem = function() {
     };
   }
   
+  // Create UI for stat checks
+  createStatCheckUI();
+  
   // Check for quest assignments on day change
   window.addEventListener('dayChanged', window.checkForQuestAssignment);
   
   console.log("Quest system initialized");
   return true;
 };
+
+// Create the UI elements for stat checks
+function createStatCheckUI() {
+  if (document.getElementById('statCheckDisplay')) return;
+  
+  // Add CSS
+  const styleElement = document.createElement('style');
+  styleElement.id = 'stat-check-styles';
+  styleElement.textContent = `
+    .stat-check-display {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0, 0, 0, 0.85);
+      border: 2px solid #c9aa71;
+      border-radius: 8px;
+      padding: 15px;
+      width: 300px;
+      z-index: 1000;
+      color: #fff;
+      text-align: center;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    
+    .stat-check-display.show {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .stat-check-header {
+      font-size: 1.2em;
+      margin-bottom: 10px;
+      color: #c9aa71;
+      border-bottom: 1px solid #555;
+      padding-bottom: 5px;
+    }
+    
+    .stat-check-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+    
+    .stat-check-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 10px;
+      border-radius: 4px;
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .stat-check-item.success {
+      background-color: rgba(100, 200, 100, 0.2);
+    }
+    
+    .stat-check-item.failure {
+      background-color: rgba(200, 100, 100, 0.2);
+    }
+    
+    .stat-name {
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    
+    .stat-value {
+      color: #c9aa71;
+    }
+    
+    .stat-result {
+      font-weight: bold;
+    }
+    
+    .success .stat-result {
+      color: #6f6;
+    }
+    
+    .failure .stat-result {
+      color: #f66;
+    }
+    
+    .stat-check-result {
+      font-size: 1.3em;
+      font-weight: bold;
+      padding: 5px;
+      border-radius: 4px;
+    }
+    
+    .stat-check-result.success {
+      color: #6f6;
+    }
+    
+    .stat-check-result.failure {
+      color: #f66;
+    }
+  `;
+  
+  document.head.appendChild(styleElement);
+
+  // Create display element
+  const statCheckDisplay = document.createElement('div');
+  statCheckDisplay.id = 'statCheckDisplay';
+  statCheckDisplay.className = 'stat-check-display';
+  document.body.appendChild(statCheckDisplay);
+}
+
+// Display stat check UI
+function displayStatCheck(results, difficulty, overallSuccess) {
+  const statCheckDisplay = document.getElementById('statCheckDisplay');
+  
+  let statsContent = '';
+  
+  results.forEach(result => {
+    statsContent += `<div class="stat-check-item ${result.success ? 'success' : 'failure'}">
+      <span class="stat-name">${result.name}</span>
+      <span class="stat-value">${result.value.toFixed(1)} ${result.randomFactor >= 0 ? '+' : ''}${result.randomFactor.toFixed(1)}</span>
+      <span class="stat-result">${result.success ? '✓' : '✗'}</span>
+    </div>`;
+  });
+  
+  statCheckDisplay.innerHTML = `
+    <div class="stat-check-header">Skill Check (DC: ${difficulty})</div>
+    <div class="stat-check-body">
+      ${statsContent}
+    </div>
+    <div class="stat-check-result ${overallSuccess ? 'success' : 'failure'}">
+      ${overallSuccess ? 'SUCCESS' : 'FAILURE'}
+    </div>
+  `;
+  
+  statCheckDisplay.classList.add('show');
+  
+  // Hide after 4 seconds
+  setTimeout(() => {
+    statCheckDisplay.classList.remove('show');
+  }, 4000);
+}
 
 // Check for quest assignment (called each day)
 window.checkForQuestAssignment = function() {
@@ -171,70 +316,16 @@ window.handleQuestStageAction = function(quest, stage) {
       }
       break;
       
-      case window.BATTLE_TYPES.INDIVIDUAL:
-        // Display pre-combat narrative
-        window.setNarrative(stage.narrative || stage.description);
-        
-        // CHANGE: Instead of automatically starting combat after a delay,
-        // we'll show the "Engage" button and let the player start combat when ready
-        window.updateQuestActionButtons(quest);
-        
-        // Store the original progress quest function so we can override it for combat stages
-        const originalProgressQuest = window.progressQuest;
-        
-        // Override progressQuest temporarily for this combat stage
-        window.progressQuest = function(questId, actionType) {
-          // Restore the original function first
-          window.progressQuest = originalProgressQuest;
-          
-          if (actionType === 'combat') {
-            // Store performance data
-            if (!quest.userData) quest.userData = {};
-            quest.userData[`${stage.id}_start`] = true;
-                    
-            // Initiate combat when the player clicks the button
-            window.combatSystem.initiateCombat(
-              stage.enemyType, 
-              [], 
-              {
-                requireDefeat: true,
-                enemySequence: stage.enemySequence,
-                ...(stage.combatOptions || {})
-              }
-            );
-            
-            // Store the original end combat function
-            const originalEndCombat = window.combatSystem.endCombat;
-            
-            // Override the endCombat function to continue the quest after combat
-            window.combatSystem.endCombat = function(outcome) {
-              // Call the original function first
-              originalEndCombat.call(window.combatSystem, outcome);
-              
-              // Restore the original function
-              window.combatSystem.endCombat = originalEndCombat;
-              
-              // Continue based on outcome
-              setTimeout(() => {
-                // Consider both true victory and "draw" (turn timeout) as success
-                if (outcome === true || outcome === "draw") {
-                  // Success - either through victory or timeout
-                  window.addToNarrative(stage.successText || "You survived the encounter!");
-                  
-                  // Continue to next stage
-                  originalProgressQuest.call(window, quest.id, stage.action);
-                } else {
-                  // Only treat defeat and retreat as failure
-                  window.addToNarrative(stage.failureText || "You have been defeated.");
-                  window.failQuest(quest.id);
-                }
-              }, 1500);
-            };
-          } else {
-            // For non-combat actions, just call the original function
-            originalProgressQuest.call(window, questId, actionType);
-          }
-        };
+    case window.BATTLE_TYPES.INDIVIDUAL:
+      // Display pre-combat narrative
+      window.setNarrative(stage.narrative || stage.description);
+      
+      // Mark this stage as a combat stage in quest userData
+      if (!quest.userData) quest.userData = {};
+      quest.userData.currentCombatStage = stage.id;
+      
+      // Update action buttons to show Engage button
+      window.updateQuestActionButtons(quest);
       break;
       
     default:
@@ -243,70 +334,164 @@ window.handleQuestStageAction = function(quest, stage) {
   }
 };
 
-// Function to perform a stat check
-function performStatCheck(statCheck) {
-  let statValue = 0;
-  let description = "";
+// Improved function to perform a stat check
+window.performStatCheck = function(statCheck) {
+  console.log("Performing stat check:", statCheck);
   
-  // Get the appropriate stat value based on the check type
+  // Arrays to track individual checks
+  const checkResults = [];
+  let statDescription = [];
+  
+  // Process different types of checks
   if (statCheck.type === 'attribute') {
-    // Check an attribute (phy or men)
-    statValue = window.player[statCheck.stat] || 0;
-    description = `${statCheck.stat.toUpperCase()} check`;
-  } else if (statCheck.type === 'skill') {
-    // Check a skill
-    statValue = window.player.skills[statCheck.stat] || 0;
-    description = `${statCheck.stat} check`;
+    // Single attribute check
+    const attrValue = window.player[statCheck.stat] || 0;
+    const randomFactor = (Math.random() * 10) - 5; // -5 to +5
+    const checkTotal = attrValue + randomFactor;
+    const success = checkTotal >= statCheck.difficulty;
     
-    // If an attribute is specified, add it to the check
-    // This allows for checks like "mental + survival"
+    statDescription.push(statCheck.stat.toUpperCase());
+    
+    checkResults.push({
+      name: statCheck.stat.toUpperCase(),
+      value: attrValue,
+      randomFactor: randomFactor,
+      total: checkTotal,
+      difficulty: statCheck.difficulty,
+      success: success
+    });
+  } 
+  else if (statCheck.type === 'skill') {
+    // For skill + attribute checks, we need to check each component separately
     if (statCheck.attribute) {
-      statValue += window.player[statCheck.attribute] || 0;
-      description = `${statCheck.attribute.toUpperCase()} + ${statCheck.stat} check`;
+      // Check attribute
+      const attrValue = window.player[statCheck.attribute] || 0;
+      const attrRandomFactor = (Math.random() * 10) - 5; // -5 to +5
+      const attrTotal = attrValue + attrRandomFactor;
+      const attrSuccess = attrTotal >= statCheck.difficulty;
+      
+      statDescription.push(statCheck.attribute.toUpperCase());
+      
+      checkResults.push({
+        name: statCheck.attribute.toUpperCase(),
+        value: attrValue,
+        randomFactor: attrRandomFactor,
+        total: attrTotal,
+        difficulty: statCheck.difficulty,
+        success: attrSuccess
+      });
+      
+      // Check skill
+      const skillValue = window.player.skills[statCheck.stat] || 0;
+      const skillRandomFactor = (Math.random() * 10) - 5; // -5 to +5
+      const skillTotal = skillValue + skillRandomFactor;
+      const skillSuccess = skillTotal >= statCheck.difficulty;
+      
+      statDescription.push(statCheck.stat);
+      
+      checkResults.push({
+        name: statCheck.stat,
+        value: skillValue,
+        randomFactor: skillRandomFactor,
+        total: skillTotal,
+        difficulty: statCheck.difficulty,
+        success: skillSuccess
+      });
+      
+      // Both need to succeed for overall success
+      const overallSuccess = attrSuccess && skillSuccess;
+      
+      // Build the UI display
+      displayStatCheck(checkResults, statCheck.difficulty, overallSuccess);
+      
+      // Return the combined result
+      return {
+        success: overallSuccess,
+        results: checkResults,
+        difficulty: statCheck.difficulty,
+        description: statDescription.join(' | ')
+      };
+    } 
+    else {
+      // Just a single skill check
+      const skillValue = window.player.skills[statCheck.stat] || 0;
+      const randomFactor = (Math.random() * 10) - 5; // -5 to +5
+      const checkTotal = skillValue + randomFactor;
+      const success = checkTotal >= statCheck.difficulty;
+      
+      statDescription.push(statCheck.stat);
+      
+      checkResults.push({
+        name: statCheck.stat,
+        value: skillValue,
+        randomFactor: randomFactor,
+        total: checkTotal,
+        difficulty: statCheck.difficulty,
+        success: success
+      });
     }
-  } else if (statCheck.type === 'combined') {
-    // Combined check that adds multiple skills and/or attributes
-    statValue = 0;
-    let checkParts = [];
-    
+  } 
+  else if (statCheck.type === 'combined') {
+    // Handle multiple attributes/skills
     if (statCheck.attributes) {
       statCheck.attributes.forEach(attr => {
-        statValue += window.player[attr] || 0;
-        checkParts.push(attr.toUpperCase());
+        const attrValue = window.player[attr] || 0;
+        const randomFactor = (Math.random() * 10) - 5;
+        const checkTotal = attrValue + randomFactor;
+        const success = checkTotal >= statCheck.difficulty;
+        
+        statDescription.push(attr.toUpperCase());
+        
+        checkResults.push({
+          name: attr.toUpperCase(),
+          value: attrValue,
+          randomFactor: randomFactor,
+          total: checkTotal,
+          difficulty: statCheck.difficulty,
+          success: success
+        });
       });
     }
     
     if (statCheck.skills) {
       statCheck.skills.forEach(skill => {
-        statValue += window.player.skills[skill] || 0;
-        checkParts.push(skill);
+        const skillValue = window.player.skills[skill] || 0;
+        const randomFactor = (Math.random() * 10) - 5;
+        const checkTotal = skillValue + randomFactor;
+        const success = checkTotal >= statCheck.difficulty;
+        
+        statDescription.push(skill);
+        
+        checkResults.push({
+          name: skill,
+          value: skillValue,
+          randomFactor: randomFactor,
+          total: checkTotal,
+          difficulty: statCheck.difficulty,
+          success: success
+        });
       });
     }
-    
-    description = checkParts.join(' + ') + ' check';
   }
   
-  // Generate a random modifier for some randomness in the check
-  const randomFactor = Math.random() * 5; // 0-5 random bonus
+  // Determine overall success - all checks must succeed
+  const overallSuccess = checkResults.every(result => result.success);
   
-  // Compare the stat value against the difficulty
-  const checkTotal = statValue + randomFactor;
-  const success = checkTotal >= statCheck.difficulty;
+  // Display the stat check UI
+  displayStatCheck(checkResults, statCheck.difficulty, overallSuccess);
   
-  // Log the check details for debugging
-  console.log(`Stat check: ${description} (value: ${statValue.toFixed(1)}) + random(${randomFactor.toFixed(1)}) = ${checkTotal.toFixed(1)} vs difficulty ${statCheck.difficulty} - ${success ? 'SUCCESS' : 'FAILURE'}`);
+  // Show notification about the check
+  window.showNotification(`${statDescription.join(' | ')} check (DC ${statCheck.difficulty}): ${overallSuccess ? 'Success!' : 'Failed!'}`, 
+    overallSuccess ? 'success' : 'warning');
   
-  // Show notification to the player about the check
-  window.showNotification(`${description} (DC ${statCheck.difficulty}): ${success ? 'Success!' : 'Failed!'}`, success ? 'success' : 'warning');
+  console.log(`Stat check: ${statDescription.join(' | ')} vs difficulty ${statCheck.difficulty} - ${overallSuccess ? 'SUCCESS' : 'FAILURE'}`);
   
-  // Return the check result and the values for potential use
+  // Return the result
   return {
-    success: success,
-    statValue: statValue,
-    randomFactor: randomFactor,
-    total: checkTotal,
+    success: overallSuccess,
+    results: checkResults,
     difficulty: statCheck.difficulty,
-    description: description
+    description: statDescription.join(' | ')
   };
 };
 
@@ -369,7 +554,6 @@ function applyOutcomePenalties(penalties) {
   window.updateProfileIfVisible();
 };
 
-
 // Progress a quest to the next stage
 window.progressQuest = function(questId, action) {
   console.log(`Progressing quest ${questId} with action ${action}`);
@@ -395,42 +579,189 @@ window.progressQuest = function(questId, action) {
   // Clear awaiting response flag - player has responded to the quest
   window.gameState.awaitingQuestResponse = false;
   
-  // CHECK FOR STAT CHECK AND BRANCHING PATHS
-  if (currentStage.statCheck && currentStage.outcomes) {
-    // Perform the stat check
-    const checkResult = performStatCheck(currentStage.statCheck);
+  // Check if the stage has a statCheck and hasn't been processed yet
+  if (currentStage.statCheck && currentStage.outcomes && !quest.userData?.statCheckProcessed) {
+    // Set a flag to show we've started processing this stat check
+    if (!quest.userData) quest.userData = {};
+    quest.userData.statCheckProcessed = true;
     
-    // Get the appropriate outcome based on check result
-    const outcome = checkResult.success ? currentStage.outcomes.success : currentStage.outcomes.failure;
+    // Perform the stat check and show UI
+    const checkResult = window.performStatCheck(currentStage.statCheck);
     
-    // Display appropriate narrative text based on the outcome
+    // Store the check result
+    quest.userData[`${currentStage.id}_check`] = checkResult;
+    
+    // Show appropriate narrative text based on the outcome
     const narrativeText = checkResult.success ? 
       currentStage.statCheck.successText || "You succeed!" :
       currentStage.statCheck.failureText || "You fail.";
     
-    window.addToNarrative(narrativeText);
+    window.setNarrative(narrativeText);
     
-    // If there's additional narrative for the outcome, add it
-    if (outcome.narrativeAddition) {
-      window.addToNarrative(outcome.narrativeAddition);
-    }
+    // Update UI for next step
+    const actionsContainer = document.getElementById('questActions');
+    actionsContainer.innerHTML = '';
     
-    // Apply rewards or penalties if defined
-    if (checkResult.success && outcome.rewards) {
-      applyOutcomeRewards(outcome.rewards);
-    } else if (!checkResult.success && outcome.penalties) {
-      applyOutcomePenalties(outcome.penalties);
-    }
+    // Add continue button to show the outcome narrative
+    const continueButton = document.createElement('button');
+    continueButton.className = 'quest-action-btn';
+    continueButton.textContent = 'Continue';
+    continueButton.onclick = function() {
+      // Get the appropriate outcome
+      const outcome = checkResult.success ? currentStage.outcomes.success : currentStage.outcomes.failure;
+      
+      // Show the outcome narrative addition if it exists
+      if (outcome.narrativeAddition) {
+        window.addToNarrative(outcome.narrativeAddition);
+      }
+      
+      // Apply rewards or penalties
+      if (checkResult.success && outcome.rewards) {
+        applyOutcomeRewards(outcome.rewards);
+      } else if (!checkResult.success && outcome.penalties) {
+        applyOutcomePenalties(outcome.penalties);
+      }
+      
+      // Update UI for next step
+      actionsContainer.innerHTML = '';
+      
+      // Add continue button to proceed to next stage
+      const nextButton = document.createElement('button');
+      nextButton.className = 'quest-action-btn';
+      nextButton.textContent = 'Continue';
+      nextButton.onclick = function() {
+        // Determine next stage from outcome
+        const nextStageId = outcome.nextStage;
+        
+        if (nextStageId) {
+          const nextStageIndex = quest.stages.findIndex(s => s.id === nextStageId);
+          if (nextStageIndex !== -1) {
+            quest.currentStageIndex = nextStageIndex;
+            
+            // Show notification
+            window.showQuestNotification(quest, 'updated');
+            
+            // Update quest log if visible
+            window.renderQuestLog();
+            
+            // Update quest UI elements
+            if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
+              // Update progress steps
+              window.updateQuestProgressSteps(quest);
+              
+              // Update quest objective
+              const newCurrentStage = quest.stages[quest.currentStageIndex];
+              document.getElementById('questObjective').textContent = newCurrentStage.objective;
+            }
+            
+            // Clear the stat check processing flag so we can handle future stat checks
+            delete quest.userData.statCheckProcessed;
+            
+            // Handle the new stage
+            window.handleQuestStageAction(quest, quest.stages[quest.currentStageIndex]);
+            
+            console.log(`Advanced to next stage: ${quest.stages[nextStageIndex].id}`);
+          } else {
+            console.error(`Next stage "${nextStageId}" not found`);
+          }
+        } else {
+          // No next stage, complete the quest
+          window.completeQuest(questId);
+        }
+      };
+      
+      actionsContainer.appendChild(nextButton);
+    };
     
-    // Store the check result in quest userData for potential later use
+    actionsContainer.appendChild(continueButton);
+    
+    return true; // Stat check handled
+  }
+  
+  // COMBAT HANDLING - Special handling for combat actions
+  if (action === 'combat' && currentStage.battleType === window.BATTLE_TYPES.INDIVIDUAL) {
+    console.log("Initiating combat for stage:", currentStage.id);
+    
+    // Store performance data
     if (!quest.userData) quest.userData = {};
-    quest.userData[`${currentStage.id}_check`] = checkResult;
+    quest.userData[`${currentStage.id}_start`] = true;
     
-    // Determine the next stage based on the outcome
-    const nextStageId = outcome.nextStage;
+    // Initiate combat with the enemy type from the stage
+    window.combatSystem.initiateCombat(
+      currentStage.enemyType, 
+      [], 
+      {
+        requireDefeat: currentStage.combatOptions?.requireDefeat || true,
+        enemySequence: currentStage.enemySequence,
+        ...(currentStage.combatOptions || {})
+      }
+    );
     
-    if (nextStageId) {
-      const nextStageIndex = quest.stages.findIndex(s => s.id === nextStageId);
+    // Store the original end combat function
+    const originalEndCombat = window.combatSystem.endCombat;
+    
+    // Override the endCombat function to continue the quest after combat
+    window.combatSystem.endCombat = function(outcome) {
+      // Call the original function first
+      originalEndCombat.call(window.combatSystem, outcome);
+      
+      // Restore the original function
+      window.combatSystem.endCombat = originalEndCombat;
+      
+      // Continue based on outcome after a delay
+      setTimeout(() => {
+        // Consider both true victory and "draw" (turn timeout) as success
+        if (outcome === true || outcome === "draw") {
+          // Success - either through victory or timeout
+          window.addToNarrative(currentStage.successText || "You survived the encounter!");
+          
+          // Find and proceed to the next stage
+          if (currentStage.nextStage) {
+            const nextStageIndex = quest.stages.findIndex(s => s.id === currentStage.nextStage);
+            if (nextStageIndex !== -1) {
+              quest.currentStageIndex = nextStageIndex;
+              
+              // Show notification
+              window.showQuestNotification(quest, 'updated');
+              
+              // Update quest log if visible
+              window.renderQuestLog();
+              
+              // Update quest UI elements
+              if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
+                // Update progress steps
+                window.updateQuestProgressSteps(quest);
+                
+                // Update action buttons
+                window.updateQuestActionButtons(quest);
+                
+                // Update quest objective
+                const newCurrentStage = quest.stages[quest.currentStageIndex];
+                document.getElementById('questObjective').textContent = newCurrentStage.objective;
+              }
+              
+              // Handle the new stage
+              window.handleQuestStageAction(quest, quest.stages[quest.currentStageIndex]);
+            }
+          }
+        } else {
+          // Only treat defeat and retreat as failure
+          window.addToNarrative(currentStage.failureText || "You have been defeated.");
+          window.failQuest(quest.id);
+        }
+      }, 1500);
+    };
+    
+    return true; // Combat initiated
+  }
+  
+  // CHOICE HANDLING
+  if (currentStage.choices && currentStage.choices.length > 0) {
+    // Find the choice that matches the given action
+    const choice = currentStage.choices.find(c => c.action === action);
+    
+    if (choice && choice.nextStage) {
+      const nextStageIndex = quest.stages.findIndex(s => s.id === choice.nextStage);
       if (nextStageIndex !== -1) {
         quest.currentStageIndex = nextStageIndex;
         
@@ -456,58 +787,16 @@ window.progressQuest = function(questId, action) {
         // Handle the new stage
         window.handleQuestStageAction(quest, quest.stages[quest.currentStageIndex]);
         
-        console.log(`Advanced to branching stage: ${quest.stages[nextStageIndex].id}`);
+        console.log(`Advanced to chosen stage: ${quest.stages[nextStageIndex].id}`);
         
         return true;
       } else {
-        console.error(`Next stage "${nextStageId}" not found`);
+        console.error(`Next stage "${choice.nextStage}" not found`);
       }
     }
   }
-
-  // NEW: Check for choices - insert between stat check and linear progression code
-else if (currentStage.choices && currentStage.choices.length > 0) {
-  // Find the choice that matches the given action
-  const choice = currentStage.choices.find(c => c.action === action);
   
-  if (choice && choice.nextStage) {
-    const nextStageIndex = quest.stages.findIndex(s => s.id === choice.nextStage);
-    if (nextStageIndex !== -1) {
-      quest.currentStageIndex = nextStageIndex;
-      
-      // Show notification
-      window.showQuestNotification(quest, 'updated');
-      
-      // Update quest log if visible
-      window.renderQuestLog();
-      
-      // Update quest UI elements
-      if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
-        // Update progress steps
-        window.updateQuestProgressSteps(quest);
-        
-        // Update action buttons
-        window.updateQuestActionButtons(quest);
-        
-        // Update quest objective
-        const newCurrentStage = quest.stages[quest.currentStageIndex];
-        document.getElementById('questObjective').textContent = newCurrentStage.objective;
-      }
-      
-      // Handle the new stage
-      window.handleQuestStageAction(quest, quest.stages[quest.currentStageIndex]);
-      
-      console.log(`Advanced to chosen stage: ${quest.stages[nextStageIndex].id}`);
-      
-      return true;
-    } else {
-      console.error(`Next stage "${choice.nextStage}" not found`);
-    }
-  }
-}
-
-  
-  // CONTINUE WITH ORIGINAL LINEAR PROGRESSION
+  // LINEAR PROGRESSION
   else if (currentStage.nextStage) {
     const nextStageIndex = quest.stages.findIndex(s => s.id === currentStage.nextStage);
     if (nextStageIndex !== -1) {
@@ -560,7 +849,7 @@ window.updateQuestActionButtons = function(quest) {
   
   console.log(`Updating action buttons for stage: ${currentStage.id}`);
   
-  // NEW: Check if stage has choices
+  // Check if stage has choices
   if (currentStage.choices && currentStage.choices.length > 0) {
     // Create a button for each choice
     currentStage.choices.forEach(choice => {
@@ -622,7 +911,7 @@ function getActionButtonText(action) {
     case 'volunteer_scout':
       return 'Volunteer';
     case 'remain_silent':
-      return 'Remain silent.'
+      return 'Remain silent';
     default:
       return 'Continue';
   }
@@ -1018,13 +1307,32 @@ window.handleAction = function(action) {
 // Create a custom event for day changes
 window.dayChangedEvent = new Event('dayChanged');
 
-// Override updateTimeAndDay to dispatch our custom event
+// Override updateTimeAndDay to dispatch our custom event and update quest UI
 const originalUpdateTimeAndDay = window.updateTimeAndDay;
 window.updateTimeAndDay = function(minutesToAdd) {
   const oldDay = window.gameDay;
   
   // Call original function
   originalUpdateTimeAndDay(minutesToAdd);
+  
+  // Also update quest UI if we're in the quest scene
+  if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
+    // Format time for display (same logic as in the original function)
+    const hours = Math.floor(window.gameTime / 60);
+    const minutes = window.gameTime % 60;
+    const ampm = hours < 12 ? 'AM' : 'PM';
+    const displayHours = hours % 12 || 12; // Convert 0 to 12 for display
+    
+    // Update quest time display
+    document.getElementById('questTimeDisplay').textContent = `Time: ${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+    document.getElementById('questDayDisplay').textContent = `Day ${window.gameDay}`;
+    
+    // Update day/night indicator
+    const timeOfDay = window.getTimeOfDay();
+    document.getElementById('questDayNightIndicator').className = 'day-night-indicator time-' + timeOfDay;
+    
+    console.log(`Updated quest UI time display to: Day ${window.gameDay}, ${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`);
+  }
   
   // Check if day changed
   if (window.gameDay > oldDay) {
