@@ -72,6 +72,7 @@ window.combatUI = {
       width: 45%;
       display: flex;
       flex-direction: column;
+      position: relative;
     }
     
     .combat-health-bar {
@@ -684,58 +685,44 @@ window.combatUI = {
     display: none;
   }
 
-  .enemy-info-btn {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 20px;
-    height: 20px;
-    background: #c9aa71;
-    border: none;
-    border-radius: 50%;
-    color: #1a1a1a;
-    font-size: 12px;
-    font-weight: bold;
-    line-height: 1;
-    cursor: pointer;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 2;
-  }
+.enemy-info-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  background: #c9aa71;
+  border: none;
+  border-radius: 50%;
+  color: #1a1a1a;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+}
 
   .enemy-info-btn:hover {
     background: #e0be82;
   }
 
   .enemy-stats-window {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   width: 80%;
   max-width: 350px;
   max-height: 80%;
   overflow-y: auto;
-  background: rgba(0, 0, 0, 0.9); /* Darker, slightly transparent background */
+  background: rgba(0, 0, 0, 0.9);
   border: 2px solid #c9aa71;
   border-radius: 8px;
   padding: 15px;
-  z-index: 100;
-  box-shadow: 0 0 30px rgba(201, 170, 113, 0.4); /* Golden glow similar to conclusion modal */
+  box-shadow: 0 0 30px rgba(201, 170, 113, 0.4);
   color: #e0e0e0;
 }
 
 
-.enemy-stats-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5); /* Semi-transparent black overlay */
-  z-index: 99; /* Just below the stats window */
-}
 
   /* Enhance the header */
 .enemy-stats-header {
@@ -749,6 +736,20 @@ window.combatUI = {
   margin: -15px -15px 15px -15px; /* Extend to edges */
   padding: 15px;
   border-radius: 6px 6px 0 0;
+}
+
+.enemy-stats-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  font-family: serif;
 }
 
   .enemy-stats-title {
@@ -928,7 +929,7 @@ updateTurnCounter: function() {
       const enemyDiv = document.createElement('div');
       enemyDiv.className = 'combat-health-container';
       enemyDiv.classList.add(index === window.combatSystem.state.activeEnemyIndex ? 'active-combatant' : 'inactive-combatant');
-      enemyDiv.style.position = 'relative';
+    
 
     
       // Add click handler to select this enemy
@@ -1417,195 +1418,113 @@ clearCombatLog: function() {
 // Show enemy stats in a modal
 
 showEnemyStats: function(enemy) {
-  // ALWAYS get the combat modal container
-  const combatModalContainer = document.querySelector('.combat-modal');
-  
-  if (!combatModalContainer) {
-    console.error("Combat modal container not found");
-    return; // Exit if no container found
+  // Create modal container if it doesn't exist or replace it
+  let statsModal = document.getElementById('enemy-stats-modal');
+  if (statsModal) {
+    statsModal.remove();
   }
   
-  // Check if an enemy stats modal already exists and remove it
-  const existingModal = document.getElementById('enemy-stats-window');
-  if (existingModal) {
-    existingModal.remove();
-  }
+  statsModal = document.createElement('div');
+  statsModal.id = 'enemy-stats-modal';
+  statsModal.className = 'enemy-stats-modal';
+  document.body.appendChild(statsModal);
   
-  // Check if overlay exists and remove it
-  const existingOverlay = document.getElementById('enemy-stats-overlay');
-  if (existingOverlay) {
-    existingOverlay.remove();
-  }
+  // Build the modal content - single container approach
+  let modalContent = `
+    <div class="enemy-stats-content">
+      <div class="enemy-stats-header">
+        <h3 class="enemy-stats-title">${enemy.name}</h3>
+        <button class="enemy-stats-close">&times;</button>
+      </div>
+      <div class="enemy-stats-body">
+        ${enemy.description ? `<div class="enemy-stats-description">${enemy.description}</div>` : ''}
+        
+        <div class="enemy-stats-section">
+          <div class="enemy-stats-section-title">Combat Attributes</div>
+          <div class="enemy-stats-attr"><span class="enemy-stats-attr-label">Health:</span> <span>${Math.round(enemy.health)} / ${enemy.maxHealth}</span></div>
+          <div class="enemy-stats-attr"><span class="enemy-stats-attr-label">Power:</span> <span>${enemy.power || 'N/A'}</span></div>
+          <div class="enemy-stats-attr"><span class="enemy-stats-attr-label">Accuracy:</span> <span>${enemy.accuracy || 'N/A'}</span></div>
+          <div class="enemy-stats-attr"><span class="enemy-stats-attr-label">Speed:</span> <span>${enemy.speed || 'N/A'}</span></div>
+          <div class="enemy-stats-attr"><span class="enemy-stats-attr-label">Defense:</span> <span>${enemy.defense || 'N/A'}</span></div>
+          <div class="enemy-stats-attr"><span class="enemy-stats-attr-label">Counter Skill:</span> <span>${enemy.counterSkill || 'N/A'}</span></div>
+        </div>
+        
+        <div class="enemy-stats-section">
+          <div class="enemy-stats-section-title">Equipment</div>
+          <div class="enemy-stats-attr"><span class="enemy-stats-attr-label">Weapon:</span> <span>${enemy.weapon || 'Unarmed'}</span></div>
+          <div class="enemy-stats-attr"><span class="enemy-stats-attr-label">Armor:</span> <span>${enemy.armor || 'Unarmored'}</span></div>
+          <div class="enemy-stats-attr"><span class="enemy-stats-attr-label">Shield:</span> <span>${enemy.hasShield ? 'Yes' : 'No'}</span></div>
+          ${enemy.hasShield ? `<div class="enemy-stats-attr"><span class="enemy-stats-attr-label">Block Chance:</span> <span>${enemy.blockChance || 0}%</span></div>` : ''}
+          ${enemy.ammunition && enemy.ammunition.javelin ? `<div class="enemy-stats-attr"><span class="enemy-stats-attr-label">Javelins:</span> <span>${enemy.ammunition.javelin.current}/${enemy.ammunition.javelin.max || 3}</span></div>` : ''}
+        </div>
+        
+        ${enemy.armorPenetration ? `
+        <div class="enemy-stats-section">
+          <div class="enemy-stats-section-title">Special Abilities</div>
+          <div class="enemy-stats-attr"><span class="enemy-stats-attr-label">Armor Penetration:</span> <span>${enemy.armorPenetration}</span></div>
+        </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
   
-  // Create overlay first
-  const overlay = document.createElement('div');
-  overlay.id = 'enemy-stats-overlay';
-  overlay.className = 'enemy-stats-overlay';
-  overlay.addEventListener('click', () => {
-    overlay.remove();
-    modal.remove();
-  });
+  // Set the content
+  statsModal.innerHTML = modalContent;
   
-  // Create modal window
-  const modal = document.createElement('div');
-  modal.id = 'enemy-stats-window';
-  modal.className = 'enemy-stats-window';
-  
-  // Create header with decorative elements
-  const header = document.createElement('div');
-  header.className = 'enemy-stats-header';
-  
-  const title = document.createElement('h3');
-  title.className = 'enemy-stats-title';
-  title.textContent = enemy.name;
-  header.appendChild(title);
-  
-  const closeBtn = document.createElement('button');
-  closeBtn.className = 'enemy-stats-close';
-  closeBtn.innerHTML = '&times;';
-  closeBtn.addEventListener('click', () => {
-    overlay.remove();
-    modal.remove();
-  });
-  header.appendChild(closeBtn);
-  
-  modal.appendChild(header);
-  
-  // Create body (rest of content as before)
-  const body = document.createElement('div');
-  body.className = 'enemy-stats-body';
-  
-  // Add description if available
-  if (enemy.description) {
-    const description = document.createElement('div');
-    description.className = 'enemy-stats-description';
-    description.textContent = enemy.description;
-    body.appendChild(description);
-  }
-  
-  // Combat attributes section
-  const combatSection = document.createElement('div');
-  combatSection.className = 'enemy-stats-section';
-  
-  const combatTitle = document.createElement('div');
-  combatTitle.className = 'enemy-stats-section-title';
-  combatTitle.textContent = 'Combat Attributes';
-  combatSection.appendChild(combatTitle);
-  
-  const attributes = [
-    { label: 'Health', value: `${Math.round(enemy.health)} / ${enemy.maxHealth}` },
-    { label: 'Power', value: enemy.power || 'N/A' },
-    { label: 'Accuracy', value: enemy.accuracy || 'N/A' },
-    { label: 'Speed', value: enemy.speed || 'N/A' },
-    { label: 'Defense', value: enemy.defense || 'N/A' },
-    { label: 'Counter Skill', value: enemy.counterSkill || 'N/A' }
-  ];
-  
-  attributes.forEach(attr => {
-    const attrDiv = document.createElement('div');
-    attrDiv.className = 'enemy-stats-attr';
-    
-    const label = document.createElement('span');
-    label.className = 'enemy-stats-attr-label';
-    label.textContent = attr.label + ':';
-    attrDiv.appendChild(label);
-    
-    const value = document.createElement('span');
-    value.className = 'enemy-stats-attr-value';
-    value.textContent = attr.value;
-    attrDiv.appendChild(value);
-    
-    combatSection.appendChild(attrDiv);
-  });
-  
-  body.appendChild(combatSection);
-  
-  // Equipment section
-  const equipSection = document.createElement('div');
-  equipSection.className = 'enemy-stats-section';
-  
-  const equipTitle = document.createElement('div');
-  equipTitle.className = 'enemy-stats-section-title';
-  equipTitle.textContent = 'Equipment';
-  equipSection.appendChild(equipTitle);
-  
-  const equipment = [
-    { label: 'Weapon', value: enemy.weapon || 'Unarmed' },
-    { label: 'Armor', value: enemy.armor || 'Unarmored' },
-    { label: 'Shield', value: enemy.hasShield ? 'Yes' : 'No' }
-  ];
-  
-  if (enemy.hasShield) {
-    equipment.push({ label: 'Block Chance', value: `${enemy.blockChance || 0}%` });
-  }
-  
-  if (enemy.ammunition && enemy.ammunition.javelin) {
-    equipment.push({ 
-      label: 'Javelins', 
-      value: `${enemy.ammunition.javelin.current}/${enemy.ammunition.javelin.max || 3}`
-    });
-  }
-  
-  equipment.forEach(item => {
-    const itemDiv = document.createElement('div');
-    itemDiv.className = 'enemy-stats-attr';
-    
-    const label = document.createElement('span');
-    label.className = 'enemy-stats-attr-label';
-    label.textContent = item.label + ':';
-    itemDiv.appendChild(label);
-    
-    const value = document.createElement('span');
-    value.className = 'enemy-stats-attr-value';
-    value.textContent = item.value;
-    itemDiv.appendChild(value);
-    
-    equipSection.appendChild(itemDiv);
-  });
-  
-  body.appendChild(equipSection);
-  
-  // Special abilities section if needed
-  if (enemy.armorPenetration) {
-    const specialSection = document.createElement('div');
-    specialSection.className = 'enemy-stats-section';
-    
-    const specialTitle = document.createElement('div');
-    specialTitle.className = 'enemy-stats-section-title';
-    specialTitle.textContent = 'Special Abilities';
-    specialSection.appendChild(specialTitle);
-    
-    const abilities = [
-      { label: 'Armor Penetration', value: enemy.armorPenetration }
-    ];
-    
-    abilities.forEach(ability => {
-      const abilityDiv = document.createElement('div');
-      abilityDiv.className = 'enemy-stats-attr';
+  // Add CSS styles if not already added
+  if (!document.getElementById('enemy-stats-styles')) {
+    const styleElement = document.createElement('style');
+    styleElement.id = 'enemy-stats-styles';
+    styleElement.textContent = `
+      .enemy-stats-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 2000;
+        font-family: serif;
+      }
       
-      const label = document.createElement('span');
-      label.className = 'enemy-stats-attr-label';
-      label.textContent = ability.label + ':';
-      abilityDiv.appendChild(label);
+      .enemy-stats-content {
+        width: 90%;
+        max-width: 500px;
+        background: #1a1a1a;
+        border: 2px solid #c9aa71;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 0 30px rgba(201, 170, 113, 0.4);
+        color: #e0e0e0;
+        max-height: 90vh;
+        overflow-y: auto;
+      }
       
-      const value = document.createElement('span');
-      value.className = 'enemy-stats-attr-value';
-      value.textContent = ability.value;
-      abilityDiv.appendChild(value);
-      
-      specialSection.appendChild(abilityDiv);
-    });
-    
-    body.appendChild(specialSection);
+      /* Other styles remain the same */
+    `;
+    document.head.appendChild(styleElement);
   }
   
-  modal.appendChild(body);
+  // Add event listener to the close button
+  statsModal.querySelector('.enemy-stats-close').addEventListener('click', () => {
+    statsModal.style.display = 'none';
+    setTimeout(() => statsModal.remove(), 100);
+  });
   
-  // ALWAYS append to the combat modal container instead of body or gameContainer
-  combatModalContainer.appendChild(overlay);
-  combatModalContainer.appendChild(modal);
-},
-
+  // Add event listener to close when clicking outside content
+  statsModal.addEventListener('click', (event) => {
+    if (event.target === statsModal) {
+      statsModal.style.display = 'none';
+      setTimeout(() => statsModal.remove(), 100);
+    }
+  });
+  
+  // Show the modal
+  statsModal.style.display = 'flex';
+}
 };
 
 // Initialize the combat UI system when DOM is ready
