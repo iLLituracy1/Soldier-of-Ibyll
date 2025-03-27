@@ -923,6 +923,37 @@ updateTurnCounter: function() {
     
     // Clear the container
     enemyContainer.innerHTML = '';
+
+      // Ensure enemy-info-btn styles exist and are applied
+  if (!document.getElementById('enemy-info-btn-styles')) {
+    const styleElement = document.createElement('style');
+    styleElement.id = 'enemy-info-btn-styles';
+    styleElement.textContent = `
+      .enemy-info-btn {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 20px;
+        height: 20px;
+        background: #c9aa71;
+        border: none;
+        border-radius: 50%;
+        color: #1a1a1a;
+        font-size: 12px;
+        font-weight: bold;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+      }
+      .enemy-info-btn:hover {
+        background: #e0be82;
+      }
+    `;
+    document.head.appendChild(styleElement);
+  }
     
     // Add each enemy to the display
     window.combatSystem.state.enemies.forEach((enemy, index) => {
@@ -1502,8 +1533,70 @@ showEnemyStats: function(enemy) {
         max-height: 90vh;
         overflow-y: auto;
       }
+
+       .enemy-stats-header {
+        border-bottom: 2px solid #c9aa71;
+        padding-bottom: 12px;
+        margin-bottom: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(to right, rgba(201, 170, 113, 0.3), transparent);
+        margin: -15px -15px 15px -15px;
+        padding: 15px;
+        border-radius: 6px 6px 0 0;
+      }
       
-      /* Other styles remain the same */
+      .enemy-stats-title {
+        font-size: 1.4em;
+        color: #c9aa71;
+        margin: 0;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
+      }
+      
+      .enemy-stats-close {
+        background: none;
+        border: none;
+        color: #c9aa71;
+        font-size: 1.5em;
+        cursor: pointer;
+        line-height: 1;
+      }
+      
+      .enemy-stats-body {
+        font-size: 0.9em;
+      }
+      
+      .enemy-stats-description {
+        font-style: italic;
+        margin-bottom: 15px;
+        color: #aaa;
+      }
+      
+      .enemy-stats-section {
+        margin-bottom: 15px;
+        background: rgba(40, 40, 40, 0.6);
+        border-radius: 4px;
+        padding: 10px;
+        border-left: 3px solid #c9aa71;
+      }
+      
+      .enemy-stats-section-title {
+        font-weight: bold;
+        color: #c9aa71;
+        margin-bottom: 5px;
+      }
+      
+      .enemy-stats-attr {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 3px;
+      }
+      
+      .enemy-stats-attr-label {
+        color: #aaa;
+      }
+      
     `;
     document.head.appendChild(styleElement);
   }
