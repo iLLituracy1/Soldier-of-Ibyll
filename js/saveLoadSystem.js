@@ -2,29 +2,26 @@
 // Handles game saving, loading, and main menu functionality
 
 // Define constants for localStorage
-const SAVE_KEY_PREFIX = 'soldierOfIbyll_save_';
-const SAVE_LIST_KEY = 'soldierOfIbyll_saveList';
-const MAX_SAVES = 5;  // Maximum number of save slots
+const SINGLE_SAVE_KEY = 'soldierOfIbyll_currentGame';
+const HAS_SAVE_KEY = 'soldierOfIbyll_hasSave';
+let currentGameSaved = false;
 
 // Initialize the save/load system
 window.initializeSaveLoadSystem = function() {
-  console.log("Initializing save/load system...");
+  console.log("Initializing roguelike save/load system...");
   
-  // Check for existing saves and enable/disable load button
-  updateLoadButtonState();
+  // Check for existing save and update continue button
+  updateContinueButton();
   
   // Attach event listeners to main menu buttons
   document.getElementById('newGameBtn').addEventListener('click', startNewGame);
-  document.getElementById('loadGameBtn').addEventListener('click', showLoadGameMenu);
+  document.getElementById('continueBtn').addEventListener('click', window.continueGame);
   document.getElementById('creditsBtn').addEventListener('click', showCreditsScreen);
   
-  // Attach event listeners to save/load menu buttons
-  document.getElementById('closeSaveMenuBtn').addEventListener('click', hideSaveGameMenu);
-  document.getElementById('closeLoadMenuBtn').addEventListener('click', hideLoadGameMenu);
+  // Attach event listener to credits close button
   document.getElementById('closeCreditsBtn').addEventListener('click', hideCreditsScreen);
-  document.getElementById('createNewSaveBtn').addEventListener('click', createNewSave);
   
-  console.log("Save/load system initialized");
+  console.log("Roguelike save/load system initialized");
 };
 
 // Update load button state based on available saves
@@ -54,6 +51,16 @@ function updateSaveList(saveList) {
 // Start a new game
 function startNewGame() {
   console.log("Starting new game...");
+  
+  // Ask for confirmation if we have a saved game
+  if (window.hasSavedGame()) {
+    if (!confirm('Starting a new game will delete your current saved game. Continue?')) {
+      return;
+    }
+    
+    // Delete current save
+    window.deleteSavedGame();
+  }
   
   // Hide main menu
   document.getElementById('mainMenuScreen').classList.add('hidden');
@@ -554,6 +561,7 @@ function createNewSave() {
   
   // Create save ID
   const saveId = 'save_' + Date.now();
+  currentSaveId = saveId; 
   
   // Create save data
   const saveTimestamp = Date.now();
@@ -597,8 +605,12 @@ function createNewSave() {
 // Load a game by ID - completely rewritten to use serialized item data
 function loadGame(saveId) {
   console.log(`Loading game with ID: ${saveId}`);
+
+  
   
   try {
+     // Store the current save ID for potential deletion on death
+     currentSaveId = saveId;
     // Get the save data
     const saveJSON = localStorage.getItem(SAVE_KEY_PREFIX + saveId);
     if (!saveJSON) {
@@ -726,11 +738,6 @@ function loadGame(saveId) {
       }
     }
     
-    // STEP 7: Add save game button to UI
-    if (typeof window.addSaveGameButton === 'function') {
-      window.addSaveGameButton();
-    }
-    
     // STEP 8: Update UI
     window.updateStatusBars();
     window.updateTimeAndDay(0); // Update time display without changing time
@@ -788,94 +795,7 @@ function hideCreditsScreen() {
   document.getElementById('creditsScreen').classList.add('hidden');
 }
 
-// Add save functionality to the game
-window.addSaveGameButton = function() {
-  // Check if the button already exists
-  if (document.querySelector('.save-game-btn')) {
-    return;
-  }
-  
-  // Create save button
-  const saveButton = document.createElement('button');
-  saveButton.className = 'control-btn save-game-btn';
-  saveButton.innerHTML = '<i class="fas fa-save"></i>Save Game';
-  saveButton.onclick = showSaveGameMenu;
-  
-  // Add to game controls
-  const gameControls = document.querySelector('.game-controls');
-  gameControls.appendChild(saveButton);
-  
-  console.log("Save game button added to UI");
-};
 
-// Show the save game menu
-function showSaveGameMenu() {
-  console.log("Showing save game menu");
-  
-  // Populate save slots
-  populateSaveSlots();
-  
-  // Show the save game menu
-  document.getElementById('saveGameMenu').classList.remove('hidden');
-}
-
-// Hide the save game menu
-function hideSaveGameMenu() {
-  document.getElementById('saveGameMenu').classList.add('hidden');
-}
-
-// Populate the save slots
-function populateSaveSlots() {
-  const saveSlotsContainer = document.getElementById('saveSlots');
-  saveSlotsContainer.innerHTML = '';
-  
-  const saveList = getSaveList();
-  
-  if (!saveList || saveList.length === 0) {
-    saveSlotsContainer.innerHTML = '<div class="empty-slots-message">No saved games. Create a new save to continue.</div>';
-    return;
-  }
-  
-  // Sort saves by date (newest first)
-  saveList.sort((a, b) => b.timestamp - a.timestamp);
-  
-  // Create a slot for each save
-  saveList.forEach(save => {
-    const saveSlot = document.createElement('div');
-    saveSlot.className = 'save-slot';
-    
-    // Format date
-    const saveDate = new Date(save.timestamp);
-    const formattedDate = saveDate.toLocaleDateString() + ' ' + saveDate.toLocaleTimeString();
-    
-    saveSlot.innerHTML = `
-      <div class="save-slot-info">
-        <div class="save-slot-title">${save.title}</div>
-        <div class="save-slot-details">
-          ${save.playerName}, ${save.career} - Day ${save.day}
-          <br>
-          Saved: ${formattedDate}
-        </div>
-      </div>
-      <div class="save-slot-actions">
-        <button class="slot-btn save-btn" title="Overwrite Save"><i class="fas fa-save"></i></button>
-        <button class="slot-btn delete-btn" title="Delete Save"><i class="fas fa-trash"></i></button>
-      </div>
-    `;
-    
-    // Add event listeners
-    saveSlot.querySelector('.save-btn').addEventListener('click', () => {
-      overwriteSave(save.id);
-    });
-    
-    saveSlot.querySelector('.delete-btn').addEventListener('click', () => {
-      deleteSave(save.id);
-      populateSaveSlots(); // Refresh the list after deletion
-    });
-    
-    saveSlotsContainer.appendChild(saveSlot);
-  });
-}
 
 // Overwrite an existing save
 function overwriteSave(saveId) {
@@ -888,6 +808,7 @@ function overwriteSave(saveId) {
   // Get existing save info
   const saveList = getSaveList();
   const saveInfo = saveList.find(save => save.id === saveId);
+  currentSaveId = saveId;
   
   if (!saveInfo) {
     window.showNotification('Error: Save not found.', 'error');
@@ -926,12 +847,201 @@ function overwriteSave(saveId) {
 
 // Return to main menu function
 window.returnToMainMenu = function() {
-  // Ask for confirmation if in a game
-  if (document.getElementById('gameContainer').classList.contains('hidden') === false) {
-    if (!confirm('Return to main menu? Unsaved progress will be lost.')) {
-      return;
-    }
+  console.log("Returning to main menu");
+  
+  // If player died, delete the save
+  if (window.gameState && window.gameState.playerDied) {
+    window.deleteSavedGame();
+  } 
+  // Otherwise auto-save if in game
+  else if (document.getElementById('gameContainer').classList.contains('hidden') === false) {
+    window.saveCurrentGame();
   }
+  
+  // Hide all screens definitively
+  const screensToHide = [
+    'creator', 
+    'gameContainer', 
+    'questSceneContainer', 
+    'combatInterface'
+  ];
+  
+  screensToHide.forEach(screenId => {
+    const element = document.getElementById(screenId);
+    if (element) {
+      element.classList.add('hidden');
+    }
+  });
+  
+  // Hide any modal that might be visible
+  const modals = document.querySelectorAll('.modal, .panel-overlay, .combat-conclusion-modal');
+  modals.forEach(modal => {
+    if (modal) {
+      modal.style.display = 'none';
+    }
+  });
+  
+  // Show main menu
+  const mainMenu = document.getElementById('mainMenuScreen');
+  if (mainMenu) {
+    mainMenu.classList.remove('hidden');
+  }
+  
+  // Update continue button to reflect save state
+  updateContinueButton();
+  
+  console.log("Returned to main menu");
+};
+
+// Check if a save exists
+window.hasSavedGame = function() {
+  return localStorage.getItem(HAS_SAVE_KEY) === 'true';
+};
+
+
+// Save the current game - automatically called when returning to main menu
+window.saveCurrentGame = function() {
+  // Don't save if player has died
+  if (window.gameState && window.gameState.playerDied) {
+    console.log("Player died - not saving game");
+    return false;
+  }
+  
+  console.log("Auto-saving current game");
+  
+  try {
+    // Create player data with full item serialization
+    const playerData = savePlayerData(window.player);
+    
+    // Create save data object
+    const saveData = {
+      player: playerData,
+      gameState: JSON.parse(JSON.stringify(window.gameState)),
+      gameTime: window.gameTime,
+      gameDay: window.gameDay,
+      timestamp: Date.now()
+    };
+    
+    // Save to localStorage
+    localStorage.setItem(SINGLE_SAVE_KEY, JSON.stringify(saveData));
+    localStorage.setItem(HAS_SAVE_KEY, 'true');
+    currentGameSaved = true;
+    
+    console.log("Game saved successfully");
+    return true;
+  } catch (error) {
+    console.error("Error saving game:", error);
+    return false;
+  }
+};
+
+// Load the saved game
+window.continueGame = function() {
+  console.log("Continuing saved game");
+  
+  try {
+    // Get the save data
+    const saveJSON = localStorage.getItem(SINGLE_SAVE_KEY);
+    if (!saveJSON) {
+      window.showNotification('No saved game found.', 'error');
+      return false;
+    }
+    
+    const saveData = JSON.parse(saveJSON);
+    
+    if (!saveData || !saveData.player) {
+      window.showNotification('Save data is corrupt.', 'error');
+      return false;
+    }
+    
+    // Reset and initialize game systems
+    resetAndReinitializeGame();
+    
+    // Restore basic game state
+    window.gameTime = saveData.gameTime;
+    window.gameDay = saveData.gameDay;
+    window.gameState = { ...saveData.gameState };
+    
+    // Set up player core properties
+    window.player = {
+      origin: saveData.player.origin,
+      career: saveData.player.career,
+      name: saveData.player.name,
+      phy: Number(saveData.player.phy || 0),
+      men: Number(saveData.player.men || 0),
+      skills: {
+        melee: Number(saveData.player.skills.melee || 0),
+        marksmanship: Number(saveData.player.skills.marksmanship || 0),
+        survival: Number(saveData.player.skills.survival || 0),
+        command: Number(saveData.player.skills.command || 0),
+        discipline: Number(saveData.player.skills.discipline || 0),
+        tactics: Number(saveData.player.skills.tactics || 0),
+        organization: Number(saveData.player.skills.organization || 0),
+        arcana: Number(saveData.player.skills.arcana || 0)
+      },
+      taelors: Number(saveData.player.taelors || 25),
+      events: saveData.player.events || [],
+      inventoryCapacity: Number(saveData.player.inventoryCapacity || 20)
+    };
+    
+    // Rebuild inventory and equipment
+    window.player.inventory = rebuildInventoryFromSaved(saveData.player.inventory);
+    window.player.equipment = rebuildEquipmentFromSaved(saveData.player.equipment);
+    
+    // Initialize additional systems
+    if (typeof window.initializeQuestSystem === 'function') {
+      window.initializeQuestSystem();
+    }
+    
+    // Hide menus, show game container
+    document.getElementById('mainMenuScreen').classList.add('hidden');
+    document.getElementById('creator').classList.add('hidden');
+    document.getElementById('gameContainer').classList.remove('hidden');
+    
+    // Update UI
+    window.updateStatusBars();
+    window.updateTimeAndDay(0);
+    window.updateActionButtons();
+    
+    window.showNotification('Game loaded successfully!', 'success');
+    console.log("Game loaded successfully");
+    
+    return true;
+  } catch (error) {
+    console.error("Error loading game:", error);
+    window.showNotification(`Error loading game: ${error.message}`, 'error');
+    return false;
+  }
+};
+
+// Delete the saved game
+window.deleteSavedGame = function() {
+  console.log("Deleting saved game");
+  
+  try {
+    localStorage.removeItem(SINGLE_SAVE_KEY);
+    localStorage.setItem(HAS_SAVE_KEY, 'false');
+    currentGameSaved = false;
+    
+    // Update continue button
+    updateContinueButton();
+    
+    console.log("Saved game deleted");
+    return true;
+  } catch (error) {
+    console.error("Error deleting saved game:", error);
+    return false;
+  }
+};
+
+// Update the continue button state
+function updateContinueButton() {
+  const continueButton = document.getElementById('continueBtn');
+  if (!continueButton) return;
+  
+  const hasSave = window.hasSavedGame();
+  continueButton.disabled = !hasSave;
+};
   
   // Hide all screens
   document.getElementById('creator').classList.add('hidden');
@@ -945,4 +1055,3 @@ window.returnToMainMenu = function() {
   document.getElementById('mainMenuScreen').classList.remove('hidden');
   
   console.log("Returned to main menu");
-};

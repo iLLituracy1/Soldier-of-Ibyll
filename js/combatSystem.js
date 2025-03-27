@@ -2422,125 +2422,138 @@ spawnNextWave: function() {
 },
   
   // End combat and handle outcome
-  endCombat: function(outcome) {
-    // Set combat as inactive
-    this.state.active = false;
-    
-    // Prepare conclusion narrative based on outcome
-    let narrativeText = [];
-    let conclusionType = typeof outcome === 'string' ? outcome : (outcome ? 'victory' : 'defeat');
-    
-    if (outcome === true) {
-      // Player victory
-      narrativeText = [
-        "The battlefield falls silent as your enemies have been defeated.",
-        "You stand victorious, your weapons slick with the blood of your foes."
-      ];
-      
-      let totalDeeds = 0;
-      
-        // Calculate total deeds from all enemies
-  this.state.enemies.forEach(enemy => {
-    if (enemy.health <= 0) {
-      // Record combat feat for each defeated enemy
-      if (typeof window.recordCombatFeat === 'function') {
-        window.recordCombatFeat(enemy.name);
-      }
-      
-      // Award deeds based on enemy type (experienceValue becomes deed value)
-      totalDeeds += enemy.experienceValue || 10;
-    } else {
-      // Partial deeds for damaged enemies
-      const damagePercent = (enemy.maxHealth - enemy.health) / enemy.maxHealth;
-      totalDeeds += Math.floor((enemy.experienceValue || 10) * damagePercent * 0.5);
-    }
-  });
+endCombat: function(outcome) {
+  // Set combat as inactive
+  this.state.active = false;
   
-  // Award deeds instead of experience
-  if (typeof window.awardDeeds === 'function') {
-    window.awardDeeds(totalDeeds, window.DEEDS_SOURCES.COMBAT, `Defeated ${this.state.enemies.length} enemies`);
+  // Prepare conclusion narrative
+  let narrativeText = [];
+  
+  if (outcome === true) {
+    // Victory
+    narrativeText = [
+      "The battlefield falls silent as your enemies have been defeated.",
+      "You stand victorious, your weapons slick with the blood of your foes."
+    ];
+    
+    // Calculate victory rewards and track combat feats
+    let totalDeeds = 0;
+    this.state.enemies.forEach(enemy => {
+      if (enemy.health <= 0) {
+        if (typeof window.recordCombatFeat === 'function') {
+          window.recordCombatFeat(enemy.name);
+        }
+        totalDeeds += enemy.experienceValue || 10;
+      } else {
+        const damagePercent = (enemy.maxHealth - enemy.health) / enemy.maxHealth;
+        totalDeeds += Math.floor((enemy.experienceValue || 10) * damagePercent * 0.5);
+      }
+    });
+    
+    if (typeof window.awardDeeds === 'function') {
+      window.awardDeeds(totalDeeds, window.DEEDS_SOURCES.COMBAT, `Defeated ${this.state.enemies.length} enemies`);
+    } else {
+      window.gameState.deeds += totalDeeds;
+    }
+    
+    narrativeText.push(`You've earned ${totalDeeds} deeds from this encounter.`);
+    
+    // Generate loot from all defeated enemies
+    const lootMessage = this.generateLootFromAll();
+    if (lootMessage) {
+      narrativeText.push(lootMessage);
+    }
+    
+    // Update achievement if first combat victory
+    if (!window.gameState.combatVictoryAchieved) {
+      window.gameState.combatVictoryAchieved = true;
+      window.showAchievement('first_blood');
+    }
+    
+    // Minor armor durability damage
+    this.applyArmorDurabilityDamage(0.75);
+  } else if (outcome === "retreat") {
+    // Player retreated
+    narrativeText = [
+      "You find an opening and quickly disengage from combat.",
+      "With swift footwork, you manage to escape the fight and slip away."
+    ];
+    
+    // Minor armor durability damage on retreat
+    this.applyArmorDurabilityDamage(0.5);
   } else {
-    // Fallback to old system if feats system isn't loaded
-    window.gameState.deeds += totalDeeds;
+    // DEATH - no survival possible
+    window.gameState.playerDied = true;
+    
+    // Death narrative
+    narrativeText = [
+      "Your vision dims as the final blow strikes home.",
+      "Blood seeping into the mud beneath you, your journey ends here on the battlefield.",
+      "In the Paanic Empire, there is only victory or death. Today, death claimed you."
+    ];
+    
+    // Calculate final stats for death screen
+    const totalDeeds = window.gameState.deeds || 0;
+    const enemiesDefeated = window.gameState.feats?.enemiesDefeated || 0;
+    const questsCompleted = window.gameState.feats?.questsCompleted || 0;
+    const finalScore = totalDeeds + (window.gameDay * 10) + (enemiesDefeated * 5);
+    
+    // Record death event if feat system is available
+    if (typeof window.recordSpecialFeat === 'function') {
+      window.recordSpecialFeat('death', `Died in battle on day ${window.gameDay}. Final score: ${finalScore}`);
+    }
+    
+    // Get rank information
+    const finalRank = window.getCurrentRank ? window.getCurrentRank() : { title: 'Unknown', description: 'Unknown' };
+    
+    // Add stats to death narrative
+    narrativeText.push(`Final rank: ${finalRank.title} (${finalRank.description})`);
+    narrativeText.push(`Days survived: ${window.gameDay}`);
+    narrativeText.push(`Total deeds earned: ${totalDeeds}`);
+    narrativeText.push(`Enemies defeated: ${enemiesDefeated}`);
+    narrativeText.push(`Quests completed: ${questsCompleted}`);
+    narrativeText.push(`FINAL SCORE: ${finalScore}`);
   }
   
-  // Add deeds gain to narrative
-  narrativeText.push(`You've earned ${totalDeeds} deeds from this encounter.`);
-
-      
-      // Generate loot from all defeated enemies
-      const lootMessage = this.generateLootFromAll();
-      if (lootMessage) {
-        narrativeText.push(lootMessage);
-      }
-      
-      // Update achievement if first combat victory
-      if (!window.gameState.combatVictoryAchieved) {
-        window.gameState.combatVictoryAchieved = true;
-        window.showAchievement('first_blood');
-      }
-      
-      // Minor armor durability damage
-      this.applyArmorDurabilityDamage(0.75);
+  // Show battle conclusion through UI
+  if (window.combatUI && typeof window.combatUI.showBattleConclusionModal === 'function') {
+    window.combatUI.showBattleConclusionModal(outcome, narrativeText);
+  } else {
+    // Fallback method if UI not available
+    document.getElementById('combatInterface').classList.add('hidden');
+    
+    // Hide modal container if it exists
+    const modalContainer = document.querySelector('.combat-modal');
+    if (modalContainer) {
+      modalContainer.style.display = 'none';
+    }
+    
+    // Show notification based on outcome
+    if (window.gameState.playerDied) {
+      window.showNotification(`You have died. Game over.`, 'error');
+      window.returnToMainMenu();
+    } else if (outcome === true) {
+      window.showNotification(`Victory!`, 'success');
     } else if (outcome === "retreat") {
-      // Player retreated
-      narrativeText = [
-        "You find an opening and quickly disengage from combat.",
-        "With swift footwork, you manage to escape the fight and slip away."
-      ];
-      
-      // Minor armor durability damage on retreat
-      this.applyArmorDurabilityDamage(0.5);
-    } else {
-      // Player defeat
-      narrativeText = [
-        "Your vision blurs as exhaustion and pain overtake you.",
-        "Though defeated, you somehow manage to crawl away before your enemies can finish you off."
-      ];
-      
-      window.gameState.health = Math.max(1, window.gameState.health); // Ensure player doesn't die
-      
-      // Apply stamina penalty for defeat
-      window.gameState.stamina = Math.max(0, window.gameState.stamina - 50);
-      narrativeText.push("The defeat has severely drained your stamina.");
-      
-      // More significant armor durability damage on defeat
-      this.applyArmorDurabilityDamage(2);
+      window.showNotification("You managed to escape.", 'info');
+    } else if (outcome === "draw") {
+      window.showNotification(`Combat ended in a draw.`, 'info');
     }
-    
-    // Show conclusion modal through UI if available
-    if (window.combatUI && typeof window.combatUI.showBattleConclusionModal === 'function') {
-      window.combatUI.showBattleConclusionModal(conclusionType, narrativeText);
-    } else {
-      // Fallback method - just hide combat interface
-      document.getElementById('combatInterface').classList.add('hidden');
-      
-      // Hide the modal container
-      const modalContainer = document.querySelector('.combat-modal');
-      if (modalContainer) {
-        modalContainer.style.display = 'none';
-      }
-      
-      // Show notification based on outcome
-      if (outcome === true) {
-        window.showNotification(`Victory!`, 'success');
-      } else if (outcome === "draw") {
-        window.showNotification(`Combat ended in a draw.`, 'info');
-      } else if (outcome === "retreat") {
-        window.showNotification("You managed to escape combat.", 'info');
-      } else {
-        window.showNotification("You were defeated but survived.", 'warning');
-      }
-    }
-    
-    // Update game UI
-    window.updateStatusBars();
-    window.updateActionButtons();
-    window.updateProfileIfVisible();
-    
-    // Check for level up
-    window.checkLevelUp();
-  },
+  }
+  
+  // For death, don't update UI or check level
+  if (window.gameState.playerDied) {
+    return;
+  }
+  
+  // Update game UI for non-death outcomes
+  window.updateStatusBars();
+  window.updateActionButtons();
+  window.updateProfileIfVisible();
+  
+  // Check for level up
+  window.checkLevelUp();
+},
   
   // Generate loot from all defeated enemies
   generateLootFromAll: function() {

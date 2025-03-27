@@ -611,17 +611,14 @@ window.addStartingItems = function() {
       break;
       
     case "Berserker":
-      // Berserker should have an axe, not a bow!
-      // Using basic_axe template if available, or could fall back to sword
-      if (window.itemTemplates.battleaxe) {
-        window.addItemToInventory(window.itemTemplates.battleaxe);
+      if (window.itemTemplates.GREATSWORD) {
+        window.addItemToInventory(window.itemTemplates.GREATSWORD);
       } else {
-        // Create a basic axe if it doesn't exist
-        window.itemTemplates.basicAxe = window.createWeapon({
-          id: 'basic_axe',
-          name: 'Wyrd Battleaxe',
-          description: 'A brutal axe favored by Wyrdman berserkers. Ideal for cleaving through enemies in a rage.',
-          weaponType: window.WEAPON_TYPES.BATTLEAXE,
+        window.itemTemplates.largecleaver = window.createWeapon({
+          id: 'large_cleaver',
+          name: 'Wyrd Cleaver',
+          description: 'A brutal two-handed cleaver favored by Wyrdman berserkers. Ideal for carving through enemies in a rage.',
+          weaponType: window.WEAPON_TYPES.GREATSWORD,
           damage: 15,
           value: 40,
           stats: {
@@ -631,16 +628,16 @@ window.addStartingItems = function() {
           },
           maxDurability: 180
         });
-        window.addItemToInventory(window.itemTemplates.basicAxe);
+        window.addItemToInventory(window.itemTemplates.largecleaver);
       }
       window.addItemToInventory(window.itemTemplates.scoutArmor);
       
       // Auto-equip items
       setTimeout(() => {
         try {
-          const axe = window.player.inventory.find(i => 
-            i.templateId === 'basic_axe' || i.templateId === 'battleaxe');
-          if (axe) window.equipItem(axe.instanceId);
+          const greatsword = window.player.inventory.find(i => 
+            i.templateId === 'large_cleaver' || i.templateId === 'largecleaver');
+          if (greatsword) window.equipItem(greatsword.instanceId);
           
           const scoutArmor = window.player.inventory.find(i => i.templateId === 'scout_armor');
           if (scoutArmor) window.equipItem(scoutArmor.instanceId);

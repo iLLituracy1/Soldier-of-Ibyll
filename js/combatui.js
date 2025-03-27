@@ -467,80 +467,101 @@ window.combatUI = {
   },
   
   // Show a dramatic battle conclusion modal
-  showBattleConclusionModal: function(outcome, narrativeText) {
-    // Create modal container if it doesn't exist
-    let conclusionModal = document.getElementById('battle-conclusion-modal');
-    if (!conclusionModal) {
-      conclusionModal = document.createElement('div');
-      conclusionModal.id = 'battle-conclusion-modal';
-      conclusionModal.className = 'combat-conclusion-modal';
-      document.body.appendChild(conclusionModal);
-    }
-    
-    // Determine title based on outcome
-    let title = "Battle Concluded";
-    let titleClass = "";
-    
-    switch (outcome) {
-      case "victory":
-        title = "Victory!";
-        titleClass = "victory-title";
-        break;
-      case "defeat":
-        title = "Defeat";
-        titleClass = "defeat-title";
-        break;
-      case "retreat":
-        title = "Tactical Retreat";
-        titleClass = "retreat-title";
-        break;
-      case "draw":
-        title = "Battle Shifts";
-        titleClass = "draw-title";
-        break;
-    }
-    
-    // Build the modal content
-    let modalContent = `
-      <div class="conclusion-content">
-        <h2 class="conclusion-title ${titleClass}">${title}</h2>
-        <div class="conclusion-narrative">
-          ${narrativeText.map(text => `<p>${text}</p>`).join('')}
-        </div>
-        <button id="return-to-game" class="conclusion-button">Continue</button>
+// In combatUI.js
+showBattleConclusionModal: function(outcome, narrativeText) {
+  // Create modal container if it doesn't exist
+  let conclusionModal = document.getElementById('battle-conclusion-modal');
+  if (!conclusionModal) {
+    conclusionModal = document.createElement('div');
+    conclusionModal.id = 'battle-conclusion-modal';
+    conclusionModal.className = 'combat-conclusion-modal';
+    document.body.appendChild(conclusionModal);
+  }
+  
+  // Determine title and class
+  let title, titleClass, buttonText;
+  
+  if (outcome === false) {
+    // Player defeat is always death
+    title = "DEATH";
+    titleClass = "death-title";
+    conclusionModal.className = 'combat-conclusion-modal game-over-modal';
+    buttonText = "Return to Main Menu";
+  } else if (outcome === true || outcome === "victory") {
+    title = "Victory!";
+    titleClass = "victory-title";
+    buttonText = "Continue";
+  } else if (outcome === "draw") {
+    title = "Battle Shifts";
+    titleClass = "draw-title";
+    buttonText = "Continue";
+  } else if (outcome === "retreat") {
+    title = "Tactical Retreat";
+    titleClass = "retreat-title";
+    buttonText = "Continue";
+  }
+  
+  // Build the modal content
+  let modalContent = `
+    <div class="conclusion-content">
+      <h2 class="conclusion-title ${titleClass}">${title}</h2>
+      <div class="conclusion-narrative">
+        ${narrativeText.map(text => `<p>${text}</p>`).join('')}
       </div>
-    `;
+      ${outcome === false ? `
+        <div class="final-score">
+          Final Score: ${window.gameState.deeds + (window.gameDay * 10) + ((window.gameState.feats?.enemiesDefeated || 0) * 5)}
+        </div>
+      ` : ''}
+      <button id="return-to-game" class="conclusion-button">
+        ${buttonText}
+      </button>
+    </div>
+  `;
+  
+  // Set the content
+  conclusionModal.innerHTML = modalContent;
+  
+  // Apply CSS styling
+  this.applyBattleConclusionStyles();
+  
+  // Show the modal
+  conclusionModal.style.display = 'flex';
+  
+  // Hide the combat interface
+  this.hideCombatInterface();
+  
+  // Add event listener to the continue button
+  document.getElementById('return-to-game').addEventListener('click', function() {
+    conclusionModal.style.display = 'none';
     
-    // Set the content
-    conclusionModal.innerHTML = modalContent;
-    
-    // Apply CSS styling
-    this.applyBattleConclusionStyles();
-    
-    // Show the modal
-    conclusionModal.style.display = 'flex';
-    
-    // Hide the combat interface
-    this.hideCombatInterface();
-    
-    // Add event listener to the continue button
-    document.getElementById('return-to-game').addEventListener('click', () => {
-      conclusionModal.style.display = 'none';
+    if (outcome === false) {
+      console.log("GAME OVER - Player died, forcing return to main menu");
       
-      // Show appropriate notification based on outcome
-      if (outcome === "victory") {
-        const expMatch = narrativeText.find(text => text.includes('experience'));
-        const exp = expMatch ? expMatch.match(/\d+/) : '0';
-        window.showNotification(`Victory! +${exp} XP`, 'success');
+      // Delete save file if possible
+      if (typeof window.deleteCurrentSaveOnDeath === 'function') {
+        window.deleteCurrentSaveOnDeath();
+      }
+      
+      // Force return to main menu
+      window.returnToMainMenu();
+      
+      // Use setTimeout as a safety measure
+      setTimeout(function() {
+        window.returnToMainMenu();
+      }, 500);
+    } else {
+      // Victory or draw notification
+      if (outcome === true || outcome === "victory") {
+        window.showNotification(`Victory!`, 'success');
       } else if (outcome === "draw") {
         window.showNotification(`Combat ended in a draw.`, 'info');
       } else if (outcome === "retreat") {
         window.showNotification("You managed to escape combat.", 'info');
-      } else {
-        window.showNotification("You were defeated but survived.", 'warning');
       }
-    });
-  },
+    }
+  });
+},
   
   // Apply styles for battle conclusion modal
   applyBattleConclusionStyles: function() {
@@ -802,6 +823,30 @@ window.combatUI = {
   .enemy-stats-attr-label {
     color: #aaa;
   }
+
+    /* Death-specific styles */
+    .death-title {
+      color: #ff0000 !important;
+      text-shadow: 0 0 10px rgba(255, 0, 0, 0.7) !important;
+      font-size: 2.5em !important;
+      letter-spacing: 3px !important;
+    }
+    
+    .game-over-modal .conclusion-content {
+      border-color: #8B0000 !important;
+      box-shadow: 0 0 40px rgba(139, 0, 0, 0.6) !important;
+      background-image: url('data:image/png;base64,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');
+    }
+    
+    .final-score {
+      font-size: 1.5em;
+      color: #c9aa71;
+      margin: 15px 0;
+      text-align: center;
+      font-weight: bold;
+      text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+    }
+
     `;
     
     document.head.appendChild(styleElement);

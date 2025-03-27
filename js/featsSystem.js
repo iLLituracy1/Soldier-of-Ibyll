@@ -523,6 +523,46 @@ window.applyFeatSystemStyles = function() {
   document.head.appendChild(styleElement);
 };
 
+// Add this to featsSystem.js at the end before the closing event listener
+// Function to record a player's death with final stats
+window.recordPlayerDeath = function(cause) {
+  // Calculate final score components
+  const daysLived = window.gameDay || 1;
+  const enemiesDefeated = window.gameState.feats?.enemiesDefeated || 0;
+  const questsCompleted = window.gameState.feats?.questsCompleted || 0;
+  const totalDeeds = window.gameState.deeds || 0;
+  const rankIndex = window.gameState.rankIndex || 0;
+  
+  // Calculate score
+  const dayScore = daysLived * 10;
+  const enemyScore = enemiesDefeated * 5;
+  const questScore = questsCompleted * 25;
+  const rankBonus = rankIndex * 100;
+  const totalScore = dayScore + enemyScore + questScore + totalDeeds + rankBonus;
+  
+  // Format cause of death
+  const deathCause = cause || "Unknown causes";
+  
+  // Record special feat
+  if (typeof window.recordSpecialFeat === 'function') {
+    window.recordSpecialFeat(
+      'death', 
+      `${window.player.name} died on day ${daysLived} (${deathCause}). Final score: ${totalScore}`
+    );
+  }
+  
+  return {
+    totalScore,
+    components: {
+      days: dayScore,
+      enemies: enemyScore,
+      quests: questScore,
+      deeds: totalDeeds,
+      rank: rankBonus
+    }
+  };
+};
+
 // Initialize during load
 document.addEventListener('DOMContentLoaded', function() {
   // Apply styles immediately
