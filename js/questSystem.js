@@ -191,13 +191,17 @@ window.handleQuestStageAction = function(quest, stage) {
           // Store performance data
           if (!quest.userData) quest.userData = {};
           quest.userData[`${stage.id}_start`] = true;
-          
-          // Initiate combat when the player clicks the button
-          window.combatSystem.initiateCombat(
-            stage.enemyType, 
-            [], 
-            stage.combatOptions || { requireDefeat: true }
-          );
+                  
+                // Initiate combat when the player clicks the button
+        window.combatSystem.initiateCombat(
+          stage.enemyType, 
+          [], 
+          {
+            requireDefeat: true,
+            enemySequence: stage.enemySequence,
+            ...(stage.combatOptions || {})
+          }
+        );
           
           // Store the original end combat function
           const originalEndCombat = window.combatSystem.endCombat;

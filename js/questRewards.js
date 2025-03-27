@@ -11,7 +11,6 @@ window.enhancedQuestRewards = {
     
     // Enhanced items with more variety and thematic connection to the mission
     items: [
-      { id: 'health_potion', quantity: 2, message: 'Medicinal supplies recovered from the outpost' },
       { id: 'arrasi_blade', quantity: 1, message: 'An ornate Arrasi officer\'s blade' }, 
       { id: 'arrasi_pendant', quantity: 1, message: 'Intelligence: A pendant with Arrasi military markings' },
       { id: 'captured_maps', quantity: 1, message: 'Intelligence: Arrasi patrol routes and supply lines' }
@@ -40,30 +39,7 @@ window.enhancedQuestRewards = {
     // Final dialogue from the Sarkein that mentions the rewards
     completionDialogue: 'The maps and intelligence you recovered will be invaluable for future operations in this sector. Your unit\'s performance was commendable, and you\'ve earned these spoils. The Arrasi blade is particularly fine - a mark of an officer. Keep it as a trophy of your victory.'
   },
-  
-  // Enhanced rewards for the Patrol Duty quest
-  patrol_duty: {
-    experience: 75,
-    taelors: 30,
-    
-    items: [
-      { id: 'health_potion', quantity: 1, message: 'Field medical supplies' },
-      { id: 'arrasi_dagger', quantity: 1, message: 'A small dagger taken from an Arrasi scout' }
-    ],
-    
-    conditionalRewards: {
-      // If player reports the ambush quickly
-      quickReport: {
-        experience: 15,
-        taelors: 10,
-        items: [
-          { id: 'scouting_map', quantity: 1, message: 'Updated patrol routes with marked danger zones' }
-        ]
-      }
-    },
-    
-    completionDialogue: 'Your patrol has provided valuable intelligence about Arrasi movements in the area. The speed of your report has helped us prepare defenses against their probing attacks. Good work, soldier.'
-  }
+
 };
 
 // Custom item definitions for quest rewards

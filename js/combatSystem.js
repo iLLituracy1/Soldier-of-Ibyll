@@ -95,6 +95,11 @@ window.combatSystem = {
       counterChain: 0,
       maxCounterChain: 4,
       lastCounterActor: null,
+
+      // Wave-based combat properties
+      currentWaveIndex: 0,
+      enemySequence: options.enemySequence || null,
+      remainingWaves: options.enemySequence ? options.enemySequence[0].waves : 0,
       
       // Backward compatibility
       enemy: null,
@@ -387,10 +392,21 @@ window.combatSystem = {
         break;
         
         case "resolution":
-          // Check if combat requires defeat
+                  // Check if combat requires defeat
           if (this.state.requireDefeat) {
             // Check if all enemies are defeated
             if (this.areAllEnemiesDefeated()) {
+              // Check if there are more waves to spawn
+              if (this.state.enemySequence && this.checkNextWave()) {
+                // Spawn next wave
+                this.spawnNextWave();
+                
+                // Continue to player phase
+                setTimeout(() => this.enterPhase("player"), 1500);
+                return;
+              }
+              
+              // No more waves, end combat with victory
               this.endCombat(true); // Player victory
               return;
             }
@@ -2343,6 +2359,56 @@ window.combatSystem = {
       }
     }
   },
+
+  // Check if there's another wave to spawn
+checkNextWave: function() {
+  if (!this.state.enemySequence) {
+    return false;
+  }
+  
+  // Check if there are waves remaining in the current wave type
+  if (this.state.remainingWaves > 1) {
+    return true;
+  }
+  
+  // Check if there are more wave types in the sequence
+  const nextWaveIndex = this.state.currentWaveIndex + 1;
+  return nextWaveIndex < this.state.enemySequence.length;
+},
+
+// Spawn the next wave of enemies
+spawnNextWave: function() {
+  if (!this.state.enemySequence) {
+    return;
+  }
+  
+  let waveIndex = this.state.currentWaveIndex;
+  let waveData = this.state.enemySequence[waveIndex];
+  
+  // If current wave type still has waves, decrement counter
+  if (this.state.remainingWaves > 1) {
+    this.state.remainingWaves--;
+  } else {
+    // Move to the next wave type
+    waveIndex = ++this.state.currentWaveIndex;
+    waveData = this.state.enemySequence[waveIndex];
+    this.state.remainingWaves = waveData.waves;
+  }
+  
+  // Add a message to the combat log
+  this.addCombatMessage("A new wave of enemies approaches!");
+  
+  // Create enemies for this wave
+  for (const enemyType of waveData.type) {
+    const enemy = this.createEnemy(enemyType);
+    this.state.enemies.push(enemy);
+  }
+  
+  // Update UI
+  if (window.combatUI) {
+    window.combatUI.updateCombatInterface();
+  }
+},
   
   // End combat and handle outcome
   endCombat: function(outcome) {

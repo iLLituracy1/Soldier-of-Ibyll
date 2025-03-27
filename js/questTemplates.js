@@ -202,14 +202,14 @@ window.questTemplates = {
         objective: 'Assault the Arrasi outpost.',
         action: 'combat',
         battleType: 'individual',
-        enemyType: ["ARRASI_DRUSKARI", 'ARRASI_VAELGORR'],
-        enemySequence: [
-          { type: ["ARRASI_DRUSKARI", "ARRASI_VAELGORR"], waves: 2 },
-          { type: ["ARRASI_VAELGOR", "ARRASI_VAELGORR"], waves: 2},
-        ],
+        enemyType: 'ARRASI_VAELGORR',
         combatOptions:{
           requireDefeat: false,
-          maxTurns: 75
+          maxTurns: 45,
+          enemySequence: [
+            { type: ["ARRASI_DRUSKARI", "ARRASI_VAELGORR"], waves: 2 },
+            { type: ["ARRASI_VAELGORR", "ARRASI_VAELGORR"], waves: 2},
+          ],
         },
         narrative: `<p>The attack begins in earnest. The first assault group launches flaming arrows over the palisade, creating a diversion at the main gate. Shouts and alarms ring out across the outpost.</p>
           
