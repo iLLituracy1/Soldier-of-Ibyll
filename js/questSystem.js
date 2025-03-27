@@ -171,69 +171,70 @@ window.handleQuestStageAction = function(quest, stage) {
       }
       break;
       
-    case window.BATTLE_TYPES.INDIVIDUAL:
-      // Display pre-combat narrative
-      window.setNarrative(stage.narrative || stage.description);
-      
-      // CHANGE: Instead of automatically starting combat after a delay,
-      // we'll show the "Engage" button and let the player start combat when ready
-      window.updateQuestActionButtons(quest);
-      
-      // Store the original progress quest function so we can override it for combat stages
-      const originalProgressQuest = window.progressQuest;
-      
-      // Override progressQuest temporarily for this combat stage
-      window.progressQuest = function(questId, actionType) {
-        // Restore the original function first
-        window.progressQuest = originalProgressQuest;
+      case window.BATTLE_TYPES.INDIVIDUAL:
+        // Display pre-combat narrative
+        window.setNarrative(stage.narrative || stage.description);
         
-        if (actionType === 'combat') {
-          // Store performance data
-          if (!quest.userData) quest.userData = {};
-          quest.userData[`${stage.id}_start`] = true;
-                  
-                // Initiate combat when the player clicks the button
-        window.combatSystem.initiateCombat(
-          stage.enemyType, 
-          [], 
-          {
-            requireDefeat: true,
-            enemySequence: stage.enemySequence,
-            ...(stage.combatOptions || {})
-          }
-        );
+        // CHANGE: Instead of automatically starting combat after a delay,
+        // we'll show the "Engage" button and let the player start combat when ready
+        window.updateQuestActionButtons(quest);
+        
+        // Store the original progress quest function so we can override it for combat stages
+        const originalProgressQuest = window.progressQuest;
+        
+        // Override progressQuest temporarily for this combat stage
+        window.progressQuest = function(questId, actionType) {
+          // Restore the original function first
+          window.progressQuest = originalProgressQuest;
           
-          // Store the original end combat function
-          const originalEndCombat = window.combatSystem.endCombat;
-          
-          // Override the endCombat function to continue the quest after combat
-          window.combatSystem.endCombat = function(outcome) {
-            // Call the original function first
-            originalEndCombat.call(window.combatSystem, outcome);
-            
-            // Restore the original function
-            window.combatSystem.endCombat = originalEndCombat;
-            
-            // Continue based on outcome
-            setTimeout(() => {
-              if (outcome === true) {
-                // Success
-                window.addToNarrative(stage.successText || "You are victorious!");
-                
-                // Continue to next stage
-                originalProgressQuest.call(window, quest.id, stage.action);
-              } else {
-                // Failure
-                window.addToNarrative(stage.failureText || "You have been defeated.");
-                window.failQuest(quest.id);
+          if (actionType === 'combat') {
+            // Store performance data
+            if (!quest.userData) quest.userData = {};
+            quest.userData[`${stage.id}_start`] = true;
+                    
+            // Initiate combat when the player clicks the button
+            window.combatSystem.initiateCombat(
+              stage.enemyType, 
+              [], 
+              {
+                requireDefeat: true,
+                enemySequence: stage.enemySequence,
+                ...(stage.combatOptions || {})
               }
-            }, 1500);
-          };
-        } else {
-          // For non-combat actions, just call the original function
-          originalProgressQuest.call(window, questId, actionType);
-        }
-      };
+            );
+            
+            // Store the original end combat function
+            const originalEndCombat = window.combatSystem.endCombat;
+            
+            // Override the endCombat function to continue the quest after combat
+            window.combatSystem.endCombat = function(outcome) {
+              // Call the original function first
+              originalEndCombat.call(window.combatSystem, outcome);
+              
+              // Restore the original function
+              window.combatSystem.endCombat = originalEndCombat;
+              
+              // Continue based on outcome
+              setTimeout(() => {
+                // Consider both true victory and "draw" (turn timeout) as success
+                if (outcome === true || outcome === "draw") {
+                  // Success - either through victory or timeout
+                  window.addToNarrative(stage.successText || "You survived the encounter!");
+                  
+                  // Continue to next stage
+                  originalProgressQuest.call(window, quest.id, stage.action);
+                } else {
+                  // Only treat defeat and retreat as failure
+                  window.addToNarrative(stage.failureText || "You have been defeated.");
+                  window.failQuest(quest.id);
+                }
+              }, 1500);
+            };
+          } else {
+            // For non-combat actions, just call the original function
+            originalProgressQuest.call(window, questId, actionType);
+          }
+        };
       break;
       
     default:

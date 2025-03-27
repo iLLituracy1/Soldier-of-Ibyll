@@ -391,63 +391,64 @@ window.combatSystem = {
         this.scheduleEnemyAction(() => this.processEnemyTurn(), 1000);
         break;
         
-        case "resolution":
-                  // Check if combat requires defeat
-          if (this.state.requireDefeat) {
-            // Check if all enemies are defeated
-            if (this.areAllEnemiesDefeated()) {
-              // Check if there are more waves to spawn
-              if (this.state.enemySequence && this.checkNextWave()) {
-                // Spawn next wave
-                this.spawnNextWave();
-                
-                // Continue to player phase
-                setTimeout(() => this.enterPhase("player"), 1500);
-                return;
-              }
-              
-              // No more waves, end combat with victory
-              this.endCombat(true); // Player victory
-              return;
-            }
+
+      case "resolution":
+        // Check if all enemies are defeated - regardless of requireDefeat setting
+        if (this.areAllEnemiesDefeated()) {
+          // Check if there are more waves to spawn - do this for both settings
+          if (this.state.enemySequence && this.checkNextWave()) {
+            // Spawn next wave
+            this.spawnNextWave();
             
-            // Check if player is defeated
-            if (window.gameState.health <= 0) {
-              this.endCombat(false); // Player defeat
-              return;
-            }
+            // Continue to player phase
+            setTimeout(() => this.enterPhase("player"), 1500);
+            return;
+          }
+          
+          // No more waves, end combat with victory
+          this.endCombat(true); // Player victory
+          return;
+        }
         
-            // IMPORTANT: When requireDefeat is true, IGNORE turn limit
-            // Combat continues regardless of turns
+        // Check if player is defeated
+        if (window.gameState.health <= 0) {
+          this.endCombat(false); // Player defeat
+          return;
+        }
+
+        // After handling all common logic, now handle the setting-specific logic
+        if (this.state.requireDefeat) {
+          // When requireDefeat is true, IGNORE turn limit
+          // Combat continues regardless of turns
+        } else {
+          // If NOT requiring defeat (default behavior)
+          // Check if maximum turns reached
+          if (this.state.turn >= this.state.maxTurns) {
+            this.endCombatEarly();
+            return;
+          }
+        }
+        
+        // Combat continues - increment turn counter
+        this.state.turn++;
+        
+        // Restore player's target if needed
+        if (this._playerTargetIndex !== undefined) {
+          // Ensure the target is still valid
+          if (this._playerTargetIndex < this.state.enemies.length && 
+              this.state.enemies[this._playerTargetIndex] && 
+              this.state.enemies[this._playerTargetIndex].health > 0) {
+            this.state.activeEnemyIndex = this._playerTargetIndex;
           } else {
-            // If NOT requiring defeat (default behavior)
-            // Check if maximum turns reached
-            if (this.state.turn >= this.state.maxTurns) {
-              this.endCombatEarly();
-              return;
-            }
+            // If original target is invalid, find the first valid enemy
+            this.state.activeEnemyIndex = this.state.enemies.findIndex(e => e.health > 0);
+            if (this.state.activeEnemyIndex === -1) this.state.activeEnemyIndex = 0;
           }
-          
-          // Combat continues - increment turn counter
-          this.state.turn++;
-          
-          // Restore player's target if needed
-          if (this._playerTargetIndex !== undefined) {
-            // Ensure the target is still valid
-            if (this._playerTargetIndex < this.state.enemies.length && 
-                this.state.enemies[this._playerTargetIndex] && 
-                this.state.enemies[this._playerTargetIndex].health > 0) {
-              this.state.activeEnemyIndex = this._playerTargetIndex;
-            } else {
-              // If original target is invalid, find the first valid enemy
-              this.state.activeEnemyIndex = this.state.enemies.findIndex(e => e.health > 0);
-              if (this.state.activeEnemyIndex === -1) this.state.activeEnemyIndex = 0;
-            }
-          }
-          
-          // Return to player phase
-          this.enterPhase("player");
-          break;
+        }
+        
+        // Return to player phase
+        this.enterPhase("player");
+        break;
     }
     
     console.log(`Combat phase changed: ${previousPhase} -> ${phase}`);
@@ -482,6 +483,25 @@ window.combatSystem = {
   areAllEnemiesDefeated: function() {
     return this.state.enemies.every(enemy => enemy.health <= 0);
   },
+  
+  // Helper function to check if combat should end with victory
+shouldEndCombatWithVictory: function() {
+  // First check if all current enemies are defeated
+  const allEnemiesDefeated = this.areAllEnemiesDefeated();
+  
+  // If enemies are still alive, definitely not victory
+  if (!allEnemiesDefeated) {
+    return false;
+  }
+  
+  // If all enemies are defeated, check if there are more waves
+  if (this.state.enemySequence && this.checkNextWave()) {
+    return false; // More waves available, don't end yet
+  }
+  
+  // All enemies defeated and no more waves
+  return true;
+},
   
   // Helper function to check if all allies are defeated
   areAllAlliesDefeated: function() {
@@ -1140,10 +1160,8 @@ window.combatSystem = {
         this.addCombatMessage(`The ${enemy.name} collapses before you, defeated.`);
         
         // Check if all enemies are defeated
-        if (this.areAllEnemiesDefeated()) {
-          // End combat immediately
+        if (this.shouldEndCombatWithVictory()) {
           setTimeout(() => this.endCombat(true), 1500);
-          return;
         }
       }
     } else {
@@ -1328,10 +1346,8 @@ window.combatSystem = {
         this.addCombatMessage(`The ${enemy.name} collapses, defeated by your well-aimed javelin.`);
         
         // Check if all enemies are defeated
-        if (this.areAllEnemiesDefeated()) {
-          // End combat immediately
+        if (this.shouldEndCombatWithVictory()) {
           setTimeout(() => this.endCombat(true), 1500);
-          return;
         }
       }
     } else {
@@ -1416,10 +1432,8 @@ window.combatSystem = {
         this.addCombatMessage(`The ${enemy.name} collapses from your shield bash.`);
         
         // Check if all enemies are defeated
-        if (this.areAllEnemiesDefeated()) {
-          // End combat immediately
+        if (this.shouldEndCombatWithVictory()) {
           setTimeout(() => this.endCombat(true), 1500);
-          return;
         }
       }
     } else {
@@ -1617,10 +1631,8 @@ window.combatSystem = {
         this.addCombatMessage(`The ${enemy.name} falls before your counter-attack.`);
         
         // Check if all enemies are defeated
-        if (this.areAllEnemiesDefeated()) {
-          // End combat immediately
+        if (this.shouldEndCombatWithVictory()) {
           setTimeout(() => this.endCombat(true), 1500);
-          return;
         }
       }
       
