@@ -48,6 +48,7 @@ window.questTemplates = {
         objective: 'March to the frontier.',
         action: 'proceed',
         battleType: 'narrative',
+        timeAdvance: 700, 
         narrative: `<p>Dawn breaks with a blood-red sun as your Spear Host assembles at the camp's edge. The Sarkein inspects the units briefly, then gives the order to move out. The column of soldiers winds its way westward, shields and spears glinting in the early morning light.</p>
           
           <p>The terrain grows increasingly rugged as you approach the frontier. The column moves in practiced silence, with scouts ranging ahead and to the flanks. Dust clings to your armor and throat as the hours pass.</p>
@@ -56,14 +57,37 @@ window.questTemplates = {
           
           <p>"The outpost is just beyond that next rise," he says, pointing westward. "We'll need to scout it properly before we commit to an attack."</p>
           
-          <p>Your Vayren returns to your Squad with orders. "Our unit is to provide a small scouting party to circle north and assess their defenses. Three soldiers. Ready yourselves."</p>
-          
-          <p>The Vayren points to you and two others. "You three, move out. Circle around, observe guard positions, routines, and any weak points. Report back within the hour."</p>`,
-        nextStage: 'stage_scout'
+          <p>Your Vayren returns to your squad with orders. "Our unit is to provide a small scouting party to circle north and assess their defenses. Three soldiers. Volunteers?"</p>`,
+        choices: [
+          {
+            text: "Volunteer.",
+            action: "volunteer_scout",
+            nextStage: "stage_scout"
+          },
+          {
+            text: "Remain silent.",
+            action: "remain_silent",
+            nextStage: "stage_wait"
+          }
+        ]
+      },
+      {
+        id: 'stage_wait',
+        description: 'You dont take the opportunity to volunteer for the scouting mission.',
+        objective: 'Wait for the scouts to return.',
+        action: 'wait',
+        battleType: 'narrative',
+        narrative: `<p>Hours pass as you wait for the scouting party to return. You can't help but wonder if they've gotten into trouble.</p>
+        
+        <p>When they finally do show up, they're bloodied and bruised. It seems they encountered an Arrasi patrol, but managed to take care of them, ensuring no alarm to our whereabouts was raised.</p>
+        
+        <p>The Vayren reorganizes your squad and heads to relay the information to Sarkein Reval, who immediately gives the mobilization order. Within the hour, our assault will begin.</p>`,
+        timeAdvance: 240,             
+        nextStage: 'stage_assault'     
       },
       {
         id: 'stage_scout',
-        description: 'As you approach the outpost, the Sarkein orders a scouting party to assess the enemy\'s defenses.',
+        description: 'You step up, volunteering as a scout.',
         objective: 'Participate in scouting the outpost.',
         action: 'proceed',
         battleType: 'narrative',
@@ -126,6 +150,7 @@ window.questTemplates = {
     <p>The remaining soldier - a more alert guard at the rear of the patrol - manages to draw his weapon as he realizes what's happening. He turns to face you, his eyes wide with the sudden understanding that he is alone.</p>`,
   successText: "With the advantage of your well-executed ambush, you dispatch the final Arrasi soldier before he can raise an alarm. The patrol has been eliminated with impressive efficiency.",
   failureText: "Despite your advantageous position, the remaining Arrasi soldier proves more skilled than anticipated. You lay in the dirt, listening to your comrades fighting as your consciousness fades away.",
+  timeAdvance: 240, 
   nextStage: 'stage_patrol_report'
 },
 
@@ -147,6 +172,7 @@ window.questTemplates = {
     <p>Two of the Arrasi soldiers notice your movement and call out an alarm. The element of surprise is lost as they draw their weapons and charge toward your position!</p>`,
   successText: "The last Arrasi soldier falls, and your scouting party quickly drags the bodies into the underbrush. The three of you need to report back to the Sarkein quickly.",
   failureText: "You find yourself overwhelmed by the Arrasi patrol. As consciousness fades, you hear shouts of alarm being raised.",
+  timeAdvance: 240, 
   nextStage: 'stage_patrol_report'
 },
       {
@@ -205,7 +231,9 @@ window.questTemplates = {
           <p>He studies the maps thoughtfully. "Tell your Vayren that I'll be looking to his unit for future operations. The Empire needs soldiers who can think and act decisively."</p>
           
           <p>As you leave the Sarkein's tent with your share of the spoils, there's a new respect in the eyes of your fellow soldiers. Your Squad's actions today have made a difference, and your reputation within the Kasvaari has grown.</p>`
-      }
+      
+        }
+
     ],
     baseReward: {
       experience: 100,

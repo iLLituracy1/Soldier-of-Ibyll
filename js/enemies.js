@@ -34,7 +34,7 @@ window.ENEMY_TEMPLATES = {
     
     // Equipment reference (for narrative purposes)
     weapon: "Thrusting Spear, Javelins",
-    armor: "Chainmail and Shield",
+    armor: "Chainmail",
     ammunition: {
       javelin: {
         current: 3,

@@ -459,6 +459,49 @@ window.progressQuest = function(questId, action) {
       }
     }
   }
+
+  // NEW: Check for choices - insert between stat check and linear progression code
+else if (currentStage.choices && currentStage.choices.length > 0) {
+  // Find the choice that matches the given action
+  const choice = currentStage.choices.find(c => c.action === action);
+  
+  if (choice && choice.nextStage) {
+    const nextStageIndex = quest.stages.findIndex(s => s.id === choice.nextStage);
+    if (nextStageIndex !== -1) {
+      quest.currentStageIndex = nextStageIndex;
+      
+      // Show notification
+      window.showQuestNotification(quest, 'updated');
+      
+      // Update quest log if visible
+      window.renderQuestLog();
+      
+      // Update quest UI elements
+      if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
+        // Update progress steps
+        window.updateQuestProgressSteps(quest);
+        
+        // Update action buttons
+        window.updateQuestActionButtons(quest);
+        
+        // Update quest objective
+        const newCurrentStage = quest.stages[quest.currentStageIndex];
+        document.getElementById('questObjective').textContent = newCurrentStage.objective;
+      }
+      
+      // Handle the new stage
+      window.handleQuestStageAction(quest, quest.stages[quest.currentStageIndex]);
+      
+      console.log(`Advanced to chosen stage: ${quest.stages[nextStageIndex].id}`);
+      
+      return true;
+    } else {
+      console.error(`Next stage "${choice.nextStage}" not found`);
+    }
+  }
+}
+
+  
   // CONTINUE WITH ORIGINAL LINEAR PROGRESSION
   else if (currentStage.nextStage) {
     const nextStageIndex = quest.stages.findIndex(s => s.id === currentStage.nextStage);
@@ -512,8 +555,32 @@ window.updateQuestActionButtons = function(quest) {
   
   console.log(`Updating action buttons for stage: ${currentStage.id}`);
   
-  // If the stage has an action, add the button for it
-  if (currentStage.action) {
+  // NEW: Check if stage has choices
+  if (currentStage.choices && currentStage.choices.length > 0) {
+    // Create a button for each choice
+    currentStage.choices.forEach(choice => {
+      const choiceButton = document.createElement('button');
+      choiceButton.className = 'quest-action-btn';
+      choiceButton.textContent = choice.text;
+      
+      choiceButton.onclick = function() {
+        console.log(`Choice selected: ${choice.text}, action: ${choice.action}`);
+        try {
+          // Store choice in quest userData for reference
+          if (!quest.userData) quest.userData = {};
+          quest.userData.lastChoice = choice.action;
+          
+          window.progressQuest(quest.id, choice.action);
+        } catch (error) {
+          console.error(`Error progressing quest: ${error.message}`);
+        }
+      };
+      
+      actionsContainer.appendChild(choiceButton);
+    });
+  }
+  // Original code for single action button
+  else if (currentStage.action) {
     const actionButton = document.createElement('button');
     actionButton.className = 'quest-action-btn';
     
@@ -527,7 +594,6 @@ window.updateQuestActionButtons = function(quest) {
         window.progressQuest(quest.id, currentStage.action);
       } catch (error) {
         console.error(`Error progressing quest: ${error.message}`);
-        // Add fallback recovery code if needed
       }
     };
     
@@ -548,6 +614,10 @@ function getActionButtonText(action) {
       return 'Engage';
     case 'complete':
       return 'Complete Mission';
+    case 'volunteer_scout':
+      return 'Volunteer';
+    case 'remain_silent':
+      return 'Remain silent.'
     default:
       return 'Continue';
   }
