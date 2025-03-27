@@ -55,9 +55,9 @@ window.questTemplates = {
           
           <p>By midday, you've reached a ridge overlooking a shallow valley. The Sarkein calls for a halt and gathers the Vayrens of each Squad.</p>
           
-          <p>"The outpost is just beyond that next rise," he says, pointing westward. "We'll need to scout it properly before we commit to an attack."</p>
+          <p>You see him point westward, but you can't make out anything they are saying. </p>
           
-          <p>Your Vayren returns to your squad with orders. "Our unit is to provide a small scouting party to circle north and assess their defenses. Three soldiers. Volunteers?"</p>`,
+          <p>A moment later, your Vayren returns to your squad with orders. "Our unit is to provide a small scouting party to circle north and assess their defenses. Three soldiers. Volunteers?"</p>`,
         choices: [
           {
             text: "Volunteer.",
@@ -77,11 +77,13 @@ window.questTemplates = {
         objective: 'Wait for the scouts to return.',
         action: 'wait',
         battleType: 'narrative',
-        narrative: `<p>Hours pass as you wait for the scouting party to return. You can't help but wonder if they've gotten into trouble.</p>
+        narrative: `<p>You dont take the opportunity to volunteer for the scouting mission.</p>
         
-        <p>When they finally do show up, they're bloodied and bruised. It seems they encountered an Arrasi patrol, but managed to take care of them, ensuring no alarm to our whereabouts was raised.</p>
+        <p>Hours pass as you wait for the scouting party to return. You can't help but wonder if they've gotten into trouble.</p>
         
-        <p>The Vayren reorganizes your squad and heads to relay the information to Sarkein Reval, who immediately gives the mobilization order. Within the hour, our assault will begin.</p>`,
+        <p>When they finally do show up, they're bloodied and bruised. It seems they encountered an Arrasi patrol but managed to take care of them, ensuring no alarm was raised in preparation of our attack.</p>
+        
+        <p>The Vayren gathers your squad, then moves to relay the information to Sarkein Reval, who immediately gives the mobilization order. Within the hour, our assault will begin.</p>`,
         timeAdvance: 240,             
         nextStage: 'stage_assault'     
       },
@@ -91,7 +93,9 @@ window.questTemplates = {
         objective: 'Participate in scouting the outpost.',
         action: 'proceed',
         battleType: 'narrative',
-        narrative: `<p>Your small scouting party - consisting of you and two fellow soldiers from your Squad - begins circling wide around the valley to approach the outpost from the north. One of your companions is a quiet Nesian with sharp eyes, the other a burly Paanic veteran.</p>
+        narrative: `<p>You step up, volunteering as a scout.</p>
+        
+          <p>Your small scouting party - consisting of you and two fellow soldiers from your Squad - begins circling wide around the valley to approach the outpost from the north. One of your companions is a quiet Nesian with sharp eyes, the other a burly Paanic veteran.</p>
           
           <p>Moving from cover to cover, you gradually work your way closer to the Arrasi position. The outpost comes into view: a wooden palisade surrounding several structures, with a larger central building that appears to be the command post. Two watchtowers stand at opposite corners, each manned by a single guard.</p>
           
@@ -104,7 +108,7 @@ window.questTemplates = {
           type: 'skill',
           stat: 'survival',
           attribute: 'men', // Add mental attribute to survival skill
-          difficulty: 15,
+          difficulty: 2,
           successText: `<p>Your heightened senses and training alert you to subtle signs - disturbed vegetation, a faint metallic glint in the distance. You signal your companions to freeze as you scan the area more carefully.</p>
             
             <p>Through the brush, you spot an Arrasi patrol of four soldiers moving along a path that will take them directly past your position. They haven't noticed you yet.</p>`,
@@ -197,8 +201,16 @@ window.questTemplates = {
         description: 'With the patrol eliminated, your unit must now assault the outpost before reinforcements arrive.',
         objective: 'Assault the Arrasi outpost.',
         action: 'combat',
-        battleType: 'individual', // Changed from 'formation' since shieldwall is phased out
-        enemyType: "ARRASI_DRUSKARI", // Use regular combat instead
+        battleType: 'individual',
+        enemyType: ["ARRASI_DRUSKARI", 'ARRASI_VAELGORR'],
+        enemySequence: [
+          { type: ["ARRASI_DRUSKARI", "ARRASI_VAELGORR"], waves: 2 },
+          { type: ["ARRASI_VAELGOR", "ARRASI_VAELGORR"], waves: 2},
+        ],
+        combatOptions:{
+          requireDefeat: false,
+          maxTurns: 75
+        },
         narrative: `<p>The attack begins in earnest. The first assault group launches flaming arrows over the palisade, creating a diversion at the main gate. Shouts and alarms ring out across the outpost.</p>
           
           <p>As the Arrasi defenders rush to the main entrance, your group quickly approaches the eastern wall with scaling ladders. You position your ladder against the wall and prepare to climb.</p>
@@ -218,127 +230,19 @@ window.questTemplates = {
         battleType: 'narrative',
         narrative: `<p>Your Spear Host returns to camp victorious, bearing captured supplies and valuable intelligence. The elimination of the Arrasi outpost represents a significant blow to enemy operations in the region.</p>
           
-          <p>Later that evening, the Vayren calls for you. "Report to the Sarkein's tent," he orders. "Apparently, he wants to hear about the scouting mission from someone who was there."</p>
-          
-          <p>When you arrive at the command tent, Sarkein Reval is studying the captured maps. He acknowledges your salute with a nod.</p>
-          
-          <p>"Your Squad performed well today," he says. "The intelligence your unit recovered will help us plan our next moves in this sector."</p>
-          
-          <p>The Sarkein gestures to a collection of items laid out on a corner of the table - spoils from the raid allocated to your unit.</p>
-          
-          <p>"These are yours by right of conquest," he continues. "The officer's blade is particularly fine - Arrasi steel, but with a balance superior to their typical work. Take it with my compliments."</p>
-          
-          <p>He studies the maps thoughtfully. "Tell your Vayren that I'll be looking to his unit for future operations. The Empire needs soldiers who can think and act decisively."</p>
-          
-          <p>As you leave the Sarkein's tent with your share of the spoils, there's a new respect in the eyes of your fellow soldiers. Your Squad's actions today have made a difference, and your reputation within the Kasvaari has grown.</p>`
-      
+          <p>Later that evening, Sarkein Reval gathered the unit in our camp. There he stood, in the center of near a hundred men with the wagon containing the spoils from the Arrasi outpost. He gave a brief speech, recognizing some of your fellow soldiers for their heroics. You are not named.</p>
+
+          <p>You collect your share and head to your quarters for the night.</p>`
         }
 
     ],
     baseReward: {
       experience: 100,
-      taelors: 50,
-      items: ['health_Potion', 'arrasi_blade', 'arrasi_pendant', 'captured_maps']
+      taelors: 150,
+      items: ['health_Potion', 'arrasi_blade', 'arrasi_pendant',]
     },
     minDayToTrigger: 2,         // Only available after day 2
     chanceTrigger: 1,        // 25% chance of triggering when conditions are met
     cooldownDays: 5             // Must wait 5 days between assignments of this quest
   },
-  
-  // Template for patrol_duty quest
-  patrol_duty: {
-    id: 'patrol_duty',
-    title: 'Frontier Patrol',
-    description: 'The western perimeter needs extra patrols due to increased Arrasi activity. The Vayren has assigned your Squad to the duty.',
-    stages: [
-      {
-        id: 'stage_briefing',
-        description: 'The Vayren has assigned your Squad to patrol the western perimeter.',
-        objective: 'Report to the Vayren for briefing.',
-        action: 'report',
-        battleType: 'narrative',
-        narrative: `<p>The Vayren calls your Squad together near the command tent. His face is grim.</p>
-          
-          <p>"Scouts have reported increased Arrasi movement near our western perimeter," he says, unfolding a rough map on a nearby crate. "We're stretched thin, so each Squad is taking extra patrols."</p>
-          
-          <p>He traces a route along the map edge. "You'll patrol this section until sunset. Keep your eyes open - we've had reports of small raiding parties testing our defenses."</p>
-          
-          <p>The Vayren hands you a small banner. "Signal flag. If you spot anything concerning, raise this on the nearest high point. The observation post will see it. Questions?"</p>
-          
-          <p>When there are none, he nods curtly. "Move out. Return by nightfall."</p>`,
-        nextStage: 'stage_patrol'
-      },
-      {
-        id: 'stage_patrol',
-        description: 'Patrol the western perimeter with your Squad, watching for signs of Arrasi activity.',
-        objective: 'Complete the patrol route.',
-        action: 'proceed',
-        battleType: 'narrative',
-        narrative: `<p>Your Squad moves out toward the western perimeter, passing the last of the Kasvaari's sentries. The terrain beyond is rugged - rocky outcroppings interspersed with scrubby brush and the occasional stunted tree.</p>
-          
-          <p>The patrol proceeds methodically, with each member scanning different sectors. From time to time, you find subtle signs of recent activity - disturbed ground, broken twigs, a fresh footprint. None seem immediately concerning, but they confirm the Vayren's report of increased movement in the area.</p>
-          
-          <p>After several hours of patrol, you reach a rocky hill that overlooks a narrow pass. It's an ideal spot for an ambush, and your Squad approaches cautiously.</p>`,
-        timeAdvance: 240, // 4 hours
-        nextStage: 'stage_encounter'
-      },
-      {
-        id: 'stage_encounter',
-        description: 'You spot signs of recent Arrasi activity near a strategic pass.',
-        objective: 'Investigate the suspicious area.',
-        action: 'proceed',
-        battleType: 'narrative',
-        narrative: `<p>As your Squad investigates the pass, one of your companions signals for silence. You follow their pointing finger to see fresh marks in the dust - multiple bootprints leading into a narrow ravine.</p>
-          
-          <p>Your Squad exchanges glances. Too many tracks for a small scouting party. This could be evidence of the raiding parties the Vayren mentioned.</p>
-          
-          <p>As you discuss whether to follow the tracks or report back immediately, a glint of metal catches your eye from the rocks above. Before you can shout a warning, an arrow whistles through the air!</p>`,
-        nextStage: 'stage_ambush'
-      },
-      {
-        id: 'stage_ambush',
-        description: 'Your patrol has been ambushed by Arrasi raiders!',
-        objective: 'Defend your Squad against the ambush.',
-        action: 'combat',
-        battleType: 'individual',
-        enemyType: "ARRASI_VAELGORR",
-        narrative: `<p>The ravine erupts with activity as Arrasi raiders emerge from hidden positions. Your Squad scatters for cover as arrows and javelins fly.</p>
-          
-          <p>You dive behind a boulder, sword already in hand. An Arrasi raider leaps down from the rocks, closing in on your position with weapon raised.</p>
-          
-          <p>The element of surprise is lost. Now it's a matter of survival.</p>`,
-        successText: "The last Arrasi raider falls. Your Squad quickly checks for survivors and secures the area. The ambush has been repelled.",
-        failureText: "The ambush overwhelms your patrol. As you fall back, wounded, your Squad is forced to retreat to avoid complete disaster.",
-        nextStage: 'stage_report'
-      },
-      {
-        id: 'stage_report',
-        description: 'Return to camp and report the Arrasi ambush to the Vayren.',
-        objective: 'Report back to the Vayren.',
-        action: 'report',
-        battleType: 'narrative',
-        narrative: `<p>Your Squad returns to camp as dusk falls, weary from the encounter. The sentries recognize your approach and let you pass without challenge.</p>
-          
-          <p>The Vayren is waiting at the command tent, studying reports. He looks up as you enter, immediately noting your battle-worn appearance.</p>
-          
-          <p>"Report," he says simply.</p>
-          
-          <p>You describe the patrol route, the signs of activity, and finally the ambush. The Vayren listens without interruption, occasionally making notes on a map.</p>
-          
-          <p>"Similar reports from other patrols," he says when you finish. "The Arrasi are probing our defenses, looking for weaknesses. Your Squad handled it well."</p>
-          
-          <p>He marks several points on the map. "We'll increase patrols in these sectors. The intelligence you've provided is valuable - it confirms a pattern we've been tracking."</p>
-          
-          <p>The Vayren nods with approval. "Rest. You've earned it. Your Squad will be recognized in the morning reports."</p>`
-      }
-    ],
-    baseReward: {
-      experience: 75,
-      taelors: 30,
-      items: ['healthPotion']
-    },
-    minDayToTrigger: 10,         // Available from day 1
-    chanceTrigger: 0.2,         // 20% chance per day
-    cooldownDays: 3             // 3 days between assignments
-  }
 };

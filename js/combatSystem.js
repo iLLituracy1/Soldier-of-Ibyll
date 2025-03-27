@@ -66,7 +66,7 @@ window.combatSystem = {
   initiateCombat: function(enemyTypes, allyTypes = [], options = {}) {
     // Default options
     const combatOptions = {
-      requireDefeat: true,  // Combat continues until one side is defeated by default
+      requireDefeat: false,  // Combat continues until one side is defeated by default
       maxTurns: 30,         // Maximum number of turns before combat ends
       ...options            // Allow overriding default options
     };
