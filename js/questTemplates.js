@@ -108,7 +108,7 @@ window.questTemplates = {
           type: 'skill',
           stat: 'survival',
           attribute: 'men', // Add mental attribute to survival skill
-          difficulty: 2,
+          difficulty: 3,
           successText: `<p>Your heightened senses and training alert you to subtle signs - disturbed vegetation, a faint metallic glint in the distance. You signal your companions to freeze as you scan the area more carefully.</p>
             
             <p>Through the brush, you spot an Arrasi patrol of four soldiers moving along a path that will take them directly past your position. They haven't noticed you yet.</p>`,
@@ -143,7 +143,8 @@ window.questTemplates = {
   objective: 'Ambush the Arrasi patrol from an advantageous position.',
   action: 'combat',
   battleType: 'individual',
-  enemyType: "ARRASI_VAELGORR", // Only one enemy instead of two
+  enemyType: 'ARRASI_VAELGORR', // Only one enemy instead of two
+  allies: ['PAANIC_REGULAR'],
   combatOptions: {
     requireDefeat: true
   },
@@ -189,11 +190,7 @@ window.questTemplates = {
           
           <p>"Good work handling that patrol," he says grimly, "but we've lost the luxury of time. We attack now, before they realize something's wrong."</p>
           
-          <p>He rapidly issues orders, dividing the Spear Host into three assault groups. "First group will create a diversion at the main gate. Second group will scale the eastern wall. Third group, with me, will breach from the west once their attention is divided."</p>
-          
-          <p>Your Squad is assigned to the second group, tasked with scaling the eastern wall. The plan is set, and with grim determination, your forces move into position.</p>
-          
-          <p>The attack begins with a barrage of flaming arrows arcing toward the front gate. Shouts of alarm erupt from within the outpost. As the Arrasi soldiers rush to defend the main entrance, your group hurries toward the eastern wall with scaling ladders.</p>`,
+          <p>He rapidly issues orders, dividing the Spear Host into three assault groups. As if no time passed at all, you find yourself rushing toward palisade walls.</p>`,
         nextStage: 'stage_assault'
       },
       {
@@ -203,9 +200,10 @@ window.questTemplates = {
         action: 'combat',
         battleType: 'individual',
         enemyType: 'ARRASI_VAELGORR',
+        allies: ['PAANIC_REGULAR'],
         combatOptions:{
           requireDefeat: false,
-          maxTurns: 45,
+          maxTurns: 65,
           enemySequence: [
             { type: ["ARRASI_DRUSKARI", "ARRASI_VAELGORR"], waves: 2 },
             { type: ["ARRASI_VAELGORR", "ARRASI_VAELGORR"], waves: 2},

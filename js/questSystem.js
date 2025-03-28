@@ -688,8 +688,8 @@ window.progressQuest = function(questId, action) {
     
     // Initiate combat with the enemy type from the stage
     window.combatSystem.initiateCombat(
-      currentStage.enemyType, 
-      [], 
+      currentStage.enemyType,
+      Array.isArray(currentStage.allies) ? currentStage.allies : (currentStage.allies ? [currentStage.allies] : []),
       {
         requireDefeat: currentStage.combatOptions?.requireDefeat || true,
         enemySequence: currentStage.enemySequence,

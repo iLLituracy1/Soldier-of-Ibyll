@@ -556,12 +556,17 @@ window.initializeItemTemplates = function() {
   // WEAPONS
   window.itemTemplates.basicSword = window.createWeapon({
     id: 'basic_sword',
-    name: 'Paanic Military Sword',
-    description: 'A standard issue military sword from the Paanic Empire. Reliable but unremarkable.',
+    name: 'Paanic Military Cleaver',
+    description: 'A standard issue military cleaver from the Paanic Empire. Reliable but unremarkable.',
     weaponType: window.WEAPON_TYPES.SWORD,
-    damage: 8,
+    damage: 10,
     value: 25,
-    maxDurability: 175
+    stats: {
+      damage: 10,
+      critChance: 2,
+    },
+    maxDurability: 175,
+    armorPenetration: 10
   });
   
   window.itemTemplates.nobleSword = window.createWeapon({
@@ -570,10 +575,10 @@ window.initializeItemTemplates = function() {
     description: 'A finely crafted blade carried by nobility. More ceremonial than practical, but still deadly.',
     weaponType: window.WEAPON_TYPES.SWORD,
     rarity: window.ITEM_RARITIES.UNCOMMON,
-    damage: 10,
+    damage: 14,
     value: 100,
     stats: {
-      damage: 10,
+      damage: 14,
       critChance: 5
     },
     maxDurability: 190,
@@ -582,7 +587,7 @@ window.initializeItemTemplates = function() {
   
   window.itemTemplates.royalGreatsword = window.createWeapon({
     id: 'royal_greatsword',
-    name: 'Royal Greatsword',
+    name: 'Royal Cleaver',
     description: 'A massive two-handed blade carried by the royal guards of Cennen. Its heft can cleave through armor.',
     weaponType: window.WEAPON_TYPES.GREATSWORD,
     rarity: window.ITEM_RARITIES.RARE,
