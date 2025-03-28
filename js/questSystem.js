@@ -933,12 +933,82 @@ window.completeQuest = function(questId) {
   window.gameState.inQuestSequence = false;
   window.gameState.awaitingQuestResponse = false;
   
+  // Check if this is a campaign quest
+  const template = window.questTemplates[quest.templateId];
+  const isCampaignQuest = template && template.isCampaignQuest === true;
+  
   // Apply rewards - use enhanced system if available
   if (typeof window.applyQuestRewards === 'function') {
     window.applyQuestRewards(quest);
   } else {
     // Basic reward application
     applyBasicRewards(quest);
+  }
+  
+  // Handle campaign quest completion
+  if (isCampaignQuest && template.campaignPartId) {
+    console.log("Completing campaign quest:", quest.templateId);
+    
+    // Call custom onComplete callback if exists
+    if (typeof template.onComplete === 'function') {
+      template.onComplete();
+    } else {
+      // Default behavior
+      window.completeCampaignPart(template.campaignPartId);
+    }
+  }
+  
+  // Update quest log if visible
+  window.renderQuestLog();
+  
+  // Exit quest scene if we're in it
+  if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
+    window.exitQuestScene();
+  }
+  
+  // Update action buttons to show regular camp actions
+  window.updateActionButtons();
+  
+  return true;
+};
+
+// Similarly, extend failQuest to handle campaign quests
+window.failQuest = function(questId) {
+  const questIndex = window.quests.findIndex(q => q.id === questId);
+  if (questIndex === -1) {
+    console.error(`Quest "${questId}" not found`);
+    return false;
+  }
+  
+  const quest = window.quests[questIndex];
+  quest.status = window.QUEST_STATUS.FAILED;
+  quest.failureDay = window.gameDay;
+  
+  // Reset quest sequence flag
+  window.gameState.inQuestSequence = false;
+  window.gameState.awaitingQuestResponse = false;
+  
+  // Check if this is a campaign quest
+  const template = window.questTemplates[quest.templateId];
+  const isCampaignQuest = template && template.isCampaignQuest === true;
+  
+  // Show failure notification
+  window.showNotification(`Quest Failed: ${quest.title}`, 'warning');
+  
+  // Add failure narrative
+  window.addToNarrative(`<p>You have failed to complete the quest "${quest.title}". The opportunity has passed.</p>`);
+  
+  // Handle campaign quest failure
+  if (isCampaignQuest && template.campaignPartId) {
+    console.log("Failed campaign quest:", quest.templateId);
+    
+    // Call custom onFail callback if exists
+    if (typeof template.onFail === 'function') {
+      template.onFail();
+    } else {
+      // Default behavior
+      window.failCampaignPart(template.campaignPartId);
+    }
   }
   
   // Update quest log if visible

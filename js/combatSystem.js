@@ -67,7 +67,7 @@ window.combatSystem = {
     // Default options
     const combatOptions = {
       requireDefeat: false,  // Combat continues until one side is defeated by default
-      maxTurns: 30,         // Maximum number of turns before combat ends
+      maxTurns: 30,        // Maximum number of turns before combat ends
       ...options            // Allow overriding default options
     };
     
@@ -89,6 +89,7 @@ window.combatSystem = {
       allies: [],
       activeEnemyIndex: 0,
       activeAllyIndex: 0,
+     
       
       // Counter system properties
       counterWindowOpen: false,
@@ -100,11 +101,28 @@ window.combatSystem = {
       currentWaveIndex: 0,
       enemySequence: options.enemySequence || null,
       remainingWaves: options.enemySequence ? options.enemySequence[0].waves : 0,
+
       
       // Backward compatibility
       enemy: null,
       distance: 2 // For backwards compatibility
+      
     };
+
+        // When starting combat, create allyDistances property to track relative distances
+    this.state.allyDistances = {};
+
+    // Initialize distance tracking for each ally to each enemy
+    for (let allyIndex = 0; allyIndex < this.state.allies.length; allyIndex++) {
+      const ally = this.state.allies[allyIndex];
+      this.state.allyDistances[ally.id] = {};
+      
+      for (let enemyIndex = 0; enemyIndex < this.state.enemies.length; enemyIndex++) {
+        const enemy = this.state.enemies[enemyIndex];
+        // Initialize ally's distance to each enemy (use enemy's preferred distance as starting point)
+        this.state.allyDistances[ally.id][enemy.id] = enemy.preferredDistance;
+      }
+    }
     
     // Create enemy instances
     if (typeof enemyTypes === 'string') {
@@ -675,36 +693,39 @@ shouldEndCombatWithVictory: function() {
   processAllyTurn: function(ally) {
     this.addCombatMessage(`${ally.name} takes action.`);
     
-    // Determine ally action based on AI
-    const action = this.determineAllyAction(ally);
-    
-    // Process the chosen action
-    switch(action.type) {
-      case "distance":
-        this.handleAllyDistanceChange(ally, action.value);
-        break;
-      
-      case "stance":
-        this.handleAllyStanceChange(ally, action.value);
-        break;
-      
-      case "attack":
-        this.handleAllyAttack(ally, action.attackType, action.targetEnemyIndex, action.targetArea);
-        break;
-    }
-    
-    // Move to next ally or enemy phase
+    // Add a delay before the ally action to make it feel more natural
     this.scheduleEnemyAction(() => {
-      this.state.activeAllyIndex++;
+      // Determine ally action based on AI
+      const action = this.determineAllyAction(ally);
       
-      // If we've processed all allies, move to enemy phase
-      if (this.state.activeAllyIndex >= this.state.allies.length) {
-        this.enterPhase("enemy");
-      } else {
-        // Otherwise, process the next ally
-        this.enterPhase("ally");
+      // Process the chosen action
+      switch(action.type) {
+        case "distance":
+          this.handleAllyDistanceChange(ally, action.value);
+          break;
+        
+        case "stance":
+          this.handleAllyStanceChange(ally, action.value);
+          break;
+        
+        case "attack":
+          this.handleAllyAttack(ally, action.attackType, action.targetEnemyIndex, action.targetArea);
+          break;
       }
-    }, 1500);
+    
+         // Move to next ally or enemy phase with a consistent delay
+         this.scheduleEnemyAction(() => {
+          this.state.activeAllyIndex++;
+          
+          // If we've processed all allies, move to enemy phase
+          if (this.state.activeAllyIndex >= this.state.allies.length) {
+            this.enterPhase("enemy");
+          } else {
+            // Otherwise, process the next ally
+            this.enterPhase("ally");
+          }
+        }, 1500);
+      }, 1000); // 1 second delay before ally acts
   },
   
   // Handle enemy getting up from knocked down
@@ -834,7 +855,7 @@ shouldEndCombatWithVictory: function() {
     }
     
     // Get the target enemy's distance
-    const enemyDistance = targetEnemy.distance;
+    const enemyDistance = this.getAllyDistanceToEnemy(ally, targetEnemy);
     
     // Probabilities based on situation (similar to enemy logic but targeting enemies)
     const distanceDiff = enemyDistance - ally.preferredDistance;
@@ -1033,6 +1054,31 @@ shouldEndCombatWithVictory: function() {
       window.combatUI.updateCombatInterface();
     }
   },
+
+    // 3. Add helper functions to get and set ally distances to enemies:
+  getAllyDistanceToEnemy: function(ally, enemy) {
+    // If we don't have distance tracking established, default to enemy's distance
+    if (!this.state.allyDistances || !this.state.allyDistances[ally.id] || 
+        this.state.allyDistances[ally.id][enemy.id] === undefined) {
+      return enemy.distance;
+    }
+    
+    return this.state.allyDistances[ally.id][enemy.id];
+  },
+
+  setAllyDistanceToEnemy: function(ally, enemy, distance) {
+    // Ensure the distance structures exist
+    if (!this.state.allyDistances) {
+      this.state.allyDistances = {};
+    }
+    
+    if (!this.state.allyDistances[ally.id]) {
+      this.state.allyDistances[ally.id] = {};
+    }
+    
+    // Set the distance
+    this.state.allyDistances[ally.id][enemy.id] = distance;
+  },
   
   // Handle ally changing stance
   handleAllyStanceChange: function(ally, newStance) {
@@ -1197,9 +1243,8 @@ shouldEndCombatWithVictory: function() {
     
     // Special case for javelin throws
     if (attackType === "ThrowJavelin") {
-      if (!this.allyHasAmmo(ally, 'javelin')) {
-        this.addCombatMessage(`${ally.name} reaches for a javelin but has none left.`);
-        attackType = this.getRandomAllyAttack(ally);
+      const enemyDistance = this.getAllyDistanceToEnemy(ally, enemy);
+      if (!this.allyHasAmmo(ally, 'javelin') || enemyDistance !== 2) {
       } else {
         // Use a javelin
         this.useAllyAmmo(ally, 'javelin');
@@ -2407,8 +2452,9 @@ spawnNextWave: function() {
   }
   
   // Add a message to the combat log
-  this.addCombatMessage("A new wave of enemies approaches!");
+  this.addCombatMessage("New enemies approach!");
   
+
   // Create enemies for this wave
   for (const enemyType of waveData.type) {
     const enemy = this.createEnemy(enemyType);

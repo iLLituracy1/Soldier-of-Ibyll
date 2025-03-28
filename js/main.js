@@ -136,6 +136,12 @@ window.startGameAdventure = function() {
   
   // Phase 2: Initialize game state
   window.initializeGameState();
+
+    // Phase 2.5: Initialize campaign system
+    if (typeof window.initializeCampaignSystem === 'function') {
+      console.log("Initializing campaign system");
+      window.initializeCampaignSystem();
+    }
   
   // Phase 3: Initialize item templates if needed
   if (!window.itemTemplates || Object.keys(window.itemTemplates).length === 0) {
@@ -164,6 +170,12 @@ window.startGameAdventure = function() {
     console.log("Initializing feats system");
     window.initializeFeatsSystem();
   }
+
+    // Phase 5.7: Initialize campaign system if not already done
+    if (typeof window.initializeCampaignSystem === 'function') {
+      console.log("Initializing campaign system");
+      window.initializeCampaignSystem();
+    }
   
   // Phase 6: Add and equip starting items
   if (window.addStartingItems) {

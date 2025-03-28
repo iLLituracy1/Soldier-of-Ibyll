@@ -60,18 +60,18 @@ window.getTimeOfDay = function() {
 };
 
 // Function to update action buttons
+// Modify the updateActionButtons function to consider current location
 window.updateActionButtons = function() {
   // Update action buttons based on time of day, location, etc.
   const actionsContainer = document.getElementById('actions');
   actionsContainer.innerHTML = '';
   
   // If player is awaiting quest response, only show the quest-related button
-  // This is what makes quests feel mandatory
   if (window.gameState.awaitingQuestResponse) {
     // Check for active quest
     const activeQuest = window.quests.find(q => q.status === window.QUEST_STATUS.ACTIVE);
     if (activeQuest) {
-      window.addActionButton('Report to Sarkein', 'report_to_sarkein_action', actionsContainer);
+      window.addActionButton('Report to Sarkein', 'respond_to_quest', actionsContainer);
       console.log("Showing only 'Report to Sarkein' button due to awaiting quest response");
       return; // Don't show any other buttons
     }
@@ -85,39 +85,78 @@ window.updateActionButtons = function() {
   const timeOfDay = window.getTimeOfDay();
   const hours = Math.floor(window.gameTime / 60);
   
-  // Standard actions available in camp
-  // Training available during the day
-  if (timeOfDay === 'day' || timeOfDay === 'dawn') {
-    window.addActionButton('Train', 'train', actionsContainer);
-  }
+  // Get current location
+  const currentLocationId = window.gameState.campaignState ? 
+    window.gameState.campaignState.currentLocation : 
+    window.CAMPAIGN_LOCATIONS.KASVAARI_CAMP.id;
   
-  // Rest always available
-  window.addActionButton('Rest', 'rest', actionsContainer);
-  
-  // Patrol available during day and evening
-  if (timeOfDay === 'day' || timeOfDay === 'evening') {
-    window.addActionButton('Patrol', 'patrol', actionsContainer);
-  }
-  
-  // Mess hall available during meal times
-  if ((hours >= 7 && hours <= 9) || (hours >= 12 && hours <= 14) || (hours >= 18 && hours <= 20)) {
-    window.addActionButton('Mess Hall', 'mess', actionsContainer);
-  }
-  
-  // Guard duty available all times
-  window.addActionButton('Guard Duty', 'guard', actionsContainer);
-  
-  // Gambling and Brawler Pits visibility logic
-  if (timeOfDay === 'evening' || timeOfDay === 'night') {
-    // Only show if player has discovered it or has the right background
-    if (window.gameState.discoveredGamblingTent) {
-      window.addActionButton('Gambling Tent', 'gambling', actionsContainer);
+  // Location-specific actions
+  if (currentLocationId === window.CAMPAIGN_LOCATIONS.KASVAARI_CAMP.id) {
+    // Standard actions available in Kasvaari Camp
+    // Training available during the day
+    if (timeOfDay === 'day' || timeOfDay === 'dawn') {
+      window.addActionButton('Train', 'train', actionsContainer);
     }
     
-    if (window.gameState.discoveredBrawlerPits) {
-      window.addActionButton('Brawler Pits', 'brawler_pits', actionsContainer);
+    // Rest always available
+    window.addActionButton('Rest', 'rest', actionsContainer);
+    
+    // Patrol available during day and evening
+    if (timeOfDay === 'day' || timeOfDay === 'evening') {
+      window.addActionButton('Patrol', 'patrol', actionsContainer);
+    }
+    
+    // Mess hall available during meal times
+    if ((hours >= 7 && hours <= 9) || (hours >= 12 && hours <= 14) || (hours >= 18 && hours <= 20)) {
+      window.addActionButton('Mess Hall', 'mess', actionsContainer);
+    }
+    
+    // Guard duty available all times
+    window.addActionButton('Guard Duty', 'guard', actionsContainer);
+    
+    // Gambling and Brawler Pits visibility logic
+    if (timeOfDay === 'evening' || timeOfDay === 'night') {
+      // Only show if player has discovered it or has the right background
+      if (window.gameState.discoveredGamblingTent) {
+        window.addActionButton('Gambling Tent', 'gambling', actionsContainer);
+      }
+      
+      if (window.gameState.discoveredBrawlerPits) {
+        window.addActionButton('Brawler Pits', 'brawler_pits', actionsContainer);
+      }
     }
   }
+  else if (currentLocationId === window.CAMPAIGN_LOCATIONS.ARRASI_FRONTIER.id) {
+    // Actions available at the Arrasi Frontier
+    // Frontier-specific actions
+    window.addActionButton('Rest', 'rest', actionsContainer);
+    
+    if (timeOfDay === 'day' || timeOfDay === 'dawn') {
+      window.addActionButton('Scout', 'frontier_scout', actionsContainer);
+    }
+    
+    if (timeOfDay === 'day' || timeOfDay === 'evening') {
+      window.addActionButton('Patrol Border', 'frontier_patrol', actionsContainer);
+    }
+    
+    // Mess available at different times at frontier
+    if ((hours >= 6 && hours <= 8) || (hours >= 18 && hours <= 20)) {
+      window.addActionButton('Field Kitchen', 'mess', actionsContainer);
+    }
+    
+    // Guard duty always available
+    window.addActionButton('Guard Post', 'guard', actionsContainer);
+    
+    // Frontier-specific activities
+    if (timeOfDay === 'day') {
+      window.addActionButton('Repair Fortifications', 'repair_fort', actionsContainer);
+    }
+    
+    if (timeOfDay === 'evening' || timeOfDay === 'night') {
+      window.addActionButton('Evening Drills', 'frontier_train', actionsContainer);
+    }
+  }
+  // Add more location-specific actions as needed
 };
 
 // Function to add action button

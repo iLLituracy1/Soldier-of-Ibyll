@@ -244,3 +244,71 @@ window.questTemplates = {
     cooldownDays: 5             // Must wait 5 days between assignments of this quest
   },
 };
+
+
+
+
+
+
+
+
+// Add a new campaign quest template example
+window.questTemplates.frontier_campaign = {
+  id: 'frontier_campaign',
+  title: 'Advance to the Frontier',
+  description: 'The Sarkein has ordered the Kasvaari to advance to the Arrasi Frontier. Prepare for a long march.',
+  isCampaignQuest: true, // Flag to mark as campaign quest
+  campaignPartId: 'part_2', // Which campaign part this belongs to
+  
+  stages: [
+    {
+      id: 'stage_orders',
+      description: 'You\'ve received orders to prepare for a march to the Arrasi Frontier.',
+      objective: 'Report to the Sarkein for campaign briefing.',
+      action: 'report',
+      battleType: 'narrative',
+      narrative: `<p>The camp buzzes with activity as orders are passed down from the command tent. Your Vayren approaches with important news.</p>
+        
+        <p>"Prepare your gear," he says. "The Sarkein has ordered the entire Kasvaari to march to the Arrasi Frontier. We move out at dawn tomorrow."</p>
+        
+        <p>This is it - your first real campaign into contested territory. The anticipation sends a shiver down your spine.</p>`,
+      nextStage: 'stage_preparation'
+    },
+    // More stages...
+    
+    // Important: Final stage should trigger location change
+    {
+      id: 'stage_arrival',
+      description: 'After days of marching, your unit arrives at the frontier outpost.',
+      objective: 'Establish camp at the frontier.',
+      action: 'complete',
+      battleType: 'narrative',
+      narrative: `<p>After days of dusty roads and watchful nights, your unit finally crests a hill to see the frontier outpost spread before you. The border between Empire and Arrasi territories stretches to the horizon - a restless, dangerous line.</p>
+        
+        <p>The Sarkein gives orders to establish camp. This will be your new home for the coming campaign.</p>`,
+      // No nextStage indicates quest completion
+    }
+  ],
+  
+  // Campaign quests should have special callbacks
+  onComplete: function() {
+    // This will be called when quest is completed
+    window.completeCampaignPart('part_2');
+  },
+  
+  onFail: function() {
+    // This will be called if quest fails
+    window.failCampaignPart('part_2');
+  },
+  
+  baseReward: {
+    deeds: 200,
+    taelors: 100,
+    items: ['frontier_rations', 'scout_map']
+  },
+  
+  // Campaign quests aren't triggered by chance - they're forced
+  minDayToTrigger: null,
+  chanceTrigger: 0,
+  cooldownDays: 0
+};

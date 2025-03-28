@@ -1259,3 +1259,43 @@ input[type="text"], input[type="number"] {
     font-size: 1.3em;
   }
 }
+
+/* Campaign Styles */
+.notification.campaign {
+  background-color: #c9aa71;
+  color: #1a1a1a;
+  border: 2px solid #e0be82;
+}
+
+.campaign-banner {
+  background-color: rgba(201, 170, 113, 0.2);
+  border-left: 4px solid #c9aa71;
+  padding: 10px 15px;
+  margin: 15px 0;
+}
+
+.campaign-banner h3 {
+  color: #c9aa71;
+  margin: 0 0 5px 0;
+  text-align: left;
+}
+
+.campaign-banner p {
+  margin: 0;
+}
+
+.campaign-part-complete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(201, 170, 113, 0.15);
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 6px;
+  border: 1px solid #c9aa71;
+}
+
+.campaign-part-complete h3 {
+  color: #c9aa71;
+  margin: 0;
+}

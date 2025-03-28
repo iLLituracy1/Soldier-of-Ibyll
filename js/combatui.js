@@ -674,12 +674,12 @@ showBattleConclusionModal: function(outcome, narrativeText) {
         }
       }
 
-    .combat-header-flex {
-      display: flex;
-      justify-content: space-between;
-      width: 100%;
-      margin-bottom: 10px;
-    }
+    // Also add this to ensure flex container uses column direction
+.combat-header-flex {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
 
     .player-container {
       width: 48%;
@@ -696,10 +696,11 @@ showBattleConclusionModal: function(outcome, narrativeText) {
     }
 
     .ally-container {
-      width: 48%;
-      margin-top: 10px;
-      clear: left;
-    }
+  width: 48%;
+  margin-top: 10px;
+  align-self: flex-start;
+  order: 2; /* Forces it to appear after player container in flex layout */
+}
 
 
   .primary-hp-display {
@@ -1095,6 +1096,16 @@ updateTurnCounter: function() {
       // Ally name and health text
       const allyNameDisplay = document.createElement('div');
       let nameText = ally.name;
+
+        // Find the best enemy this ally would target
+    const targetEnemyIndex = window.combatSystem.findBestEnemyTarget();
+    const targetEnemy = window.combatSystem.state.enemies[targetEnemyIndex];
+
+    // Add distance tag if target enemy exists
+    if (targetEnemy) {
+      const distance = window.combatSystem.getAllyDistanceToEnemy(ally, targetEnemy);
+      nameText += ` <span class="enemy-distance-tag">${window.combatSystem.distanceLabels[distance]}</span>`;
+    }
       
       // Add status indicators
       if (ally.stunned) nameText += " (Stunned)";

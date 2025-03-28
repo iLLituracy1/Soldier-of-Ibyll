@@ -575,6 +575,7 @@ function createNewSave() {
     career: window.player.career.title,
     day: window.gameDay,
     timestamp: saveTimestamp
+    
   };
   
   // Create fully serialized player data with complete item information
@@ -586,7 +587,8 @@ function createNewSave() {
     gameState: JSON.parse(JSON.stringify(window.gameState)),
     gameTime: window.gameTime,
     gameDay: window.gameDay,
-    saveInfo: saveInfo
+    saveInfo: saveInfo,
+    campaignState: window.gameState.campaignState || null
   };
   
   // Save to localStorage
@@ -606,8 +608,6 @@ function createNewSave() {
 function loadGame(saveId) {
   console.log(`Loading game with ID: ${saveId}`);
 
-  
-  
   try {
      // Store the current save ID for potential deletion on death
      currentSaveId = saveId;
@@ -665,9 +665,19 @@ function loadGame(saveId) {
       missionStage: saveData.gameState.missionStage || 0,
       combatVictoryAchieved: saveData.gameState.combatVictoryAchieved || false,
       discoveredBrawlerPits: saveData.gameState.discoveredBrawlerPits || false,
-      discoveredGamblingTent: saveData.gameState.discoveredGamblingTent || false
+      discoveredGamblingTent: saveData.gameState.discoveredGamblingTent || false,
+     // Campaign state
+      campaignState: saveData.campaignState || {
+      currentPartId: null,
+      completedParts: [],
+      failedParts: [],
+      currentLocation: window.CAMPAIGN_LOCATIONS.KASVAARI_CAMP.id,
+      campaignStatus: window.CAMPAIGN_STATUS.NOT_STARTED,
+      specialFlags: {},
+      }
     };
-    
+
+  
     // STEP 3: Set up player core properties
     window.player = {
       origin: saveData.player.origin,
