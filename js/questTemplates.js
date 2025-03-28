@@ -415,9 +415,15 @@ window.questTemplates.frontier_campaign = {
         {
           text: "Protect the ladders.",
           action: "protect",
-          nextStage: "stage_protect"
+          nextStage: "stage_protect",
+          requiresShield: true
         }
-      ]
+      ],
+      defaultChoice: {
+        text: "Try to stay alive.",
+        action: "selfpreserve",
+        nextStage: "stage_selfpreserve"
+      }
      },
 
      {

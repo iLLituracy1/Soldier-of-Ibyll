@@ -157,6 +157,28 @@ function createStatCheckUI() {
   document.body.appendChild(statCheckDisplay);
 }
 
+
+// Function to check if player has a shield equipped
+window.playerHasShieldEquipped = function() {
+  // Check if player has equipment initialized
+  if (!window.player || !window.player.equipment) {
+    return false;
+  }
+  
+  // Check if the offHand slot has an item (not "occupied" or null)
+  const offHandItem = window.player.equipment.offHand;
+  if (!offHandItem || offHandItem === "occupied") {
+    return false;
+  }
+  
+  // Get the template and check if it's a shield type
+  const template = offHandItem.getTemplate();
+  return template && 
+         template.weaponType && 
+         template.weaponType.name === 'Shield';
+};
+
+
 // Display stat check UI
 function displayStatCheck(results, difficulty, overallSuccess) {
   const statCheckDisplay = document.getElementById('statCheckDisplay');
@@ -188,6 +210,8 @@ function displayStatCheck(results, difficulty, overallSuccess) {
     statCheckDisplay.classList.remove('show');
   }, 4000);
 }
+
+
 
 // Check for quest assignment (called each day)
 window.checkForQuestAssignment = function() {
@@ -850,8 +874,23 @@ window.updateQuestActionButtons = function(quest) {
   
   // Check if stage has choices
   if (currentStage.choices && currentStage.choices.length > 0) {
-    // Create a button for each choice
-    currentStage.choices.forEach(choice => {
+    // Filter choices based on equipment requirements
+    const validChoices = currentStage.choices.filter(choice => {
+      // If the choice requires a shield, check if player has one equipped
+      if (choice.requiresShield && !window.playerHasShieldEquipped()) {
+        console.log(`Choice "${choice.text}" requires a shield, but player doesn't have one equipped`);
+        return false;
+      }
+      return true;
+    });
+    
+    // If no valid choices remain after filtering, create a default choice
+    if (validChoices.length === 0 && currentStage.defaultChoice) {
+      validChoices.push(currentStage.defaultChoice);
+    }
+    
+    // Create a button for each valid choice
+    validChoices.forEach(choice => {
       const choiceButton = document.createElement('button');
       choiceButton.className = 'quest-action-btn';
       choiceButton.textContent = choice.text;
