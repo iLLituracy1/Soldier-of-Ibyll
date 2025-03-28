@@ -1,6 +1,12 @@
 // Quest Templates Data
 // This file contains quest templates data separated from quest logic
 
+// 7 days: 1440 × 7 = 10080
+
+// 14 days: 1440 × 14 = 20160
+
+// 30 days: 1440 × 30 = 43200 
+
 // Define quest templates as pure data
 window.questTemplates = {
   // Raid the Frontier quest template
@@ -15,13 +21,13 @@ window.questTemplates = {
         objective: 'Report to the Sarkein\'s tent for briefing.',
         action: 'report',
         battleType: 'narrative',
-        narrative: `<p>Your Vayren orders you to report to the command tent with the rest of your Squad. The interior is sparse but organized, with maps of the frontier spread across a sturdy wooden table. Sarkein Reval, a weathered veteran with a scar crossing his left eye, addresses the assembled soldiers.</p>
+        narrative: `<p>Your Vayren orders you to report to the command tent with the rest of your squad. The interior is sparse but organized, with maps of the frontier spread across a sturdy wooden table. Sarkein Reval, a weathered veteran with a scar crossing his left eye, addresses the assembled soldiers.</p>
           
           <p>"Listen well," he says, his voice carrying throughout the tent. "Our scouts have identified an Arrasi outpost near the frontier that's been a staging ground for raids on our supply lines. Our Spear Host has been selected to neutralize it."</p>
           
           <p>He points to a location on the map. "The outpost is here, a half-day's march to the west. It's lightly garrisoned - perhaps twenty men - but they have good visibility of the surrounding area. We'll need to move quickly and quietly."</p>
           
-          <p>"Your objective is to disable the outpost - eliminate the garrison, destroy any supplies, and burn the structures. We move out at dawn tomorrow. Use today to prepare."</p>
+          <p>"Our objective is to disable the outpost - eliminate the garrison, destroy any supplies, and burn the structures. We move out at dawn tomorrow. Use today to prepare."</p>
           
           <p>The Sarkein looks over the gathered soldiers with a steady gaze. "Any questions?"</p>
           
@@ -34,9 +40,7 @@ window.questTemplates = {
         objective: 'Prepare for the raid (1 day).',
         action: 'prepare',
         battleType: 'narrative',
-        narrative: `<p>You spend the day preparing for tomorrow's raid. You inspect your equipment, carefully checking your armor for weak spots and ensuring your weapons are in good condition. You also visit the quartermaster to procure any necessary supplies.</p>
-          
-          <p>Around camp, other soldiers are similarly engaged in preparation. Some practice formations, others sharpen blades or repair armor. There's a quiet tension in the air - the anticipation of combat.</p>
+        narrative: `<p>Around camp, other soldiers are similarly engaged in preparation. Some practice formations, others sharpen blades or repair armor. There's a quiet tension in the air - the anticipation of combat.</p>
           
           <p>You take time to rest and mentally prepare yourself for what lies ahead. Tomorrow will bring danger, but also an opportunity to prove your worth to the Kasvaari.</p>`,
         timeAdvance: 1440, // 24 hours
@@ -48,7 +52,7 @@ window.questTemplates = {
         objective: 'March to the frontier.',
         action: 'proceed',
         battleType: 'narrative',
-        timeAdvance: 700, 
+        timeAdvance: 600, 
         narrative: `<p>Dawn breaks with a blood-red sun as your Spear Host assembles at the camp's edge. The Sarkein inspects the units briefly, then gives the order to move out. The column of soldiers winds its way westward, shields and spears glinting in the early morning light.</p>
           
           <p>The terrain grows increasingly rugged as you approach the frontier. The column moves in practiced silence, with scouts ranging ahead and to the flanks. Dust clings to your armor and throat as the hours pass.</p>
@@ -61,7 +65,7 @@ window.questTemplates = {
         choices: [
           {
             text: "Volunteer.",
-            action: "volunteer_scout",
+            action: "volunteer",
             nextStage: "stage_scout"
           },
           {
@@ -239,7 +243,7 @@ window.questTemplates = {
       taelors: 150,
       items: ['health_Potion', 'arrasi_blade', 'arrasi_pendant',]
     },
-    minDayToTrigger: 2,         // Only available after day 2
+    minDayToTrigger: 100,         // Only available after day 2
     chanceTrigger: 1,        // 25% chance of triggering when conditions are met
     cooldownDays: 5             // Must wait 5 days between assignments of this quest
   },
@@ -256,36 +260,377 @@ window.questTemplates = {
 window.questTemplates.frontier_campaign = {
   id: 'frontier_campaign',
   title: 'Advance to the Frontier',
-  description: 'The Sarkein has ordered the Kasvaari to advance to the Arrasi Frontier. Prepare for a long march.',
+  description: 'Our Kasvaari will join up with the main invasion force, and advance to the Arrasi Frontier. Prepare for a long march.',
   isCampaignQuest: true, // Flag to mark as campaign quest
-  campaignPartId: 'part_2', // Which campaign part this belongs to
+  campaignPartId: 'part_1', // Which campaign part this belongs to
   
   stages: [
     {
       id: 'stage_orders',
       description: 'You\'ve received orders to prepare for a march to the Arrasi Frontier.',
-      objective: 'Report to the Sarkein for campaign briefing.',
+      objective: 'Receive orders...',
       action: 'report',
       battleType: 'narrative',
-      narrative: `<p>The camp buzzes with activity as orders are passed down from the command tent. Your Vayren approaches with important news.</p>
-        
-        <p>"Prepare your gear," he says. "The Sarkein has ordered the entire Kasvaari to march to the Arrasi Frontier. We move out at dawn tomorrow."</p>
-        
-        <p>This is it - your first real campaign into contested territory. The anticipation sends a shiver down your spine.</p>`,
-      nextStage: 'stage_preparation'
+      narrative: `<p>The camp buzzes with activity as orders are passed down from the command tent. Sarkein Reval gathers all eighty members of the Spear Host in the center of the camp, and announces that we'll be moving out soon.</p>
+      
+      <p>This is it. This is what you've been preparing for the last few months. The anticipation in the camp is palpable. You only hope that your training has prepared you for this.</p>
+      
+      <p>You'll be joining the rest of the invasion force at the Wall of Nesia-- a bastion that spans the length of Nesia's western border. On the other side, the Arrasi kingdoms of the peninsula stake their claim.</p>`,
+      nextStage: 'stage_preparation',
+      timeAdvance: 10080, 
     },
-    // More stages...
+
+    {
+      id: 'stage_preparation',
+      description: 'Fall in and begin your march.',
+      objective: 'Form up',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>A week later, your Spear Host is among the last to take down their section of camp and fall into formation with the rest of the Kasvaari.</p>
+
+      <p>Your unit is one of the last, at the very end of the Kasvaari's column. Still, you can see the Wall of Nesia fast approaching, dominating more and more of the backdrop with every mile marched.</p>
+      
+      <p>Apparently the Armarin-- the invasion force that you are currently marching to join with, is expected to be around 30,000 strong once all forces are assembled.`,
+      nextStage: 'stage_march',
+      timeAdvance: 10080, 
+    },
+
+    {
+      id: 'stage_march',
+      description: 'Your march continues.',
+      objective: 'Stay in line, soldier.',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>Dont Oslotheon, the Hierarch of Eterpau and King of the Nesians, marshaled his own force of 15,000 under the command of the Sceptremarch, his brother Adiv.</p>
+      
+      <p>They will be fighting alongside our Armarin. This is good news. The Nesian Heirknights are renowned heavy cavalry, and their sharpshooters have enlisted in the Paanic ranks since their conquest.</p>
+      
+      <p>You can't help but wonder what the stakes are for the Nesian nobility.</p>`,
+      nextStage: 'stage_march2',
+      timeAdvance: 10080, 
+    },
+
+    {
+      id: 'stage_march2',
+      description: 'The Wall of Nesia looms ahead.',
+      objective: 'Enter the sprawling camp at the Wall.',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>By dusk, you crest a final hill and there it is — the Wall of Nesia, rising like a jagged spine of stone and timber. Its ramparts bristle with banners, each marking a different Kasvaari or Nesian host.</p>
+      
+      <p>The sprawling camp at its base is a chaotic mass of tents, fires, and soldiers moving with purpose. Officers bark orders, smiths hammer out fresh weapons, and clusters of riders thunder down the roads delivering messages.</p>
+      
+      <p>It's clear that this is no mere encampment — it's a war machine prepared to grind forward. Your unit is directed to pitch camp near the northern wing, among a host of veteran Kasvaari's. Their hardened faces regard your unit with clear pity, though some throw you curt nods.</p>
+      
+      <p>You get to work digging in.</p>`,
+      nextStage: 'stage_muster',
+      timeAdvance: 4320, 
+    },
+
+    {
+      id: 'stage_muster',
+      description: 'Muster and prepare to march into enemy territory.',
+      objective: 'Form ranks with the Iron Legion.',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>A week passes very quickly. In the morning, your unit assembles in formation as the muster horn sounds. Alongside your Kasvaari, other units fall into their places, swelling your force to a powerful 7,000 strong — a Vaoseht, an Iron Legion.</p>
+      
+      <p>The Vaorin, a grim-faced man clad in lacquered black armor, rides past on a powerful destrier. His gaze lingers on your formation a moment longer than the others before he wheels away, satisfied.</p>
+      
+      <p>Word spreads quickly: enemy fortifications lie ahead, barring the way to the Crystalline Plains. Worse still, scouts report that two Arrasi Kings have combined their forces — a host of some 14,000 — and they are somewhere in the border region.</p>
+      
+      <p>Your unit marches past the Wall of Nesia in a long, grinding column. The air is thick with the scent of oil and iron. Somewhere ahead, war waits.</p>
+      
+      <p>You wonder if you'll ever see the towering feudalscapes of Nesia again.</p>`,
+      nextStage: 'stage_prebattle',
+      timeAdvance: 10080, 
+    },
+
+    {
+      id: 'stage_prebattle',
+      description: 'Battle looms...',
+      objective: 'Stay in formation. Remember your training.',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>The border frontier is a desolate place — semi-hilly, with gravel crunching underfoot for mile after mile. You struggle to imagine how anyone survives here; no wonder the Arrasi kingdoms are raiders, living off plunder.</p>
+      
+      <p>Your 7,000-strong force finally comes within two miles of your destination — a fortified hill pass blocking the only viable route forward. There’s no way around it; you'll have to attack head-on.</p>
+      
+      <p>Camp is established about a mile and a half away, perched on high ground. From there, you can see the pass and far beyond — no doubt the Arrasi have dispatched riders already, warning of your advance.</p>
+      
+      <p>That evening, orders come down from the Vaorin. The assault is set for dawn. The camp remains busy into the night — weapons sharpened, ladders constructed, and warriors lingering by the fires, knowing what tomorrow will bring.</p>`,
+      nextStage: 'stage_battle',
+      timeAdvance: 1440, 
+    },
+
+    {
+      id: 'stage_battle',
+      description: 'Battle!',
+      objective: 'Stay alive, do your duty. For the Paanic Empire!',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>Come the dawn, your Kasvaari is the second to form up in the pass.</p>
+      
+      <p>Most of the men are silent as the dead. You feel a mixture of tension and eagerness swelling within you. Your first real engagement lies ahead.</p>
+      
+      <p>The horns are blown, signalling the attack to begin.</p>`,
+      timeAdvance: 600, 
+
+      statCheck: {
+        type: 'skill',
+        stat: ['survival', 'melee'],
+        attribute: 'PHY', 
+        difficulty: 4,
+        successText: `<p>Your Sarkein personally orders you and a few others from your squad to the front to join the vanguard. You quickly move up, joining a smaller element of around 500 regulars. Most of them are veterans, and you feel out of place.</p>`,
+        failureText: `<p>Your Sarkein personally orders some of the more experienced members of your squad to join the vanguard. You don't envy them, but part of you wishes you were honored with the duty.</p>`,
+      },  
+      outcomes: {
+        success: {
+          nextStage: 'stage_precombat', 
+          narrativeAddition: `<p>You're led by a hardened Sen'Vaorin named Darius. You notice that it is not a traditional Paanic name, but the men seem to revere his ability.</p>
+          <p>You are quickly organized into a smaller group of around 50. You will storm the far right wall, making a ladder assault with the rest of the vanguard in that section. Within minutes, you find yourself assailed by enemy projectiles, the defenders desperately doing anything to ward off your advance!`,
+        },
+        failure: {
+          nextStage: 'stage_wait', 
+          narrativeAddition: `<p>You stand in formation. This is all you can do for now. From many rows back, it's hard to make out exactly what's happening ahead of you, but you can see the mass of Paanic Regulars making their assault across the walls of the bastion ahead.</p>`,
+          timeAdvance: 60,
+        }
+      }
+     },
+
+
+     {
+      id: 'stage_precombat',
+      description: 'Battle!',
+      objective: 'You\'re in the vanguard! The din of battle crashes around you. Stay alive, do your duty. For the Paanic Empire!',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>You march forward with the vanguard element. You try your best to... `,
+      choices: [
+        {
+          text: "Stay alive.",
+          action: "selfpreserve",
+          nextStage: "stage_selfpreserve"
+        },
+        {
+          text: "Protect the ladders.",
+          action: "protect",
+          nextStage: "stage_protect"
+        }
+      ]
+     },
+
+     {
+      id: 'stage_selfpreserve',
+      description: 'Battle!',
+      objective: 'You\'re in the vanguard! The din of battle crashes around you. Stay alive, do your duty. For the Paanic Empire!',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>You decide to just try to stay alive. Risking your life to protect the ladders is suicidal.</p>
+      
+      <p>You quickly realize that you aren't special in that regard anyway. Some defenders seem to call you out from atop the walls, directing their volley toward your position!</p>`,
+     
+      statCheck: {
+        type: 'skill',
+        stat: ['survival', 'melee'],
+        attribute: 'PHY', 
+        difficulty: 3,
+        successText: `<p>You quickly raise your shield and defend yourself against the incoming projectiles.</p>`,
+        failureText: `<p>Your defensive posture is lacking, and one of the arrows lands true.</p>`,
+      },  
+      outcomes: {
+        success: {
+          nextStage: 'stage_vanguard', 
+          narrativeAddition: `The projectiles are deflected from your shield as a result of your well-timed defensive posture. Moments later, you find yourself fighting atop the walls.`,
+        },
+        failure: {
+          nextStage: 'stage_vanguard', 
+          narrativeAddition: `<p>A grazing hit, but it stings. Moments later, you find yourself fighting atop the walls.</p>`,
+          penalties: {
+            health: -8
+          }
+        }
+      }
+     },
+
+     {
+      id: 'stage_protect',
+      description: 'Battle!',
+      objective: 'You\'re in the vanguard! The din of battle crashes around you. Stay alive, do your duty. For the Paanic Empire!',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>Protecting the ladder bearers might be suicidal, but if you make it to the walls with no ladders, you're dead anyway. You decide to help them make it there.</p>
+      
+      <p>It doesn't take long for your position to be targeted by a volley of projectiles!</p>`,
+
+      statCheck: {
+        type: 'skill',
+        stat: ['survival', 'melee'],
+        attribute: 'PHY', 
+        difficulty: 3,
+        successText: `<p>You quickly raise your shield and defend both yourself and the ladder bearer next to you against the incoming projectiles.</p>`,
+        failureText: `<p>Your defensive posture is lacking, and one of the arrows lands true. Another slips past your defense, and strikes a ladder bearer in the throat.</p>`,
+      },  
+      outcomes: {
+        success: {
+          nextStage: 'stage_vanguard', 
+          narrativeAddition: `The projectiles are deflected from your shield as a result of your well-timed defensive posture. The ladder bearers make it to their destination easier thanks to your efforts. Moments later, you find yourself fighting atop the walls.`,
+          rewards: {
+            deeds: 50
+          }
+        },
+        failure: {
+          nextStage: 'stage_vanguard', 
+          narrativeAddition: `<p>A grazing hit, but it stings. At least you defended the ladder bearers. Most of you make it to the walls alive. Moments later, you find yourself fighting atop them...</p>`,
+          penalties: {
+            health: -12,
+          },
+          rewards: {
+            deeds: 20
+          }
+        }
+      }
+     },
+
+     {
+      id: 'stage_vanguard',
+      description: 'Battle!',
+      objective: 'You\'re in the vanguard! The din of battle crashes around you. Stay alive, do your duty. For the Paanic Empire!',
+      action: 'combat',
+      battleType: 'individual',
+      enemyType: ['ARRASI_VAELGORR'], 
+      allies: ['PAANIC_REGULAR'],
+      combatOptions:{
+        requireDefeat: false,
+        maxTurns: 75,
+        enemySequence: [
+          { type: ["ARRASI_DRUSKARI", "ARRASI_VAELGORR"], waves: 2 },
+          { type: ["ARRASI_VAELGORR", "ARRASI_VAELGORR"], waves: 2},
+        ],
+      },
+      narrative: `<p>On the walls, you come face to face with brutal Arrasi warriors...</p>`,
+      nextStage: 'stage_aftermath',
+    },
+
+
+     {
+      id: 'stage_wait',
+      description: 'Battle!',
+      objective: 'The din of battle crashes around you. Stay alive, do your duty. For the Paanic Empire!',
+      action: 'combat',
+      battleType: 'individual',
+      enemyType: ['ARRASI_VAELGORR', 'ARRASI_VAELGORR'], 
+      allies: ['PAANIC_REGULAR'],
+      combatOptions:{
+        requireDefeat: false,
+        maxTurns: 75,
+        enemySequence: [
+          { type: ["ARRASI_DRUSKARI", "ARRASI_VAELGORR"], waves: 2 },
+          { type: ["ARRASI_VAELGORR", "ARRASI_VAELGORR"], waves: 2},
+        ],
+      },
+      narrative: `<p>Finally, the order is given, and you are thrown into the fray. The way has been paved for you, paid with by the blood of your fellow regulars.</p>
+      
+      <p>You move quickly, stepping over the bodies of fellow soldiers. There's no time to think about it.</p>
+      
+      <p>Some of the walls are still contested, and there is an active ram at the gatehouse. Your officers direct your unit to a section of the wall that has collapsed. Men are scrapping atop the rubble, and formations hold both sides.</p>
+      
+      <p>Weapon in hand, you step into the fold of your first battle...</p>`,
+      nextStage: 'stage_aftermath',
+      timeAdvance: 60, 
+    },
+
+    {
+      id: 'stage_aftermath',
+      description: 'Dust and blood is in the air.',
+      objective: 'Witness the aftermath of the initial assault.',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>The fort is yours, though it came at a steep cost. The wounded are dragged to makeshift triage stations, while soldiers patrol the battlements to ensure no counterattack catches you unaware.</p>
+
+      <p>Among the surviving defenders, a small group of hardened elites have retreated to the Keep. The entrance has been barred, and the defenders are refusing to yield.</p>
+
+      <p>Darius, the Sen'Vaorin who led the vanguard, stands before the assembled host and calls for volunteers. Anyone willing to storm the Keep will receive two extra shares of spoils. Predictably, most of the volunteers are seasoned warriors. No one expects a green recruit to step forward.</p>
+
+      <p>You feel a mix of exhaustion and relief, but part of you wonders if the Keep’s defenders have anything worth the risk...</p>`,
+
+      choices: [
+        {
+          text: "Don't volunteer.",
+          action: "remain_silent",
+          nextStage: "stage_camp"
+        },
+        {
+          text: "Volunteer.",
+          action: "Volunteer",
+          nextStage: "stage_keep"
+        }
+      ]
+    },
+
+    {
+      id: 'stage_keep',
+      description: 'Battle!',
+      objective: 'Storm the keep!',
+      action: 'combat',
+      battleType: 'individual',
+      enemyType: ['ARRASI_DRUSKARI', 'ARRASI_DRUSKARI'], 
+      allies: ['PAANIC_REGULAR'],
+      combatOptions:{
+        requireDefeat: false,
+        maxTurns: 100,
+        enemySequence: [
+          { type: ["ARRASI_DRUSKARI", "ARRASI_DRUSKARI"], waves: 2 },
+          { type: ["ARRASI_DRUSKARI", "ARRASI_DRUSKARI"], waves: 2},
+        ],
+      },
+      narrative: `<p>You step forward, taking your place among the group of volunteers. Sen'Vaorin Darius gives you a nod.</p>
+      
+      <p>It isn't long until you're thrust against the keep defenders, face to face with elite warriors...</p>`,
+      timeAdvance: 120,
+      nextStage: "stage_keepaftermath"
+    },
+
+    {
+      id: 'stage_keepaftermath',
+      description: 'Witness the aftermath of the keep battle.',
+      objective: 'Victory!',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>As the keep falls, the last defenders are either put to the swords or captured. You move through the structure, having first plunder rights!</p>
+      
+      <p>Sen'Vaorin Darius ensures your task force gets to plunder the keep spoils without the rest of the army, and afterward you receive your double share.</p>`,
+      timeAdvance: 60,
+      nextStage: 'stage_camp',
+      rewards: {
+        taelors: 350,
+        deeds: 25,
+      }
+    },
+
+    {
+      id: 'stage_camp',
+      description: 'Back at camp...',
+      objective: 'Collect yourself, and rest.',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>Later, you find yourself hard at rest within your quarters, reflecting on the matters of the day. It felt like only now have you realized the carnage that you witnessed back on that hill.</p>
+      
+      <p>As you drift to sleep, you imagine yourself a more stoic warrior, unfazed by the gruesome realities of warfare.</p>`,
+      timeAdvance: 120,
+      nextStage: "stage_arrival"
+    },
     
-    // Important: Final stage should trigger location change
     {
       id: 'stage_arrival',
-      description: 'After days of marching, your unit arrives at the frontier outpost.',
-      objective: 'Establish camp at the frontier.',
-      action: 'complete',
+      description: 'After days of marching, your unit arrives back at the massive camp beneath the Wall of Nesia.',
+      objective: 'Return to camp.',
+      action: 'prepare',
       battleType: 'narrative',
-      narrative: `<p>After days of dusty roads and watchful nights, your unit finally crests a hill to see the frontier outpost spread before you. The border between Empire and Arrasi territories stretches to the horizon - a restless, dangerous line.</p>
-        
-        <p>The Sarkein gives orders to establish camp. This will be your new home for the coming campaign.</p>`,
+      narrative: `<p>After some days of marching, your force finally makes it back to the Wall of Nesia. As you move beneath its ramparts, you feel a sense of elation. You didn't know if you'd lay eyes on these lands ever again.</p>
+      
+      <p>As you reclaim your camp grounds, you get the feeling that this was only the beginning of a long and arduous conflict...</p>`,
+      timeAdvance: 20160
       // No nextStage indicates quest completion
     }
   ],
@@ -293,22 +638,20 @@ window.questTemplates.frontier_campaign = {
   // Campaign quests should have special callbacks
   onComplete: function() {
     // This will be called when quest is completed
-    window.completeCampaignPart('part_2');
+    window.completeCampaignPart('part_1');
   },
   
   onFail: function() {
     // This will be called if quest fails
-    window.failCampaignPart('part_2');
+    window.failCampaignPart('part_1');
   },
   
   baseReward: {
-    deeds: 200,
-    taelors: 100,
-    items: ['frontier_rations', 'scout_map']
+    deeds: 150,
+    taelors: 300,
   },
   
   // Campaign quests aren't triggered by chance - they're forced
   minDayToTrigger: null,
-  chanceTrigger: 0,
-  cooldownDays: 0
+  chanceTrigger: 1,
 };

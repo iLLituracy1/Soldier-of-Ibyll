@@ -156,6 +156,27 @@ window.updateActionButtons = function() {
       window.addActionButton('Evening Drills', 'frontier_train', actionsContainer);
     }
   }
+  else if (currentLocationId === window.CAMPAIGN_LOCATIONS.WALL_OF_NESIA.id) {
+    // Actions available at the Wall of Nesia
+    window.addActionButton('Rest', 'rest', actionsContainer);
+    
+    if (timeOfDay === 'day' || timeOfDay === 'evening') {
+      window.addActionButton('Patrol Border', 'frontier_patrol', actionsContainer);
+    }
+    
+    // Mess available at different times at frontier
+    if ((hours >= 6 && hours <= 8) || (hours >= 18 && hours <= 20)) {
+      window.addActionButton('Field Kitchen', 'mess', actionsContainer);
+    }
+    
+    // Guard duty always available
+    window.addActionButton('Guard Post', 'guard', actionsContainer);
+
+    
+    if (timeOfDay === 'evening' || timeOfDay === 'night') {
+      window.addActionButton('Evening Drills', 'frontier_train', actionsContainer);
+    }
+  }
   // Add more location-specific actions as needed
 };
 

@@ -536,26 +536,29 @@ shouldEndCombatWithVictory: function() {
   },
   
   // End combat early due to turn limit
-  endCombatEarly: function() {
-    // Create narrative about the battle shifting
-    const narrativeText = [
-      "The battle shifts, forcing your engagement to end as the larger conflict swallows your skirmish!",
-    ];
+endCombatEarly: function() {
+  // Create narrative about the battle shifting
+  const narrativeText = [
+    "The battle shifts, forcing your engagement to end as the larger conflict swallows your skirmish!",
+  ];
+  
+  // Add messages to combat log
+  for (const line of narrativeText) {
+    this.addCombatMessage(line);
+  }
+  
+  // Show battle conclusion modal if UI exists
+  if (window.combatUI && typeof window.combatUI.showBattleConclusionModal === 'function') {
+    window.combatUI.showBattleConclusionModal('draw', narrativeText);
     
-    // Add messages to combat log
-    for (const line of narrativeText) {
-      this.addCombatMessage(line);
-    }
-    
-    // Show battle conclusion modal if UI exists
-    if (window.combatUI && typeof window.combatUI.showBattleConclusionModal === 'function') {
-      window.combatUI.showBattleConclusionModal('draw', narrativeText);
-      return; // UI will handle the actual ending
-    } else {
-      // Fallback if UI isn't available
-      setTimeout(() => this.endCombat("draw"), 2000);
-    }
-  },
+    // IMPORTANT CHANGE: Always call endCombat with "draw" outcome after a delay,
+    // even when the UI is displayed
+    setTimeout(() => this.endCombat("draw"), 2000);
+  } else {
+    // Fallback if UI isn't available
+    setTimeout(() => this.endCombat("draw"), 2000);
+  }
+},
   
   // Handle player getting up from knocked down
 handlePlayerGetUp: function() {

@@ -14,17 +14,17 @@ window.CAMPAIGN_STATUS = {
     KASVAARI_CAMP: {
       id: 'kasvaari_camp',
       name: 'Kasvaari Camp',
-      description: 'The primary military encampment in the Western Hierarchate of Nesia.'
+      description: 'Your regiment\'s military encampment in the Western Hierarchate of Nesia.'
     },
     ARRASI_FRONTIER: {
       id: 'arrasi_frontier',
       name: 'Arrasi Frontier',
       description: 'The contested borderlands between the Empire and the Arrasi territories.'
     },
-    FORTRESS_ETERPAU: {
-      id: 'fortress_eterpau',
-      name: 'Fortress Eterpau',
-      description: 'A mighty Paanic fortress guarding the passage to the Crystalline Plains.'
+    WALL_OF_NESIA: {
+      id: 'wall_of_nesia',
+      name: 'Wall of Nesia',
+      description: 'A massive fortified wall, spanning the length of the western border of Nesia. This divides the Nesian state from the Arrasi Peninsula.'
     },
     // Add more locations as needed
   };
@@ -33,30 +33,13 @@ window.CAMPAIGN_STATUS = {
   window.CAMPAIGN_PARTS = [
     {
       id: 'part_1',
-      title: 'Training and Preparation',
-      description: 'Prepare for your first mission with the Kasvaari.',
-      location: window.CAMPAIGN_LOCATIONS.KASVAARI_CAMP,
-      startDay: 2, // When this part becomes available
-      mainQuestId: 'raid_frontier', // ID of the main quest for this part
-      requiredForProgression: true, // Must complete to progress
-      nextPartId: 'part_2', // Where to go next
-      // Define any special conditions for this part
-      startConditions: {
-        minDay: 2,
-        minLevel: 1
-      }
-    },
-    {
-      id: 'part_2',
       title: 'Advance to the Frontier',
       description: 'March with your unit to the Arrasi Frontier.',
-      location: window.CAMPAIGN_LOCATIONS.ARRASI_FRONTIER,
-      startDay: null, // Triggered by completion of previous part
+      location: window.CAMPAIGN_LOCATIONS.WALL_OF_NESIA,
+      startDay: 2, 
       mainQuestId: 'frontier_campaign', // This quest needs to be created
       requiredForProgression: true,
-      nextPartId: 'part_3',
-      // Optional start delay after previous part
-      startDelay: 1 // Days after previous part before this becomes available
+      nextPartId: 'part_2',
     },
     // Add more campaign parts...
   ];

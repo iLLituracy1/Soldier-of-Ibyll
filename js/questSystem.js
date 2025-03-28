@@ -904,11 +904,15 @@ function getActionButtonText(action) {
       return 'Prepare';
     case 'proceed':
       return 'Continue';
+    case 'protect':
+      return 'Protect';
     case 'combat':
       return 'Engage';
+    case 'selfpreserve':
+      return 'Stay alive';
     case 'complete':
       return 'Complete Mission';
-    case 'volunteer_scout':
+    case 'volunteer':
       return 'Volunteer';
     case 'remain_silent':
       return 'Remain silent';

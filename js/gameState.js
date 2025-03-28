@@ -92,7 +92,6 @@ window.checkLevelUp = function() {
     // Level up!
     window.gameState.level++;
     window.gameState.deeds -= requiredExp;
-    window.gameState.skillPoints += 1;
     
     // Increase max health and stamina
     window.gameState.maxHealth += 10;
