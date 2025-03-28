@@ -952,13 +952,25 @@ updateTurnCounter: function() {
   
   // Show get up option when player is knocked down
   showGetUpOption: function() {
+    console.log("Showing get up button");
     const actionsContainer = document.getElementById('combatActions');
+    if (!actionsContainer) {
+      console.error("Combat actions container not found");
+      return;
+    }
+    
+    // Clear ALL existing buttons
     actionsContainer.innerHTML = '';
     
-    // Add get up button
-    this.addCombatButton("Get Up", () => window.combatSystem.executePlayerGetUp(), actionsContainer);
+    // Add ONLY get up button
+    this.addCombatButton("Get Up", () => {
+      console.log("Get Up button clicked");
+      window.combatSystem.executePlayerGetUp();
+    }, actionsContainer);
   },
   
+
+
   // Update enemy display
   updateEnemyDisplay: function() {
     const enemyContainer = document.getElementById('enemyContainer');
