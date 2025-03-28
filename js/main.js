@@ -229,6 +229,9 @@ window.handleAction = function(action) {
   } else if (action === 'inventory') {
     window.handleInventoryClick();
     return;
+  } else if (action === 'feats') {
+    window.showFeatsPanel();
+    return;
   }
   
   // Show submenu actions

@@ -3,15 +3,69 @@
 
 // Rank definitions (from lowest to highest)
 window.RANKS = [
-  { id: 'sai_lun', title: 'Sai\'Lun', description: 'Recruit', deedsRequired: 0 },
-  { id: 'marin', title: 'Marin', description: 'Trooper', deedsRequired: 100 },
-  { id: 'marin_chei', title: 'Marin\'Chei', description: 'Senior Trooper', deedsRequired: 250 },
-  { id: 'sey_na', title: 'Sey\'na', description: 'Sergeant', deedsRequired: 500 },
-  { id: 'vayren', title: 'Vayren', description: 'Squad Leader', deedsRequired: 1000 },
-  { id: 'sarkein', title: 'Sarkein', description: 'Company Leader', deedsRequired: 2000 },
-  { id: 'sen_vaorin', title: 'Sen\'Vaorin', description: 'Senior Line Commander', deedsRequired: 4000 },
-  { id: 'kas_taal', title: 'Kas\'Taal', description: 'Banner Captain', deedsRequired: 8000 },
-  { id: 'taal_veyar', title: 'Taal\'Veyar', description: 'Regimental Lord', deedsRequired: 16000 }
+  { 
+    id: 'sai_lun', 
+    title: 'Sai\'Lun', 
+    description: 'Recruit', 
+    deedsRequired: 0,
+    detailedDescription: 'The rawest of recruits, often drafted or freshly volunteered. You have little experience and no influence. Lesser than a grunt, a nobody of nobodies.'
+  },
+  { 
+    id: 'marin', 
+    title: 'Marin', 
+    description: 'Trooper', 
+    deedsRequired: 100,
+    detailedDescription: 'A basic soldier of the legion, having proven basic competence in drills and minor skirmishes. You\'re not just scum after all.'
+  },
+  { 
+    id: 'marin_chei', 
+    title: 'Marin\'Chei', 
+    description: 'Senior Trooper', 
+    deedsRequired: 250,
+    detailedDescription: 'A trooper recognized for consistent performance in battle. The recruits look up to you, and the Vayren expects you to set an example.'
+  },
+  { 
+    id: 'sey_na', 
+    title: 'Sey\'na', 
+    description: 'Sergeant', 
+    deedsRequired: 500,
+    detailedDescription: 'You are a Sey\'na, a squadhand. Second to the Vayren, you are a key link in the command chain between trooper and officer, overseeing small responsibilities in the squad like weapon maintenance, and watch shifts.'
+  },
+  { 
+    id: 'vayren', 
+    title: 'Vayren', 
+    description: 'Squad Leader', 
+    deedsRequired: 1000,
+    detailedDescription: 'A seasoned enlisted leader, entrusted with training fresh recruits and advising squadhands. Often the backbone of a Spear Host, you are personally responsible for around 30 soldiers.'
+  },
+  { 
+    id: 'sarkein', 
+    title: 'Sarkein', 
+    description: 'Company Leader', 
+    deedsRequired: 2000,
+    detailedDescription: 'The commander of an entire Spear Host. On and off the field, you are responsible for 80 Paanic soldiers. You are one of three Sarkein in a Sword Host, a larger element of 240 which your unit is attached to.'
+  },
+  { 
+    id: 'sen_vaorin', 
+    title: 'Sen\'Vaorin', 
+    description: 'Senior Line Commander', 
+    deedsRequired: 4000,
+    detailedDescription: 'The most senior enlisted rank, serving as a senior enlisted adviser and commander of a Sword Host. You are one of three Sen\'Vaorin in a Banner Host, a larger element of 750 of which your unit is attached to. As a Senior Line Commander, you are expected to be a front-line presence, leading your 240 soldiers into battle.'
+  },
+  { 
+    id: 'kas_taal', 
+    title: 'Kas\'Taal', 
+    description: 'Banner Captain', 
+    deedsRequired: 8000,
+    detailedDescription: 'The Kas\'Taal is one of two such leaders in a Kasvaari, a larger element of 1,500 of which your unit is attached to. You are considered an elite commander and are expected to both advise and make strategic decisions. With the Kasvaari banner fitted to the back of your armor, the Kas\'Taal is not expected to fight, but to lead.'
+  },
+  { 
+    id: 'taal_veyar', 
+    title: 'Taal\'Veyar', 
+    description: 'Regimental Lord', 
+    deedsRequired: 16000,
+    detailedDescription: 'The Taal\'Veyar is the apex of enlisted command, overseeing an entire 1,500 strong Kasvaari with strategic acumen. You lead from the rear of your force, your decisive orders shape the empire\'s campaigns and secure its legacy.'
+  }
 ];
 
 // Deeds sources tracking
@@ -186,12 +240,13 @@ window.addFeatsButton = function() {
   const gameControls = document.querySelector('.game-controls');
   if (!gameControls) return;
   
-  // Check if button already exists
-  if (document.querySelector('.control-btn[onclick="handleAction(\'feats\')"]')) return;
+  // Check if button already exists - use a data attribute check
+  if (gameControls.querySelector('.control-btn[data-action="feats"]')) return;
   
   // Create button
   const featsButton = document.createElement('button');
   featsButton.className = 'control-btn';
+  featsButton.setAttribute('data-action', 'feats'); // Add data attribute for identification
   featsButton.innerHTML = '<i class="fas fa-medal"></i>Feats & Rank';
   featsButton.onclick = function() {
     window.handleAction('feats');
@@ -271,17 +326,12 @@ window.updateFeatsUI = function() {
           <div class="commendations-count">Commendations: ${window.gameState.commendations}</div>
         </div>
         
-        ${nextRank ? `
-          <div class="next-rank">
-            <h4>Next Rank</h4>
-            <div class="rank-title">${nextRank.title} (${nextRank.description})</div>
-            <div class="deeds-required">Deeds Required: ${nextRank.deedsRequired}</div>
-            <div class="deeds-remaining">Remaining: ${nextRank.deedsRequired - window.gameState.deeds}</div>
-            <div class="rank-progress-bar">
-              <div class="progress" style="width: ${Math.min(100, (window.gameState.deeds / nextRank.deedsRequired) * 100)}%"></div>
-            </div>
+        <div class="rank-details">
+          <h4>Rank Details</h4>
+          <div class="rank-detailed-description">
+            ${currentRank.detailedDescription || "No detailed description available for this rank."}
           </div>
-        ` : '<div class="max-rank">Maximum rank achieved</div>'}
+        </div>
       </div>
       
       <div class="feats-section">
@@ -517,6 +567,22 @@ window.applyFeatSystemStyles = function() {
       display: inline-block;
       margin-top: 5px;
       color: #c9aa71;
+    }
+
+    .rank-details {
+      background: rgba(201, 170, 113, 0.1);
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 15px;
+    }
+    
+    .rank-detailed-description {
+      color: #e0e0e0;
+      font-style: italic;
+      line-height: 1.5;
+      padding: 5px;
+      border-left: 3px solid #c9aa71;
+      margin-top: 5px;
     }
   `;
   
