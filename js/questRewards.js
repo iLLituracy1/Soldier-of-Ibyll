@@ -152,25 +152,26 @@ window.applyQuestRewards = function(quest) {
     items: []
   };
   
-  if (rewardsToApply.experience) {
-    const deedsAmount = rewardsToApply.experience;
-    
-    // Use new feats system if available
-    if (typeof window.awardDeeds === 'function') {
-      window.awardDeeds(deedsAmount, window.DEEDS_SOURCES.QUEST, `Completed quest: ${quest.title}`);
-    } else {
-      // Fallback to old system
-      window.gameState.deeds += deedsAmount;
-    }
-    
-    // Track in reward summary (rename to deeds)
-    rewardSummary.deeds = (rewardSummary.deeds || 0) + deedsAmount;
-    
-    // Record quest feat
-    if (typeof window.recordQuestFeat === 'function') {
-      window.recordQuestFeat(quest.templateId, quest.title);
-    }
+  // Check for either deeds (new system) or experience (old system)
+if (rewardsToApply.deeds || rewardsToApply.experience) {
+  const deedsAmount = rewardsToApply.deeds || rewardsToApply.experience || 0;
+  
+  // Use new feats system if available
+  if (typeof window.awardDeeds === 'function') {
+    window.awardDeeds(deedsAmount, window.DEEDS_SOURCES.QUEST, `Completed quest: ${quest.title}`);
+  } else {
+    // Fallback to old system
+    window.gameState.deeds += deedsAmount;
   }
+  
+  // Track in reward summary
+  rewardSummary.deeds = (rewardSummary.deeds || 0) + deedsAmount;
+  
+  // Record quest feat
+  if (typeof window.recordQuestFeat === 'function') {
+    window.recordQuestFeat(quest.templateId, quest.title);
+  }
+}
   
   // Apply base currency
   if (rewardsToApply.taelors) {
@@ -199,18 +200,21 @@ window.applyQuestRewards = function(quest) {
     });
   }
   
-  // Apply enhanced rewards if available
-  if (enhancedRewards) {
-    // Ensure quest reward items are created
-    window.createQuestRewardItems();
-    
-    // Apply enhanced experience
-    if (enhancedRewards.experience) {
-      const enhancedExp = enhancedRewards.experience;
-      window.gameState.experience += enhancedExp;
-      rewardSummary.experience += enhancedExp;
-      console.log(`Added ${enhancedExp} enhanced experience`);
-    }
+      // Apply enhanced experience/deeds
+    if (enhancedRewards.deeds || enhancedRewards.experience) {
+      const enhancedDeeds = enhancedRewards.deeds || enhancedRewards.experience || 0;
+      
+      // Use new feats system if available
+      if (typeof window.awardDeeds === 'function') {
+        window.awardDeeds(enhancedDeeds, window.DEEDS_SOURCES.QUEST, `Enhanced reward: ${quest.title}`);
+      } else {
+        // Fallback to old system
+        window.gameState.deeds += enhancedDeeds;
+      }
+      
+      rewardSummary.deeds = (rewardSummary.deeds || 0) + enhancedDeeds;
+      console.log(`Added ${enhancedDeeds} enhanced deeds`);
+
     
     // Apply enhanced currency
     if (enhancedRewards.taelors) {

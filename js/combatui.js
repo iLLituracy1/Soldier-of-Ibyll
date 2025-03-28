@@ -490,14 +490,17 @@ showBattleConclusionModal: function(outcome, narrativeText) {
   } else if (outcome === true || outcome === "victory") {
     title = "Victory!";
     titleClass = "victory-title";
+    conclusionModal.className = 'combat-conclusion-modal victory-modal';
     buttonText = "Continue";
   } else if (outcome === "draw") {
     title = "Battle Shifts";
     titleClass = "draw-title";
+    conclusionModal.className = 'combat-conclusion-modal draw-modal';
     buttonText = "Continue";
   } else if (outcome === "retreat") {
     title = "Tactical Retreat";
     titleClass = "retreat-title";
+    conclusionModal.className = 'combat-conclusion-modal retreat-modal';
     buttonText = "Continue";
   }
   

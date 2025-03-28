@@ -379,20 +379,84 @@ window.updateProfileIfVisible = function() {
   }
 };
 
-// Function to set narrative text
+// Function to set narrative text with typewriter effect
 window.setNarrative = function(text) {
-  // Replace the narrative with new text instead of appending
+  // Save reference to the full content for skipping
+  window.currentNarrativeContent = text;
+  
+  // Get narrative div
   const narrativeDiv = document.getElementById('narrative');
-  narrativeDiv.innerHTML = `<p>${text}</p>`;
-  narrativeDiv.scrollTop = 0; // Scroll to top
+  
+  // Use typewriter effect
+  window.typewriterEffect(text, narrativeDiv, function() {
+    // Enable any disabled buttons after typewriter completes
+    window.enableQuestButtons();
+  });
+  
+  // Disable buttons until typewriter completes
+  window.disableQuestButtons();
 };
 
-// Function to add to narrative text
+// Function to add to narrative text with typewriter effect
+window.addToNarrative = function(text) {
+  // Get narrative div
+  const narrativeDiv = document.getElementById('narrative');
+  
+  // If typewriter is already active, just append the text normally
+  if (window.typewriterConfig.isActive) {
+    // Just append the full HTML
+    narrativeDiv.innerHTML += text;
+    
+    // Update the current content reference
+    window.currentNarrativeContent = narrativeDiv.innerHTML;
+    
+    // Scroll to bottom
+    narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+    return;
+  }
+  
+  // Save reference to current content + new content
+  window.currentNarrativeContent = narrativeDiv.innerHTML + text;
+  
+  // Use typewriter effect on the new content only
+  window.typewriterEffect(text, document.createElement('div'), function() {
+    // After typewriter completes, append the full HTML
+    narrativeDiv.innerHTML += text;
+    narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+    
+    // Enable buttons
+    window.enableQuestButtons();
+  });
+  
+  // Disable buttons until typewriter completes
+  window.disableQuestButtons();
+};
+
+// Function to add to narrative text with typewriter effect
 window.addToNarrative = function(text) {
   // Append to existing narrative
   const narrativeDiv = document.getElementById('narrative');
-  narrativeDiv.innerHTML += `<p>${text}</p>`;
-  narrativeDiv.scrollTop = narrativeDiv.scrollHeight; // Scroll to bottom
+  
+  // If typewriter is already active, just append the text normally to avoid conflicts
+  if (window.typewriterConfig.isActive) {
+    narrativeDiv.innerHTML += `<p>${text}</p>`;
+    narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+    return;
+  }
+  
+  // Otherwise use typewriter effect
+  const currentContent = narrativeDiv.innerHTML;
+  window.typewriterEffect(text, document.createElement('div'), function() {
+    // After typewriter completes, append the full text to the narrative
+    narrativeDiv.innerHTML += `<p>${text}</p>`;
+    narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+    
+    // Enable buttons
+    window.enableQuestButtons();
+  });
+  
+  // Disable buttons until typewriter completes
+  window.disableQuestButtons();
 };
 
 // Show notification function
@@ -429,9 +493,195 @@ window.showAchievement = function(achievementId) {
   `;
   
   document.body.appendChild(notificationElement);
+
+
   
   // Remove after animation completes
   setTimeout(() => {
     document.body.removeChild(notificationElement);
   }, 5000);
+};
+
+ // Typewriter effect configuration
+ window.typewriterConfig = {
+  isActive: false,         // Flag to track if typewriter is currently running
+  speed: 25,               // Milliseconds per character (adjust for faster/slower)
+  buttonDelay: 500,        // Minimum delay before enabling buttons (milliseconds)
+  paragraphPause: 400,     // Pause between paragraphs
+  shouldAnimate: true      // Toggle to enable/disable animation globally
+};
+
+// Improved typewriter effect that properly handles HTML
+window.typewriterEffect = function(htmlContent, element, onComplete) {
+  // If animation is disabled, just set the HTML immediately
+  if (!window.typewriterConfig.shouldAnimate) {
+    element.innerHTML = htmlContent;
+    if (onComplete) setTimeout(onComplete, window.typewriterConfig.buttonDelay);
+    return;
+  }
+  
+  // Set state to active
+  window.typewriterConfig.isActive = true;
+  
+  // Create a temporary element to parse the HTML
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = htmlContent;
+  
+  // Get all child nodes (elements, text nodes, etc.)
+  const nodes = Array.from(tempDiv.childNodes);
+  
+  // Clear target element
+  element.innerHTML = '';
+  
+  // Track whether we're done
+  let isComplete = false;
+  
+  // Process nodes sequentially
+  function processNextNode(index = 0) {
+    if (index >= nodes.length) {
+      if (!isComplete) {
+        isComplete = true;
+        window.typewriterConfig.isActive = false;
+        if (onComplete) setTimeout(onComplete, window.typewriterConfig.buttonDelay);
+      }
+      return;
+    }
+    
+    const currentNode = nodes[index];
+    
+    // Handle different node types
+    if (currentNode.nodeType === Node.TEXT_NODE) {
+      // For text nodes, process character by character
+      const text = currentNode.textContent;
+      let charIndex = 0;
+      
+      // Create a text node in the target element
+      const newTextNode = document.createTextNode('');
+      element.appendChild(newTextNode);
+      
+      // Function to type characters
+      function typeNextChar() {
+        if (!window.typewriterConfig.isActive) {
+          // Animation was skipped, complete immediately
+          newTextNode.textContent = text;
+          processNextNode(index + 1);
+          return;
+        }
+        
+        if (charIndex >= text.length) {
+          // Finished with this text node
+          setTimeout(() => processNextNode(index + 1), 
+            text.endsWith('\n') ? window.typewriterConfig.paragraphPause : 0);
+          return;
+        }
+        
+        // Add next character
+        newTextNode.textContent += text[charIndex++];
+        
+        // Scroll container as needed
+        element.scrollTop = element.scrollHeight;
+        
+        // Schedule next character
+        setTimeout(typeNextChar, window.typewriterConfig.speed);
+      }
+      
+      // Start typing this text node
+      typeNextChar();
+    }
+    else if (currentNode.nodeType === Node.ELEMENT_NODE) {
+      // For element nodes (like <p>, <strong>, etc.)
+      const newElement = document.createElement(currentNode.tagName);
+      
+      // Copy attributes
+      Array.from(currentNode.attributes).forEach(attr => {
+        newElement.setAttribute(attr.name, attr.value);
+      });
+      
+      // Add the empty element to the target
+      element.appendChild(newElement);
+      
+      // If it's a <br> or other empty element, move to next node
+      if (currentNode.childNodes.length === 0 || currentNode.tagName === 'BR') {
+        // Slight pause after paragraph breaks
+        setTimeout(() => processNextNode(index + 1), 
+          currentNode.tagName === 'BR' ? window.typewriterConfig.paragraphPause : 0);
+        return;
+      }
+      
+      // Otherwise, need to recursively process its children
+      const childNodes = Array.from(currentNode.childNodes);
+      let childIndex = 0;
+      
+      function processChildNode() {
+        if (childIndex >= childNodes.length) {
+          // All children processed, move to next sibling
+          processNextNode(index + 1);
+          return;
+        }
+        
+        const childNode = childNodes[childIndex++];
+        
+        if (childNode.nodeType === Node.TEXT_NODE) {
+          // Process text inside elements character by character
+          const text = childNode.textContent;
+          let innerCharIndex = 0;
+          
+          // Create text node inside the element
+          const newTextNode = document.createTextNode('');
+          newElement.appendChild(newTextNode);
+          
+          function typeInnerChar() {
+            if (!window.typewriterConfig.isActive) {
+              // Animation was skipped
+              newTextNode.textContent = text;
+              processChildNode();
+              return;
+            }
+            
+            if (innerCharIndex >= text.length) {
+              // Move to next child
+              processChildNode();
+              return;
+            }
+            
+            // Add next character
+            newTextNode.textContent += text[innerCharIndex++];
+            
+            // Scroll container
+            element.scrollTop = element.scrollHeight;
+            
+            // Schedule next character
+            setTimeout(typeInnerChar, window.typewriterConfig.speed);
+          }
+          
+          // Start typing this text
+          typeInnerChar();
+        }
+        else {
+          // Handle nested elements (simplification: add immediately)
+          newElement.appendChild(childNode.cloneNode(true));
+          processChildNode();
+        }
+      }
+      
+      // Start processing element's children
+      processChildNode();
+    }
+    else {
+      // Skip other node types
+      processNextNode(index + 1);
+    }
+  }
+  
+  // Start processing from the first node
+  processNextNode(0);
+  
+  // Return a function that can force-complete the animation
+  return function forceComplete() {
+    if (window.typewriterConfig.isActive) {
+      window.typewriterConfig.isActive = false;
+      element.innerHTML = htmlContent;
+      if (onComplete) onComplete();
+    }
+  };
 };

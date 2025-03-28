@@ -307,9 +307,8 @@ window.handleQuestStageAction = function(quest, stage) {
         
         // Allow a moment for time update to register before continuing
         setTimeout(() => {
-          window.addToNarrative('Time passes...');
           window.updateQuestActionButtons(quest);
-        }, 1000);
+        }, 5000);
       } else {
         // Update action buttons immediately
         window.updateQuestActionButtons(quest);
@@ -1032,10 +1031,11 @@ window.failQuest = function(questId) {
 // Apply basic rewards if enhanced system is not available
 function applyBasicRewards(quest) {
   if (quest.rewards) {
-    // Experience
-    if (quest.rewards.experience) {
-      window.gameState.experience += quest.rewards.experience;
-      window.showNotification(`+${quest.rewards.experience} XP`, 'success');
+    // Experience/Deeds
+    if (quest.rewards.deeds || quest.rewards.experience) {
+      const deedsAmount = quest.rewards.deeds || quest.rewards.experience || 0;
+      window.gameState.deeds += deedsAmount;
+      window.showNotification(`+${deedsAmount} deeds`, 'success');
     }
     
     // Currency
@@ -1062,6 +1062,7 @@ function applyBasicRewards(quest) {
   // Check for level up
   window.checkLevelUp();
 }
+
 
 // Fail a quest
 window.failQuest = function(questId) {
@@ -1333,6 +1334,28 @@ window.renderQuestLog = function() {
   });
 };
 
+    // Function to disable quest buttons during typewriter effect
+    window.disableQuestButtons = function() {
+      // Disable all quest action buttons
+      const buttons = document.querySelectorAll('.quest-action-btn');
+      buttons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('disabled');
+      });
+    };
+
+    // Function to enable quest buttons after typewriter effect
+    window.enableQuestButtons = function() {
+      // After a short delay, enable all quest action buttons
+      setTimeout(() => {
+        const buttons = document.querySelectorAll('.quest-action-btn');
+        buttons.forEach(button => {
+          button.disabled = false;
+          button.classList.remove('disabled');
+        });
+      }, window.typewriterConfig.buttonDelay);
+    };
+
 // Connect the initial quest action to the quest progression system
 window.handleQuestAction = function(action) {
   // Handle quest-specific actions
@@ -1423,12 +1446,16 @@ const originalSetNarrative = window.setNarrative;
 window.setNarrative = function(text) {
   // Check if we're in quest scene
   if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
-    // Update quest narrative
+    // Update quest narrative with typewriter effect
     const questNarrative = document.getElementById('questNarrative');
-    questNarrative.innerHTML = text;
-    questNarrative.scrollTop = 0; // Scroll to top
+    window.typewriterEffect(text, questNarrative, function() {
+      window.enableQuestButtons();
+    });
+    
+    // Disable buttons during typewriter
+    window.disableQuestButtons();
   } else {
-    // Use original function for main game
+    // Use original function for main game (which now has typewriter built in)
     originalSetNarrative(text);
   }
 };
@@ -1437,10 +1464,26 @@ const originalAddToNarrative = window.addToNarrative;
 window.addToNarrative = function(text) {
   // Check if we're in quest scene
   if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
-    // Update quest narrative
+    // If typewriter is already active, just append normally
+    if (window.typewriterConfig.isActive) {
+      const questNarrative = document.getElementById('questNarrative');
+      questNarrative.innerHTML += `<p>${text}</p>`;
+      questNarrative.scrollTop = questNarrative.scrollHeight;
+      return;
+    }
+    
+    // Update quest narrative with typewriter effect
     const questNarrative = document.getElementById('questNarrative');
-    questNarrative.innerHTML += `<p>${text}</p>`;
-    questNarrative.scrollTop = questNarrative.scrollHeight; // Scroll to bottom
+    const currentContent = questNarrative.innerHTML;
+    
+    window.typewriterEffect(text, document.createElement('div'), function() {
+      questNarrative.innerHTML += `<p>${text}</p>`;
+      questNarrative.scrollTop = questNarrative.scrollHeight;
+      window.enableQuestButtons();
+    });
+    
+    // Disable buttons during typewriter
+    window.disableQuestButtons();
   } else {
     // Use original function for main game
     originalAddToNarrative(text);

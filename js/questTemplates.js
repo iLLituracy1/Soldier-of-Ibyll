@@ -288,7 +288,7 @@ window.questTemplates.frontier_campaign = {
       battleType: 'narrative',
       narrative: `<p>A week later, your Spear Host is among the last to take down their section of camp and fall into formation with the rest of the Kasvaari.</p>
 
-      <p>Your unit is one of the last, at the very end of the Kasvaari's column. Still, you can see the Wall of Nesia fast approaching, dominating more and more of the backdrop with every mile marched.</p>
+      <p>Unsurprisingly, your unit is also one of the last in column, at the very end of the Kasvaari. Still, you can see the Wall of Nesia fast approaching, dominating more and more of the backdrop with every mile marched.</p>
       
       <p>Apparently the Armarin-- the invasion force that you are currently marching to join with, is expected to be around 30,000 strong once all forces are assembled.`,
       nextStage: 'stage_march',
@@ -378,7 +378,7 @@ window.questTemplates.frontier_campaign = {
 
       statCheck: {
         type: 'skill',
-        stat: ['survival', 'melee'],
+        stat: 'melee',
         attribute: 'PHY', 
         difficulty: 4,
         successText: `<p>Your Sarkein personally orders you and a few others from your squad to the front to join the vanguard. You quickly move up, joining a smaller element of around 500 regulars. Most of them are veterans, and you feel out of place.</p>`,
@@ -432,7 +432,7 @@ window.questTemplates.frontier_campaign = {
      
       statCheck: {
         type: 'skill',
-        stat: ['survival', 'melee'],
+        stat: 'survival',
         attribute: 'PHY', 
         difficulty: 3,
         successText: `<p>You quickly raise your shield and defend yourself against the incoming projectiles.</p>`,
@@ -465,7 +465,7 @@ window.questTemplates.frontier_campaign = {
 
       statCheck: {
         type: 'skill',
-        stat: ['survival', 'melee'],
+        stat: 'survival',
         attribute: 'PHY', 
         difficulty: 3,
         successText: `<p>You quickly raise your shield and defend both yourself and the ladder bearer next to you against the incoming projectiles.</p>`,

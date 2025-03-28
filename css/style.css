@@ -1299,3 +1299,9 @@ input[type="text"], input[type="number"] {
   color: #c9aa71;
   margin: 0;
 }
+
+.quest-action-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}

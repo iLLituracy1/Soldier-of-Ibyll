@@ -2782,6 +2782,13 @@ endCombat: function(outcome) {
       "You find an opening and quickly disengage from combat.",
       "With swift footwork, you manage to escape the fight and slip away."
     ];
+
+     
+    } else if (outcome === "draw") {
+      // Battle shift / draw outcome
+      narrativeText = [
+        "The battle shifts, forcing your engagement to end as the larger conflict swallows your skirmish.",
+      ];
     
     // Minor armor durability damage on retreat
     this.applyArmorDurabilityDamage(0.5);
