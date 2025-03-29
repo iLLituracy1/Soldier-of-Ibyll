@@ -1038,7 +1038,10 @@ determineEnemyAction: function(enemy) {
     // Update the player's distance to this enemy
     this.setPlayerDistanceToEnemy(activeEnemy, newDistance);
     
-    // Update global distance for backward compatibility instead of modifying enemy.distance directly
+    // RESTORE THIS LINE for backward compatibility
+    activeEnemy.distance = newDistance;
+    
+    // Also update global distance
     this.state.globalDistance = newDistance;
     this.state.distance = newDistance;
     

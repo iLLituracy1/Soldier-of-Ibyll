@@ -974,122 +974,86 @@ updateTurnCounter: function() {
   
 
 
-  // Update enemy display
-  updateEnemyDisplay: function() {
-    const enemyContainer = document.getElementById('enemyContainer');
-    if (!enemyContainer) {
-      console.error("Enemy container not found");
-      return;
-    }
-    
-    // Clear the container
-    enemyContainer.innerHTML = '';
-
-      // Ensure enemy-info-btn styles exist and are applied
-  if (!document.getElementById('enemy-info-btn-styles')) {
-    const styleElement = document.createElement('style');
-    styleElement.id = 'enemy-info-btn-styles';
-    styleElement.textContent = `
-      .enemy-info-btn {
-        position: absolute;
-        top: 5px;
-        right: 5px;
-        width: 20px;
-        height: 20px;
-        background: #c9aa71;
-        border: none;
-        border-radius: 50%;
-        color: #1a1a1a;
-        font-size: 12px;
-        font-weight: bold;
-        line-height: 1;
-        cursor: pointer;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 10;
-      }
-      .enemy-info-btn:hover {
-        background: #e0be82;
-      }
-    `;
-    document.head.appendChild(styleElement);
+ // Update enemy display
+updateEnemyDisplay: function() {
+  const enemyContainer = document.getElementById('enemyContainer');
+  if (!enemyContainer) {
+    console.error("Enemy container not found");
+    return;
   }
+  
+  // Clear the container
+  enemyContainer.innerHTML = '';
+  
+  // Add each enemy to the display
+  window.combatSystem.state.enemies.forEach((enemy, index) => {
+    // Skip rendering defeated enemies
+    if (enemy.health <= 0) return;
     
-    // Add each enemy to the display
-    window.combatSystem.state.enemies.forEach((enemy, index) => {
-      const enemyDiv = document.createElement('div');
-      enemyDiv.className = 'combat-health-container';
-      enemyDiv.classList.add(index === window.combatSystem.state.activeEnemyIndex ? 'active-combatant' : 'inactive-combatant');
+    const enemyDiv = document.createElement('div');
+    enemyDiv.className = 'combat-health-container';
+    enemyDiv.classList.add(index === window.combatSystem.state.activeEnemyIndex ? 'active-combatant' : 'inactive-combatant');
     
-
-    
-      // Add click handler to select this enemy
-      enemyDiv.addEventListener('click', () => {
-        window.combatSystem.handleCombatAction('select_enemy', { enemyIndex: index });
-      });
-      
-      // Enemy name and health text
-      const enemyNameDisplay = document.createElement('div');
-      let nameText = enemy.name;
-      
-      // Add distance to enemy name
-      nameText += ` <span class="enemy-distance-tag">${window.combatSystem.distanceLabels[enemy.distance]}</span>`;
-      
-      // Add status indicators
-      if (enemy.stunned) nameText += " (Stunned)";
-      if (enemy.knockedDown) nameText += " (Knocked Down)";
-      
-      // Add defeated indicator
-      if (enemy.health <= 0) {
-        nameText += " (Defeated)";
-        enemyDiv.classList.add('defeated');
-      }
-      
-      enemyNameDisplay.innerHTML = `<span class="enemy-name">${nameText}</span>: <span id="enemy${index}HealthDisplay">${Math.round(enemy.health)} HP</span>`;
-      enemyDiv.appendChild(enemyNameDisplay);
-      
-      // Enemy health bar
-      const healthBarContainer = document.createElement('div');
-      healthBarContainer.className = 'combat-health-bar';
-      
-      const healthBar = document.createElement('div');
-      healthBar.id = `enemy${index}CombatHealth`;
-      healthBar.style.width = `${(enemy.health / enemy.maxHealth) * 100}%`;
-      healthBar.className = 'enemy-health-bar';
-      
-      healthBarContainer.appendChild(healthBar);
-      enemyDiv.appendChild(healthBarContainer);
-      
-      // Add stance indicator
-      const stanceIndicator = document.createElement('div');
-      stanceIndicator.className = `stance-indicator stance-${enemy.currentStance}`;
-      stanceIndicator.textContent = enemy.currentStance.charAt(0).toUpperCase() + enemy.currentStance.slice(1);
-      enemyDiv.appendChild(stanceIndicator);
-      
-      // Add javelin count if enemy has javelins
-      if (enemy.ammunition && enemy.ammunition.javelin) {
-        const javelinCount = document.createElement('div');
-        javelinCount.className = 'ammo-indicator';
-        javelinCount.textContent = `Javelins: ${enemy.ammunition.javelin.current}`;
-        enemyDiv.appendChild(javelinCount);
-      }
-
-            // Add info button
-      const infoBtn = document.createElement('button');
-      infoBtn.className = 'enemy-info-btn';
-      infoBtn.innerHTML = 'i';
-      infoBtn.title = 'View enemy information';
-      infoBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // Prevent selecting the enemy when clicking info button
-        window.combatUI.showEnemyStats(enemy);
-      });
-      enemyDiv.appendChild(infoBtn);
-      
-      // Add to container
-      enemyContainer.appendChild(enemyDiv);
+    // Add click handler to select this enemy
+    enemyDiv.addEventListener('click', () => {
+      window.combatSystem.handleCombatAction('select_enemy', { enemyIndex: index });
     });
-  },
+    
+    // Enemy name and health text
+    const enemyNameDisplay = document.createElement('div');
+    let nameText = enemy.name;
+    
+    // Add distance to enemy name
+    nameText += ` <span class="enemy-distance-tag">${window.combatSystem.distanceLabels[enemy.distance]}</span>`;
+    
+    // Add status indicators
+    if (enemy.stunned) nameText += " (Stunned)";
+    if (enemy.knockedDown) nameText += " (Knocked Down)";
+    
+    enemyNameDisplay.innerHTML = `<span class="enemy-name">${nameText}</span>: <span id="enemy${index}HealthDisplay">${Math.round(enemy.health)} HP</span>`;
+    enemyDiv.appendChild(enemyNameDisplay);
+    
+    // Enemy health bar
+    const healthBarContainer = document.createElement('div');
+    healthBarContainer.className = 'combat-health-bar';
+    
+    const healthBar = document.createElement('div');
+    healthBar.id = `enemy${index}CombatHealth`;
+    healthBar.style.width = `${(enemy.health / enemy.maxHealth) * 100}%`;
+    healthBar.className = 'enemy-health-bar';
+    
+    healthBarContainer.appendChild(healthBar);
+    enemyDiv.appendChild(healthBarContainer);
+    
+    // Add stance indicator
+    const stanceIndicator = document.createElement('div');
+    stanceIndicator.className = `stance-indicator stance-${enemy.currentStance}`;
+    stanceIndicator.textContent = enemy.currentStance.charAt(0).toUpperCase() + enemy.currentStance.slice(1);
+    enemyDiv.appendChild(stanceIndicator);
+    
+    // Add javelin count if enemy has javelins
+    if (enemy.ammunition && enemy.ammunition.javelin) {
+      const javelinCount = document.createElement('div');
+      javelinCount.className = 'ammo-indicator';
+      javelinCount.textContent = `Javelins: ${enemy.ammunition.javelin.current}`;
+      enemyDiv.appendChild(javelinCount);
+    }
+
+    // Add info button
+    const infoBtn = document.createElement('button');
+    infoBtn.className = 'enemy-info-btn';
+    infoBtn.innerHTML = 'i';
+    infoBtn.title = 'View enemy information';
+    infoBtn.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent selecting the enemy when clicking info button
+      window.combatUI.showEnemyStats(enemy);
+    });
+    enemyDiv.appendChild(infoBtn);
+    
+    // Add to container
+    enemyContainer.appendChild(enemyDiv);
+  });
+},
   
   // Update ally display
   updateAllyDisplay: function() {

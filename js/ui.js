@@ -381,83 +381,65 @@ window.updateProfileIfVisible = function() {
 
 // Function to set narrative text with typewriter effect
 window.setNarrative = function(text) {
+  // Cancel any ongoing typewriter animation
+  if (window.currentTypewriterCancelFn) {
+    window.currentTypewriterCancelFn();
+    window.currentTypewriterCancelFn = null;
+  }
+  
   // Save reference to the full content for skipping
   window.currentNarrativeContent = text;
   
   // Get narrative div
   const narrativeDiv = document.getElementById('narrative');
   
-  // Use typewriter effect
-  window.typewriterEffect(text, narrativeDiv, function() {
+  // Use typewriter effect and store the cancel function
+  window.currentTypewriterCancelFn = window.typewriterEffect(text, narrativeDiv, function() {
     // Enable any disabled buttons after typewriter completes
     window.enableQuestButtons();
+    // Clear the cancel function when complete
+    window.currentTypewriterCancelFn = null;
   });
   
   // Disable buttons until typewriter completes
   window.disableQuestButtons();
 };
 
-// Function to add to narrative text with typewriter effect
+// Replace both implementations of addToNarrative (approximately lines 431-468)
 window.addToNarrative = function(text) {
   // Get narrative div
   const narrativeDiv = document.getElementById('narrative');
   
-  // If typewriter is already active, just append the text normally
-  if (window.typewriterConfig.isActive) {
-    // Just append the full HTML
-    narrativeDiv.innerHTML += text;
-    
-    // Update the current content reference
-    window.currentNarrativeContent = narrativeDiv.innerHTML;
-    
-    // Scroll to bottom
-    narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
-    return;
+  // Cancel any ongoing typewriter animation
+  if (window.currentTypewriterCancelFn) {
+    window.currentTypewriterCancelFn();
+    window.currentTypewriterCancelFn = null;
   }
   
-  // Save reference to current content + new content
-  window.currentNarrativeContent = narrativeDiv.innerHTML + text;
-  
-  // Use typewriter effect on the new content only
-  window.typewriterEffect(text, document.createElement('div'), function() {
-    // After typewriter completes, append the full HTML
-    narrativeDiv.innerHTML += text;
-    narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
-    
-    // Enable buttons
-    window.enableQuestButtons();
-  });
-  
-  // Disable buttons until typewriter completes
-  window.disableQuestButtons();
-};
-
-// Function to add to narrative text with typewriter effect
-window.addToNarrative = function(text) {
-  // Append to existing narrative
-  const narrativeDiv = document.getElementById('narrative');
-  
-  // If typewriter is already active, just append the text normally to avoid conflicts
+  // If typewriter was active, just append the text normally
   if (window.typewriterConfig.isActive) {
     narrativeDiv.innerHTML += `<p>${text}</p>`;
     narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+    window.typewriterConfig.isActive = false;
     return;
   }
   
   // Otherwise use typewriter effect
-  const currentContent = narrativeDiv.innerHTML;
-  window.typewriterEffect(text, document.createElement('div'), function() {
+  window.currentTypewriterCancelFn = window.typewriterEffect(text, document.createElement('div'), function() {
     // After typewriter completes, append the full text to the narrative
     narrativeDiv.innerHTML += `<p>${text}</p>`;
     narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
     
     // Enable buttons
     window.enableQuestButtons();
+    // Clear the cancel function
+    window.currentTypewriterCancelFn = null;
   });
   
   // Disable buttons until typewriter completes
   window.disableQuestButtons();
 };
+
 
 // Show notification function
 window.showNotification = function(text, type = 'info') {

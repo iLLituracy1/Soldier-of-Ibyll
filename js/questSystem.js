@@ -392,7 +392,7 @@ window.performStatCheck = function(statCheck) {
   if (statCheck.type === 'attribute') {
     // Single attribute check
     const attrValue = window.player[statCheck.stat] || 0;
-    const randomFactor = (Math.random() * 10) - 2; // -5 to +5
+    const randomFactor = (Math.random() * 10) - 8; // -5 to +5
     const checkTotal = attrValue + randomFactor;
     const success = checkTotal >= statCheck.difficulty;
     
@@ -412,7 +412,7 @@ window.performStatCheck = function(statCheck) {
     if (statCheck.attribute) {
       // Check attribute
       const attrValue = window.player[statCheck.attribute] || 0;
-      const attrRandomFactor = (Math.random() * 10) - 2; // -5 to +5
+      const attrRandomFactor = (Math.random() * 10) - 8; // -5 to +5
       const attrTotal = attrValue + attrRandomFactor;
       const attrSuccess = attrTotal >= statCheck.difficulty;
       
@@ -429,7 +429,7 @@ window.performStatCheck = function(statCheck) {
       
       // Check skill
       const skillValue = window.player.skills[statCheck.stat] || 0;
-      const skillRandomFactor = (Math.random() * 10) - 2; // -5 to +5
+      const skillRandomFactor = (Math.random() * 10) - 8; // -5 to +5
       const skillTotal = skillValue + skillRandomFactor;
       const skillSuccess = skillTotal >= statCheck.difficulty;
       
@@ -461,7 +461,7 @@ window.performStatCheck = function(statCheck) {
     else {
       // Just a single skill check
       const skillValue = window.player.skills[statCheck.stat] || 0;
-      const randomFactor = (Math.random() * 10) - 2; // -5 to +5
+      const randomFactor = (Math.random() * 10) - 8; // -5 to +5
       const checkTotal = skillValue + randomFactor;
       const success = checkTotal >= statCheck.difficulty;
       
@@ -482,7 +482,7 @@ window.performStatCheck = function(statCheck) {
     if (statCheck.attributes) {
       statCheck.attributes.forEach(attr => {
         const attrValue = window.player[attr] || 0;
-        const randomFactor = (Math.random() * 10) - 2;
+        const randomFactor = (Math.random() * 10) - 8;
         const checkTotal = attrValue + randomFactor;
         const success = checkTotal >= statCheck.difficulty;
         
@@ -502,7 +502,7 @@ window.performStatCheck = function(statCheck) {
     if (statCheck.skills) {
       statCheck.skills.forEach(skill => {
         const skillValue = window.player.skills[skill] || 0;
-        const randomFactor = (Math.random() * 10) - 2;
+        const randomFactor = (Math.random() * 10) - 8;
         const checkTotal = skillValue + randomFactor;
         const success = checkTotal >= statCheck.difficulty;
         
@@ -1567,12 +1567,19 @@ window.updateTimeAndDay = function(minutesToAdd) {
 // Override the narrative functions to work in both scenes
 const originalSetNarrative = window.setNarrative;
 window.setNarrative = function(text) {
+  // Cancel any ongoing typewriter animation
+  if (window.currentTypewriterCancelFn) {
+    window.currentTypewriterCancelFn();
+    window.currentTypewriterCancelFn = null;
+  }
+  
   // Check if we're in quest scene
   if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
     // Update quest narrative with typewriter effect
     const questNarrative = document.getElementById('questNarrative');
-    window.typewriterEffect(text, questNarrative, function() {
+    window.currentTypewriterCancelFn = window.typewriterEffect(text, questNarrative, function() {
       window.enableQuestButtons();
+      window.currentTypewriterCancelFn = null;
     });
     
     // Disable buttons during typewriter
@@ -1583,8 +1590,15 @@ window.setNarrative = function(text) {
   }
 };
 
+// Replace the overridden addToNarrative function (around line 1800)
 const originalAddToNarrative = window.addToNarrative;
 window.addToNarrative = function(text) {
+  // Cancel any ongoing typewriter animation
+  if (window.currentTypewriterCancelFn) {
+    window.currentTypewriterCancelFn();
+    window.currentTypewriterCancelFn = null;
+  }
+  
   // Check if we're in quest scene
   if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
     // If typewriter is already active, just append normally
@@ -1592,17 +1606,18 @@ window.addToNarrative = function(text) {
       const questNarrative = document.getElementById('questNarrative');
       questNarrative.innerHTML += `<p>${text}</p>`;
       questNarrative.scrollTop = questNarrative.scrollHeight;
+      window.typewriterConfig.isActive = false;
       return;
     }
     
     // Update quest narrative with typewriter effect
     const questNarrative = document.getElementById('questNarrative');
-    const currentContent = questNarrative.innerHTML;
     
-    window.typewriterEffect(text, document.createElement('div'), function() {
+    window.currentTypewriterCancelFn = window.typewriterEffect(text, document.createElement('div'), function() {
       questNarrative.innerHTML += `<p>${text}</p>`;
       questNarrative.scrollTop = questNarrative.scrollHeight;
       window.enableQuestButtons();
+      window.currentTypewriterCancelFn = null;
     });
     
     // Disable buttons during typewriter

@@ -374,7 +374,7 @@ window.questTemplates.frontier_campaign = {
       <p>Most of the men stand silent as the dead. A mix of tension and eagerness swells within you — your first real engagement lies ahead.</p>
       
       <p>The horns sound, signalling the attack to begin.</p>`,
-      timeAdvance: 600, 
+      timeAdvance: 60, 
 
       statCheck: {
         type: 'skill',
@@ -420,7 +420,7 @@ window.questTemplates.frontier_campaign = {
           requiresShield: true
         },
         {
-          text: "Focus on survival.",
+          text: "Stay alive.",
           action: "prepare",
           nextStage: "stage_survival",
         }
@@ -440,7 +440,7 @@ window.questTemplates.frontier_campaign = {
       statCheck: {
         type: 'skill',
         stat: 'survival',
-        attribute: 'PHY', 
+        attribute: 'phy', 
         difficulty: 3,
         successText: `<p>You quickly raise your shield and defend yourself against the incoming projectiles.</p>`,
         failureText: `<p>Your defensive posture is lacking, and one of the arrows lands true.</p>`,
@@ -473,7 +473,7 @@ window.questTemplates.frontier_campaign = {
       statCheck: {
         type: 'skill',
         stat: 'survival',
-        attribute: 'PHY', 
+        attribute: 'phy', 
         difficulty: 3,
         successText: `<p>You duck and run, managing to take cover beneath another regular's shield.</p>`,
         failureText: `<p>You are too slow to react, and one of the arrows lands true.</p>`,
@@ -506,7 +506,7 @@ window.questTemplates.frontier_campaign = {
       statCheck: {
         type: 'combined',
         stat: ['survival', 'melee'],
-        attribute: 'PHY', 
+        attribute: 'phy', 
         difficulty: 3,
         successText: `<p>You quickly raise your shield and defend both yourself and the ladder bearer next to you against the incoming projectiles.</p>`,
         failureText: `<p>Your defensive posture is lacking, and one of the arrows lands true. Another slips past your defense, and strikes a ladder bearer in the throat.</p>`,
