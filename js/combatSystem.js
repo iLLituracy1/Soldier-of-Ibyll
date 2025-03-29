@@ -109,28 +109,27 @@ window.combatSystem = {
       
     };
 
-        // When starting combat, create allyDistances property to track relative distances
+    // When starting combat, create allyDistances property to track relative distances
     this.state.allyDistances = {};
-
-    // Initialize distance tracking for each ally to each enemy
-    for (let allyIndex = 0; allyIndex < this.state.allies.length; allyIndex++) {
-      const ally = this.state.allies[allyIndex];
-      this.state.allyDistances[ally.id] = {};
-      
-      for (let enemyIndex = 0; enemyIndex < this.state.enemies.length; enemyIndex++) {
-        const enemy = this.state.enemies[enemyIndex];
-        // Initialize ally's distance to each enemy (use enemy's preferred distance as starting point)
-        this.state.allyDistances[ally.id][enemy.id] = enemy.preferredDistance;
-      }
-    }
-
-        this.state.playerDistances = {};
+    this.state.playerDistances = {};
 
     // Initialize distance tracking for each enemy
     for (let enemyIndex = 0; enemyIndex < this.state.enemies.length; enemyIndex++) {
       const enemy = this.state.enemies[enemyIndex];
       // Initialize player's distance to each enemy (use enemy's preferred distance as starting point)
       this.state.playerDistances[enemy.id] = enemy.preferredDistance;
+    }
+
+    // Initialize distance tracking for each ally to each enemy
+    for (let allyIndex = 0; allyIndex < this.state.allies.length; allyIndex++) {
+      const ally = this.state.allies[allyIndex];
+      this.state.allyDistances[ally.id] = {};
+  
+    for (let enemyIndex = 0; enemyIndex < this.state.enemies.length; enemyIndex++) {
+      const enemy = this.state.enemies[enemyIndex];
+      // Initialize ally's distance to each enemy (use enemy's preferred distance as starting point)
+      this.state.allyDistances[ally.id][enemy.id] = enemy.preferredDistance;
+     }
     }
     
     // Create enemy instances
@@ -490,8 +489,9 @@ window.combatSystem = {
   updateGlobalDistance: function() {
     const activeEnemy = this.getActiveEnemy();
     if (activeEnemy) {
-      this.state.globalDistance = activeEnemy.distance;
-      this.state.distance = activeEnemy.distance; // For backward compatibility
+      // Use player's distance to enemy, not enemy's direct distance property
+      this.state.globalDistance = this.getPlayerDistanceToEnemy(activeEnemy);
+      this.state.distance = this.state.globalDistance; // For backward compatibility
     }
   },
   
@@ -1028,35 +1028,35 @@ determineEnemyAction: function(enemy) {
     }
   },
   
-  // Handle player changing distance to active enemy
   handleDistanceChange: function(change) {
     const activeEnemy = this.getActiveEnemy();
     if (!activeEnemy) return;
     
     const oldDistance = this.getPlayerDistanceToEnemy(activeEnemy);
     const newDistance = Math.max(0, Math.min(3, oldDistance + change));
-
-// Update the player's distance to this enemy
-  this.setPlayerDistanceToEnemy(activeEnemy, newDistance);
   
-  // For backward compatibility
-  activeEnemy.distance = newDistance;
+    // Update the player's distance to this enemy
+    this.setPlayerDistanceToEnemy(activeEnemy, newDistance);
     
-     // Generate appropriate narrative
-  if (change < 0) {
-    this.addCombatMessage(this.generateDistanceNarrative("approach"));
-  } else {
-    this.addCombatMessage(this.generateDistanceNarrative("retreat"));
-  }
-  
-  // Enemy reaction to distance change
-  this.addCombatMessage(this.generateEnemyReactionToDistance());
-  
-  // Update UI
-  if (window.combatUI) {
-    window.combatUI.updateCombatInterface();
-  }
-},
+    // Update global distance for backward compatibility instead of modifying enemy.distance directly
+    this.state.globalDistance = newDistance;
+    this.state.distance = newDistance;
+    
+    // Generate appropriate narrative
+    if (change < 0) {
+      this.addCombatMessage(this.generateDistanceNarrative("approach"));
+    } else {
+      this.addCombatMessage(this.generateDistanceNarrative("retreat"));
+    }
+    
+    // Enemy reaction to distance change
+    this.addCombatMessage(this.generateEnemyReactionToDistance());
+    
+    // Update UI
+    if (window.combatUI) {
+      window.combatUI.updateCombatInterface();
+    }
+  },
   
     // Handle ally changing distance to active enemy
   handleAllyDistanceChange: function(ally, change) {
@@ -1105,12 +1105,13 @@ determineEnemyAction: function(enemy) {
     }
   },
 
-    // 3. Add helper functions to get and set ally distances to enemies:
+    
   getAllyDistanceToEnemy: function(ally, enemy) {
-    // If we don't have distance tracking established, default to enemy's distance
+    // If we don't have distance tracking established, use a stable default
     if (!this.state.allyDistances || !this.state.allyDistances[ally.id] || 
         this.state.allyDistances[ally.id][enemy.id] === undefined) {
-      return enemy.distance;
+      // Use the enemy's preferred distance instead of current distance
+      return enemy.preferredDistance || 2; // Default to medium if no preferred distance
     }
     
     return this.state.allyDistances[ally.id][enemy.id];
@@ -1781,8 +1782,15 @@ setPlayerDistanceToEnemy: function(enemy, distance) {
   
   // Handle enemy changing distance - now modifies the specific enemy's distance
   handleEnemyDistanceChange: function(enemy, change) {
-    const oldDistance = enemy.distance;
-    enemy.distance = Math.max(0, Math.min(3, enemy.distance + change));
+    // Get current distance from player's perspective
+    const oldDistance = this.getPlayerDistanceToEnemy(enemy);
+    const newDistance = Math.max(0, Math.min(3, oldDistance + change));
+    
+    // Update the player's distance to this enemy in the mapping
+    this.setPlayerDistanceToEnemy(enemy, newDistance);
+    
+    // For backward compatibility - also update enemy's internal distance
+    enemy.distance = newDistance;
     
     // Update global distance property for backward compatibility
     if (enemy === this.getActiveEnemy()) {
@@ -3490,7 +3498,13 @@ endCombat: function(outcome) {
   // Helper function to get the distance to an enemy for UI display
   getEnemyDistance: function(enemyIndex) {
     const enemy = this.state.enemies[enemyIndex];
-    return enemy ? enemy.distance : 2; // Default to medium range if enemy not found
+    
+    // Always use playerDistances map, not direct enemy.distance property
+    if (enemy && this.state.playerDistances && this.state.playerDistances[enemy.id] !== undefined) {
+      return this.state.playerDistances[enemy.id];
+    }
+    
+    return enemy ? enemy.preferredDistance || 2 : 2; // Default to medium range
   },
   
   // Get a descriptive phrase for the enemy's distance

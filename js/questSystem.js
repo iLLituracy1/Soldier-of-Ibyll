@@ -17,6 +17,7 @@ window.BATTLE_TYPES = {
 
 // Store all active quests
 window.quests = [];
+window.lastStatCheckResult = null;
 
 // Initialize the quest system
 window.initializeQuestSystem = function() {
@@ -179,7 +180,6 @@ window.playerHasShieldEquipped = function() {
 };
 
 
-// Display stat check UI
 function displayStatCheck(results, difficulty, overallSuccess) {
   const statCheckDisplay = document.getElementById('statCheckDisplay');
   
@@ -205,10 +205,16 @@ function displayStatCheck(results, difficulty, overallSuccess) {
   
   statCheckDisplay.classList.add('show');
   
-  // Hide after 4 seconds
-  setTimeout(() => {
-    statCheckDisplay.classList.remove('show');
-  }, 4000);
+  // Store the result for reference in progressQuest
+  window.lastStatCheckResult = {
+    success: overallSuccess,
+    timestamp: Date.now()
+  };
+  
+  console.log("Stat check display shown, result:", overallSuccess ? "SUCCESS" : "FAILURE");
+  
+  // Don't auto-hide - we'll hide it when user clicks Continue
+  // The progressQuest function will handle hiding this
 }
 
 
@@ -320,22 +326,35 @@ window.handleQuestStageAction = function(quest, stage) {
   // Set quest sequence flag
   window.gameState.inQuestSequence = true;
   
+  // Get quest actions container and ensure it's empty
+  const questActionsContainer = document.getElementById('questActions');
+  if (questActionsContainer) {
+    questActionsContainer.innerHTML = '';
+    console.log("Cleared questActions container");
+  } else {
+    console.error("questActions container not found!");
+  }
+  
   switch (stage.battleType) {
     case window.BATTLE_TYPES.NARRATIVE:
-      // Display the narrative
+      // Display the narrative with typewriter effect
       window.setNarrative(stage.narrative || stage.description);
+      console.log("Set narrative for stage:", stage.id);
       
       // Advance time if specified
       if (stage.timeAdvance) {
+        console.log(`Advancing time by ${stage.timeAdvance} minutes`);
         window.updateTimeAndDay(stage.timeAdvance);
         
         // Allow a moment for time update to register before continuing
         setTimeout(() => {
           window.updateQuestActionButtons(quest);
-        }, 5000);
+        }, 1500); // Reduced from 5000ms to 1500ms for better flow
       } else {
-        // Update action buttons immediately
-        window.updateQuestActionButtons(quest);
+        // Wait briefly for typewriter to start before updating buttons
+        setTimeout(() => {
+          window.updateQuestActionButtons(quest);
+        }, 500);
       }
       break;
       
@@ -347,13 +366,17 @@ window.handleQuestStageAction = function(quest, stage) {
       if (!quest.userData) quest.userData = {};
       quest.userData.currentCombatStage = stage.id;
       
-      // Update action buttons to show Engage button
-      window.updateQuestActionButtons(quest);
+      // Wait briefly for typewriter to start before updating buttons
+      setTimeout(() => {
+        window.updateQuestActionButtons(quest);
+      }, 500);
       break;
       
     default:
       console.error(`Unknown battleType: ${stage.battleType}`);
-      window.updateQuestActionButtons(quest);
+      setTimeout(() => {
+        window.updateQuestActionButtons(quest);
+      }, 500);
   }
 };
 
@@ -369,7 +392,7 @@ window.performStatCheck = function(statCheck) {
   if (statCheck.type === 'attribute') {
     // Single attribute check
     const attrValue = window.player[statCheck.stat] || 0;
-    const randomFactor = (Math.random() * 10) - 5; // -5 to +5
+    const randomFactor = (Math.random() * 10) - 2; // -5 to +5
     const checkTotal = attrValue + randomFactor;
     const success = checkTotal >= statCheck.difficulty;
     
@@ -389,7 +412,7 @@ window.performStatCheck = function(statCheck) {
     if (statCheck.attribute) {
       // Check attribute
       const attrValue = window.player[statCheck.attribute] || 0;
-      const attrRandomFactor = (Math.random() * 10) - 5; // -5 to +5
+      const attrRandomFactor = (Math.random() * 10) - 2; // -5 to +5
       const attrTotal = attrValue + attrRandomFactor;
       const attrSuccess = attrTotal >= statCheck.difficulty;
       
@@ -406,7 +429,7 @@ window.performStatCheck = function(statCheck) {
       
       // Check skill
       const skillValue = window.player.skills[statCheck.stat] || 0;
-      const skillRandomFactor = (Math.random() * 10) - 5; // -5 to +5
+      const skillRandomFactor = (Math.random() * 10) - 2; // -5 to +5
       const skillTotal = skillValue + skillRandomFactor;
       const skillSuccess = skillTotal >= statCheck.difficulty;
       
@@ -438,7 +461,7 @@ window.performStatCheck = function(statCheck) {
     else {
       // Just a single skill check
       const skillValue = window.player.skills[statCheck.stat] || 0;
-      const randomFactor = (Math.random() * 10) - 5; // -5 to +5
+      const randomFactor = (Math.random() * 10) - 2; // -5 to +5
       const checkTotal = skillValue + randomFactor;
       const success = checkTotal >= statCheck.difficulty;
       
@@ -459,7 +482,7 @@ window.performStatCheck = function(statCheck) {
     if (statCheck.attributes) {
       statCheck.attributes.forEach(attr => {
         const attrValue = window.player[attr] || 0;
-        const randomFactor = (Math.random() * 10) - 5;
+        const randomFactor = (Math.random() * 10) - 2;
         const checkTotal = attrValue + randomFactor;
         const success = checkTotal >= statCheck.difficulty;
         
@@ -479,7 +502,7 @@ window.performStatCheck = function(statCheck) {
     if (statCheck.skills) {
       statCheck.skills.forEach(skill => {
         const skillValue = window.player.skills[skill] || 0;
-        const randomFactor = (Math.random() * 10) - 5;
+        const randomFactor = (Math.random() * 10) - 2;
         const checkTotal = skillValue + randomFactor;
         const success = checkTotal >= statCheck.difficulty;
         
@@ -602,104 +625,138 @@ window.progressQuest = function(questId, action) {
   // Clear awaiting response flag - player has responded to the quest
   window.gameState.awaitingQuestResponse = false;
   
-  // Check if the stage has a statCheck and hasn't been processed yet
-  if (currentStage.statCheck && currentStage.outcomes && !quest.userData?.statCheckProcessed) {
-    // Set a flag to show we've started processing this stat check
-    if (!quest.userData) quest.userData = {};
-    quest.userData.statCheckProcessed = true;
-    
-    // Perform the stat check and show UI
-    const checkResult = window.performStatCheck(currentStage.statCheck);
-    
-    // Store the check result
-    quest.userData[`${currentStage.id}_check`] = checkResult;
-    
-    // Show appropriate narrative text based on the outcome
-    const narrativeText = checkResult.success ? 
-      currentStage.statCheck.successText || "You succeed!" :
-      currentStage.statCheck.failureText || "You fail.";
-    
-    window.setNarrative(narrativeText);
-    
-    // Update UI for next step
-    const actionsContainer = document.getElementById('questActions');
-    actionsContainer.innerHTML = '';
-    
-    // Add continue button to show the outcome narrative
-    const continueButton = document.createElement('button');
-    continueButton.className = 'quest-action-btn';
-    continueButton.textContent = 'Continue';
-    continueButton.onclick = function() {
-      // Get the appropriate outcome
-      const outcome = checkResult.success ? currentStage.outcomes.success : currentStage.outcomes.failure;
-      
-      // Show the outcome narrative addition if it exists
-      if (outcome.narrativeAddition) {
-        window.addToNarrative(outcome.narrativeAddition);
-      }
-      
-      // Apply rewards or penalties
-      if (checkResult.success && outcome.rewards) {
-        applyOutcomeRewards(outcome.rewards);
-      } else if (!checkResult.success && outcome.penalties) {
-        applyOutcomePenalties(outcome.penalties);
-      }
-      
-      // Update UI for next step
+ // Check if the stage has a statCheck and hasn't been processed yet
+if (currentStage.statCheck && currentStage.outcomes && !quest.userData?.statCheckProcessed) {
+  console.log(`Processing stat check for stage ${currentStage.id}`);
+  
+  // Set a flag to show we've started processing this stat check
+  if (!quest.userData) quest.userData = {};
+  quest.userData.statCheckProcessed = true;
+  
+  // Perform the stat check and show UI
+  const checkResult = window.performStatCheck(currentStage.statCheck);
+  console.log(`Stat check result for ${currentStage.id}:`, checkResult.success ? "SUCCESS" : "FAILURE");
+  
+  // Store the check result
+  quest.userData[`${currentStage.id}_check`] = checkResult;
+  
+  // Show appropriate narrative text based on the outcome
+  const narrativeText = checkResult.success ? 
+    currentStage.statCheck.successText || "You succeed!" :
+    currentStage.statCheck.failureText || "You fail.";
+  
+  // Set narrative with typewriter effect
+  window.setNarrative(narrativeText);
+  
+  // Get the actions container
+  const actionsContainer = document.getElementById('questActions');
+  
+  // Make sure UI is updated after narrative is set (with delay for typewriter)
+  setTimeout(() => {
+    // First, clear the container
+    if (actionsContainer) {
       actionsContainer.innerHTML = '';
       
-      // Add continue button to proceed to next stage
-      const nextButton = document.createElement('button');
-      nextButton.className = 'quest-action-btn';
-      nextButton.textContent = 'Continue';
-      nextButton.onclick = function() {
-        // Determine next stage from outcome
-        const nextStageId = outcome.nextStage;
-        
-        if (nextStageId) {
-          const nextStageIndex = quest.stages.findIndex(s => s.id === nextStageId);
-          if (nextStageIndex !== -1) {
-            quest.currentStageIndex = nextStageIndex;
-            
-            // Show notification
-            window.showQuestNotification(quest, 'updated');
-            
-            // Update quest log if visible
-            window.renderQuestLog();
-            
-            // Update quest UI elements
-            if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
-              // Update progress steps
-              window.updateQuestProgressSteps(quest);
-              
-              // Update quest objective
-              const newCurrentStage = quest.stages[quest.currentStageIndex];
-              document.getElementById('questObjective').textContent = newCurrentStage.objective;
-            }
-            
-            // Clear the stat check processing flag so we can handle future stat checks
-            delete quest.userData.statCheckProcessed;
-            
-            // Handle the new stage
-            window.handleQuestStageAction(quest, quest.stages[quest.currentStageIndex]);
-            
-            console.log(`Advanced to next stage: ${quest.stages[nextStageIndex].id}`);
-          } else {
-            console.error(`Next stage "${nextStageId}" not found`);
-          }
-        } else {
-          // No next stage, complete the quest
-          window.completeQuest(questId);
+      // Add continue button to show the outcome narrative
+      const continueButton = document.createElement('button');
+      continueButton.id = 'statCheckContinueBtn';
+      continueButton.className = 'quest-action-btn';
+      continueButton.textContent = 'Continue';
+      
+      continueButton.onclick = function() {
+        // Hide the stat check display when continue is clicked
+        const statCheckDisplay = document.getElementById('statCheckDisplay');
+        if (statCheckDisplay) {
+          statCheckDisplay.classList.remove('show');
         }
+        
+        // Get the appropriate outcome
+        const outcome = checkResult.success ? currentStage.outcomes.success : currentStage.outcomes.failure;
+        
+        // Show the outcome narrative addition if it exists
+        if (outcome.narrativeAddition) {
+          // Use setNarrative for clearer transition
+          window.setNarrative(narrativeText + "\n\n" + outcome.narrativeAddition);
+        }
+        
+        // Apply rewards or penalties
+        if (checkResult.success && outcome.rewards) {
+          applyOutcomeRewards(outcome.rewards);
+        } else if (!checkResult.success && outcome.penalties) {
+          applyOutcomePenalties(outcome.penalties);
+        }
+        
+        // Apply any timeAdvance from the outcome
+        if (outcome.timeAdvance) {
+          window.updateTimeAndDay(outcome.timeAdvance);
+        }
+        
+        // Update UI for next step (after typewriter completes)
+        setTimeout(() => {
+          if (actionsContainer) {
+            actionsContainer.innerHTML = '';
+            
+            // Add continue button to proceed to next stage
+            const nextButton = document.createElement('button');
+            nextButton.className = 'quest-action-btn';
+            nextButton.textContent = 'Continue';
+            nextButton.onclick = function() {
+              // Determine next stage from outcome
+              const nextStageId = outcome.nextStage;
+              
+              if (nextStageId) {
+                const nextStageIndex = quest.stages.findIndex(s => s.id === nextStageId);
+                if (nextStageIndex !== -1) {
+                  quest.currentStageIndex = nextStageIndex;
+                  
+                  // Show notification
+                  window.showQuestNotification(quest, 'updated');
+                  
+                  // Update quest log if visible
+                  window.renderQuestLog();
+                  
+                  // Update quest UI elements
+                  if (!document.getElementById('questSceneContainer').classList.contains('hidden')) {
+                    // Update progress steps
+                    window.updateQuestProgressSteps(quest);
+                    
+                    // Update quest objective
+                    const newCurrentStage = quest.stages[quest.currentStageIndex];
+                    document.getElementById('questObjective').textContent = newCurrentStage.objective;
+                  }
+                  
+                  // Clear the stat check processing flag so we can handle future stat checks
+                  delete quest.userData.statCheckProcessed;
+                  
+                  // Handle the new stage
+                  window.handleQuestStageAction(quest, quest.stages[quest.currentStageIndex]);
+                  
+                  console.log(`Advanced to next stage: ${quest.stages[nextStageIndex].id}`);
+                } else {
+                  console.error(`Next stage "${nextStageId}" not found`);
+                }
+              } else {
+                // No next stage, complete the quest
+                window.completeQuest(questId);
+              }
+            };
+            
+            actionsContainer.appendChild(nextButton);
+          } else {
+            console.error("questActions container not found for next stage button!");
+          }
+        }, 1000); // Delay to ensure typewriter effect has started
       };
       
-      actionsContainer.appendChild(nextButton);
-    };
-    
-    actionsContainer.appendChild(continueButton);
-    
-    return true; // Stat check handled
-  }
+      actionsContainer.appendChild(continueButton);
+      console.log("Added continue button after stat check");
+    } else {
+      console.error("questActions container not found!");
+    }
+  }, 500); // Short delay to ensure narrative is set
+  
+  return true; // Stat check handled
+}
   
   // COMBAT HANDLING - Special handling for combat actions
   if (action === 'combat' && currentStage.battleType === window.BATTLE_TYPES.INDIVIDUAL) {
@@ -862,15 +919,37 @@ window.progressQuest = function(questId, action) {
 // Update quest action buttons
 window.updateQuestActionButtons = function(quest) {
   const actionsContainer = document.getElementById('questActions');
-  if (!actionsContainer) return;
+  if (!actionsContainer) {
+    console.error("questActions container not found!");
+    return;
+  }
   
+  // Clear existing buttons
   actionsContainer.innerHTML = '';
   
   // Get current stage
   const currentStage = quest.stages[quest.currentStageIndex];
-  if (!currentStage) return;
+  if (!currentStage) {
+    console.error("No current stage found!");
+    return;
+  }
   
   console.log(`Updating action buttons for stage: ${currentStage.id}`);
+  
+  // Don't add buttons if we're still animating narrative
+  if (window.typewriterConfig.isActive) {
+    console.log("Typewriter active, delaying buttons");
+    setTimeout(() => window.updateQuestActionButtons(quest), 500);
+    return;
+  }
+  
+  // If there's a recent stat check that hasn't been processed with a Continue button
+  if (window.lastStatCheckResult && 
+      (Date.now() - window.lastStatCheckResult.timestamp < 2000) && 
+      !document.getElementById('statCheckContinueBtn')) {
+    console.log("Recent stat check detected, buttons will be handled by progressQuest");
+    return;
+  }
   
   // Check if stage has choices
   if (currentStage.choices && currentStage.choices.length > 0) {
@@ -910,6 +989,8 @@ window.updateQuestActionButtons = function(quest) {
       
       actionsContainer.appendChild(choiceButton);
     });
+    
+    console.log(`Added ${validChoices.length} choice buttons`);
   }
   // Original code for single action button
   else if (currentStage.action) {
@@ -930,6 +1011,9 @@ window.updateQuestActionButtons = function(quest) {
     };
     
     actionsContainer.appendChild(actionButton);
+    console.log(`Added action button: ${actionButton.textContent}`);
+  } else {
+    console.log("No action or choices defined for this stage");
   }
 };
 

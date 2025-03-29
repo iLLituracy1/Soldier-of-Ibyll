@@ -271,9 +271,9 @@ window.questTemplates.frontier_campaign = {
       objective: 'Receive orders...',
       action: 'report',
       battleType: 'narrative',
-      narrative: `<p>The camp buzzes with activity as orders are passed down from the command tent. Sarkein Reval gathers all eighty members of the Spear Host in the center of the camp, and announces that we'll be moving out soon.</p>
+      narrative: `<p>The camp buzzes with activity as orders pass down from the command tent. Sarkein Reval gathers all eighty members of the Spear Host at the center of the camp and announces that they’ll be moving out soon.</p>
       
-      <p>This is it. This is what you've been preparing for the last few months. The anticipation in the camp is palpable. You only hope that your training has prepared you for this.</p>
+      <p>This is it. This is what you’ve been preparing for over the past few months. The anticipation in the camp is palpable. You can only hope your training has prepared you for what’s to come.</p>
       
       <p>You'll be joining the rest of the invasion force at the Wall of Nesia-- a bastion that spans the length of Nesia's western border. On the other side, the Arrasi kingdoms of the peninsula stake their claim.</p>`,
       nextStage: 'stage_preparation',
@@ -286,11 +286,11 @@ window.questTemplates.frontier_campaign = {
       objective: 'Form up',
       action: 'proceed',
       battleType: 'narrative',
-      narrative: `<p>A week later, your Spear Host is among the last to take down their section of camp and fall into formation with the rest of the Kasvaari.</p>
+      narrative: `<p>A week later, your Spear Host is among the last to dismantle their section of camp and fall into formation with the rest of the Kasvaari.</p>
 
-      <p>Unsurprisingly, your unit is also one of the last in column, at the very end of the Kasvaari. Still, you can see the Wall of Nesia fast approaching, dominating more and more of the backdrop with every mile marched.</p>
+      <p>Unsurprisingly, your unit is also one of the last in the column, trailing at the very end of the Kasvaari. Even so, the Wall of Nesia looms ever larger on the horizon, dominating more of the backdrop with each passing mile.</p>
       
-      <p>Apparently the Armarin-- the invasion force that you are currently marching to join with, is expected to be around 30,000 strong once all forces are assembled.`,
+      <p>Apparently, the Armarin--the invasion force that you are currently marching to join with--is expected to be around 30,000 strong once all forces are assembled.`,
       nextStage: 'stage_march',
       timeAdvance: 10080, 
     },
@@ -301,9 +301,9 @@ window.questTemplates.frontier_campaign = {
       objective: 'Stay in line, soldier.',
       action: 'proceed',
       battleType: 'narrative',
-      narrative: `<p>Dont Oslotheon, the Hierarch of Eterpau and King of the Nesians, marshaled his own force of 15,000 under the command of the Sceptremarch, his brother Adiv.</p>
+      narrative: `<p>Dont Oslotheon, the Hierarch of Eterpau and King of the Nesians, has marshaled his own force of 15,000 under the command of his brother, Adiv, the Sceptremarch.</p>
       
-      <p>They will be fighting alongside our Armarin. This is good news. The Nesian Heirknights are renowned heavy cavalry, and their sharpshooters have enlisted in the Paanic ranks since their conquest.</p>
+      <p>They will be fighting alongside our Armarin. This is good news — the Nesian Heirknights are renowned heavy cavalry, and their sharpshooters have served in the Paanic ranks since their conquest.</p>
       
       <p>You can't help but wonder what the stakes are for the Nesian nobility.</p>`,
       nextStage: 'stage_march2',
@@ -369,18 +369,18 @@ window.questTemplates.frontier_campaign = {
       objective: 'Stay alive, do your duty. For the Paanic Empire!',
       action: 'proceed',
       battleType: 'narrative',
-      narrative: `<p>Come the dawn, your Kasvaari is the second to form up in the pass.</p>
+      narrative: `<p>Come dawn, your Kasvaari is the second to form up in the pass.</p>
       
-      <p>Most of the men are silent as the dead. You feel a mixture of tension and eagerness swelling within you. Your first real engagement lies ahead.</p>
+      <p>Most of the men stand silent as the dead. A mix of tension and eagerness swells within you — your first real engagement lies ahead.</p>
       
-      <p>The horns are blown, signalling the attack to begin.</p>`,
+      <p>The horns sound, signalling the attack to begin.</p>`,
       timeAdvance: 600, 
 
       statCheck: {
         type: 'skill',
         stat: 'melee',
-        attribute: 'PHY', 
-        difficulty: 4,
+        attribute: 'phy', 
+        difficulty: 3,
         successText: `<p>Your Sarkein personally orders you and a few others from your squad to the front to join the vanguard. You quickly move up, joining a smaller element of around 500 regulars. Most of them are veterans, and you feel out of place.</p>`,
         failureText: `<p>Your Sarkein personally orders some of the more experienced members of your squad to join the vanguard. You don't envy them, but part of you wishes you were honored with the duty.</p>`,
       },  
@@ -410,20 +410,21 @@ window.questTemplates.frontier_campaign = {
         {
           text: "Stay alive.",
           action: "selfpreserve",
-          nextStage: "stage_selfpreserve"
+          nextStage: "stage_selfpreserve",
+          requiresShield: true,
         },
         {
           text: "Protect the ladders.",
           action: "protect",
           nextStage: "stage_protect",
           requiresShield: true
+        },
+        {
+          text: "Focus on survival.",
+          action: "prepare",
+          nextStage: "stage_survival",
         }
       ],
-      defaultChoice: {
-        text: "Try to stay alive.",
-        action: "selfpreserve",
-        nextStage: "stage_selfpreserve"
-      }
      },
 
      {
@@ -460,6 +461,39 @@ window.questTemplates.frontier_campaign = {
      },
 
      {
+      id: 'stage_survival',
+      description: 'Battle!',
+      objective: 'You\'re in the vanguard! The din of battle crashes around you. Stay alive, do your duty. For the Paanic Empire!',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>You decide to just try to stay alive. You don't have a shield, so risking your life to protect the ladders is suicidal.</p>
+      
+      <p>Some defenders seem to call you out from atop the walls, directing their next volleys toward your position!</p>`,
+     
+      statCheck: {
+        type: 'skill',
+        stat: 'survival',
+        attribute: 'PHY', 
+        difficulty: 3,
+        successText: `<p>You duck and run, managing to take cover beneath another regular's shield.</p>`,
+        failureText: `<p>You are too slow to react, and one of the arrows lands true.</p>`,
+      },  
+      outcomes: {
+        success: {
+          nextStage: 'stage_vanguard', 
+          narrativeAddition: `Your quick footwork allows you to slip beneath the cover of a nearby companion. The projectiles miss you completely. Moments later, you find yourself fighting atop the walls.`,
+        },
+        failure: {
+          nextStage: 'stage_vanguard', 
+          narrativeAddition: `<p>A grazing hit, but it stings. Moments later, you find yourself fighting atop the walls.</p>`,
+          penalties: {
+            health: -8
+          }
+        }
+      }
+     },
+
+     {
       id: 'stage_protect',
       description: 'Battle!',
       objective: 'You\'re in the vanguard! The din of battle crashes around you. Stay alive, do your duty. For the Paanic Empire!',
@@ -470,8 +504,8 @@ window.questTemplates.frontier_campaign = {
       <p>It doesn't take long for your position to be targeted by a volley of projectiles!</p>`,
 
       statCheck: {
-        type: 'skill',
-        stat: 'survival',
+        type: 'combined',
+        stat: ['survival', 'melee'],
         attribute: 'PHY', 
         difficulty: 3,
         successText: `<p>You quickly raise your shield and defend both yourself and the ladder bearer next to you against the incoming projectiles.</p>`,

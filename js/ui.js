@@ -505,9 +505,9 @@ window.showAchievement = function(achievementId) {
  // Typewriter effect configuration
  window.typewriterConfig = {
   isActive: false,         // Flag to track if typewriter is currently running
-  speed: 25,               // Milliseconds per character (adjust for faster/slower)
+  speed: 15,               // Milliseconds per character (adjust for faster/slower)
   buttonDelay: 500,        // Minimum delay before enabling buttons (milliseconds)
-  paragraphPause: 400,     // Pause between paragraphs
+  paragraphPause: 200,     // Pause between paragraphs
   shouldAnimate: true      // Toggle to enable/disable animation globally
 };
 
