@@ -396,16 +396,20 @@ window.setNarrative = function(text) {
   // Use typewriter effect and store the cancel function
   window.currentTypewriterCancelFn = window.typewriterEffect(text, narrativeDiv, function() {
     // Enable any disabled buttons after typewriter completes
-    window.enableQuestButtons();
+    if (typeof window.enableQuestButtons === 'function') {
+      window.enableQuestButtons();
+    }
     // Clear the cancel function when complete
     window.currentTypewriterCancelFn = null;
   });
   
   // Disable buttons until typewriter completes
-  window.disableQuestButtons();
+  if (typeof window.disableQuestButtons === 'function') {
+    window.disableQuestButtons();
+  }
 };
 
-// Replace both implementations of addToNarrative (approximately lines 431-468)
+// Replace both implementations of addToNarrative
 window.addToNarrative = function(text) {
   // Get narrative div
   const narrativeDiv = document.getElementById('narrative');
@@ -416,7 +420,7 @@ window.addToNarrative = function(text) {
     window.currentTypewriterCancelFn = null;
   }
   
-  // If typewriter was active, just append the text normally
+  // If typewriter is currently active or was just interrupted, just append normally
   if (window.typewriterConfig.isActive) {
     narrativeDiv.innerHTML += `<p>${text}</p>`;
     narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
@@ -424,20 +428,28 @@ window.addToNarrative = function(text) {
     return;
   }
   
-  // Otherwise use typewriter effect
-  window.currentTypewriterCancelFn = window.typewriterEffect(text, document.createElement('div'), function() {
+  // Create a temporary element to hold the typewriter output
+  const tempElement = document.createElement('div');
+  
+  // Use typewriter effect and store the cancel function
+  window.currentTypewriterCancelFn = window.typewriterEffect(text, tempElement, function() {
     // After typewriter completes, append the full text to the narrative
     narrativeDiv.innerHTML += `<p>${text}</p>`;
     narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
     
-    // Enable buttons
-    window.enableQuestButtons();
+    // Enable buttons if function is available
+    if (typeof window.enableQuestButtons === 'function') {
+      window.enableQuestButtons();
+    }
+    
     // Clear the cancel function
     window.currentTypewriterCancelFn = null;
   });
   
   // Disable buttons until typewriter completes
-  window.disableQuestButtons();
+  if (typeof window.disableQuestButtons === 'function') {
+    window.disableQuestButtons();
+  }
 };
 
 
@@ -499,7 +511,7 @@ window.typewriterEffect = function(htmlContent, element, onComplete) {
   if (!window.typewriterConfig.shouldAnimate) {
     element.innerHTML = htmlContent;
     if (onComplete) setTimeout(onComplete, window.typewriterConfig.buttonDelay);
-    return;
+    return function() {}; // Return empty cancel function
   }
   
   // Set state to active
@@ -518,13 +530,19 @@ window.typewriterEffect = function(htmlContent, element, onComplete) {
   // Track whether we're done
   let isComplete = false;
   
+  // Store all timeout IDs for proper cancellation
+  const timeoutIds = [];
+  
   // Process nodes sequentially
   function processNextNode(index = 0) {
     if (index >= nodes.length) {
       if (!isComplete) {
         isComplete = true;
         window.typewriterConfig.isActive = false;
-        if (onComplete) setTimeout(onComplete, window.typewriterConfig.buttonDelay);
+        if (onComplete) {
+          const timeoutId = setTimeout(onComplete, window.typewriterConfig.buttonDelay);
+          timeoutIds.push(timeoutId);
+        }
       }
       return;
     }
@@ -552,8 +570,9 @@ window.typewriterEffect = function(htmlContent, element, onComplete) {
         
         if (charIndex >= text.length) {
           // Finished with this text node
-          setTimeout(() => processNextNode(index + 1), 
+          const timeoutId = setTimeout(() => processNextNode(index + 1), 
             text.endsWith('\n') ? window.typewriterConfig.paragraphPause : 0);
+          timeoutIds.push(timeoutId);
           return;
         }
         
@@ -564,7 +583,8 @@ window.typewriterEffect = function(htmlContent, element, onComplete) {
         element.scrollTop = element.scrollHeight;
         
         // Schedule next character
-        setTimeout(typeNextChar, window.typewriterConfig.speed);
+        const timeoutId = setTimeout(typeNextChar, window.typewriterConfig.speed);
+        timeoutIds.push(timeoutId);
       }
       
       // Start typing this text node
@@ -585,8 +605,9 @@ window.typewriterEffect = function(htmlContent, element, onComplete) {
       // If it's a <br> or other empty element, move to next node
       if (currentNode.childNodes.length === 0 || currentNode.tagName === 'BR') {
         // Slight pause after paragraph breaks
-        setTimeout(() => processNextNode(index + 1), 
+        const timeoutId = setTimeout(() => processNextNode(index + 1), 
           currentNode.tagName === 'BR' ? window.typewriterConfig.paragraphPause : 0);
+        timeoutIds.push(timeoutId);
         return;
       }
       
@@ -597,7 +618,8 @@ window.typewriterEffect = function(htmlContent, element, onComplete) {
       function processChildNode() {
         if (childIndex >= childNodes.length) {
           // All children processed, move to next sibling
-          processNextNode(index + 1);
+          const timeoutId = setTimeout(() => processNextNode(index + 1), 0);
+          timeoutIds.push(timeoutId);
           return;
         }
         
@@ -622,7 +644,8 @@ window.typewriterEffect = function(htmlContent, element, onComplete) {
             
             if (innerCharIndex >= text.length) {
               // Move to next child
-              processChildNode();
+              const timeoutId = setTimeout(processChildNode, 0);
+              timeoutIds.push(timeoutId);
               return;
             }
             
@@ -633,7 +656,8 @@ window.typewriterEffect = function(htmlContent, element, onComplete) {
             element.scrollTop = element.scrollHeight;
             
             // Schedule next character
-            setTimeout(typeInnerChar, window.typewriterConfig.speed);
+            const timeoutId = setTimeout(typeInnerChar, window.typewriterConfig.speed);
+            timeoutIds.push(timeoutId);
           }
           
           // Start typing this text
@@ -642,7 +666,8 @@ window.typewriterEffect = function(htmlContent, element, onComplete) {
         else {
           // Handle nested elements (simplification: add immediately)
           newElement.appendChild(childNode.cloneNode(true));
-          processChildNode();
+          const timeoutId = setTimeout(processChildNode, 0);
+          timeoutIds.push(timeoutId);
         }
       }
       
@@ -651,7 +676,8 @@ window.typewriterEffect = function(htmlContent, element, onComplete) {
     }
     else {
       // Skip other node types
-      processNextNode(index + 1);
+      const timeoutId = setTimeout(() => processNextNode(index + 1), 0);
+      timeoutIds.push(timeoutId);
     }
   }
   
@@ -661,8 +687,18 @@ window.typewriterEffect = function(htmlContent, element, onComplete) {
   // Return a function that can force-complete the animation
   return function forceComplete() {
     if (window.typewriterConfig.isActive) {
+      // Clear all pending timeouts
+      timeoutIds.forEach(id => clearTimeout(id));
+      
+      // Set flag to inactive and complete the animation
       window.typewriterConfig.isActive = false;
+      isComplete = true;
+      
+      // Immediately update element with complete content
       element.innerHTML = htmlContent;
+      element.scrollTop = element.scrollHeight;
+      
+      // Call completion callback if provided
       if (onComplete) onComplete();
     }
   };

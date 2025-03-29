@@ -124,6 +124,29 @@ function setupEventHandlers() {
   console.log("Event handlers set up");
 }
 
+// Return to main menu function
+window.returnToMainMenu = function() {
+  // Hide game containers
+  document.getElementById('gameContainer').classList.add('hidden');
+  document.getElementById('questSceneContainer').classList.add('hidden');
+  document.getElementById('creator').classList.add('hidden');
+  
+  // Show main menu
+  document.getElementById('mainMenuScreen').classList.remove('hidden');
+  
+  // Reset player died state if applicable
+  if (window.gameState) {
+    window.gameState.playerDied = false;
+  }
+  
+  // Change to intro music
+  if (window.setMusicContext) {
+    window.setMusicContext('menu', 'intro');
+  }
+  
+  console.log("Returned to main menu");
+};
+
 // ================= GAME START & ADVENTURE SEQUENCE =================
 
 // Improved startAdventure function with proper inventory integration
@@ -137,11 +160,11 @@ window.startGameAdventure = function() {
   // Phase 2: Initialize game state
   window.initializeGameState();
 
-    // Phase 2.5: Initialize campaign system
-    if (typeof window.initializeCampaignSystem === 'function') {
-      console.log("Initializing campaign system");
-      window.initializeCampaignSystem();
-    }
+  // Phase 2.5: Initialize campaign system
+  if (typeof window.initializeCampaignSystem === 'function') {
+    console.log("Initializing campaign system");
+    window.initializeCampaignSystem();
+  }
   
   // Phase 3: Initialize item templates if needed
   if (!window.itemTemplates || Object.keys(window.itemTemplates).length === 0) {
@@ -165,17 +188,17 @@ window.startGameAdventure = function() {
     window.initializeAmmunition();
   }
 
-    // Phase 5.5: Initialize feats system
+  // Phase 5.5: Initialize feats system
   if (window.initializeFeatsSystem) {
     console.log("Initializing feats system");
     window.initializeFeatsSystem();
   }
 
-    // Phase 5.7: Initialize campaign system if not already done
-    if (typeof window.initializeCampaignSystem === 'function') {
-      console.log("Initializing campaign system");
-      window.initializeCampaignSystem();
-    }
+  // Phase 5.7: Initialize campaign system if not already done
+  if (typeof window.initializeCampaignSystem === 'function') {
+    console.log("Initializing campaign system");
+    window.initializeCampaignSystem();
+  }
   
   // Phase 6: Add and equip starting items
   if (window.addStartingItems) {
@@ -193,6 +216,11 @@ window.startGameAdventure = function() {
   window.updateStatusBars();
   window.updateTimeAndDay(0); // Start at the initial time
   window.updateActionButtons();
+  
+  // Start camp music
+  if (window.setMusicContext) {
+    window.setMusicContext('camp', 'campMarch');
+  }
   
   // Phase 9: Set initial narrative
   window.setNarrative(`${window.player.name}, a ${window.player.career.title} of ${window.player.origin} heritage, the road has been long. Nearly a season has passed since you departed the heartlands of Paan'eun, the distant spires of Cennen giving way to the endless hinterlands of the empire. Through the great riverlands and the mountain passes, across the dust-choked roads of the interior, and finally westward into the feudalscape of the Hierarchate, you have traveled. Each step has carried you further from home, deeper into the shadow of war.<br><br>

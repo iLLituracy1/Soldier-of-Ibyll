@@ -271,7 +271,7 @@ window.questTemplates.frontier_campaign = {
       objective: 'Receive orders...',
       action: 'report',
       battleType: 'narrative',
-      narrative: `<p>The camp buzzes with activity as orders pass down from the command tent. Sarkein Reval gathers all eighty members of the Spear Host at the center of the camp and announces that they’ll be moving out soon.</p>
+      narrative: `<p>The camp buzzes with activity as orders pass down from the command tent. Sarkein Reval gathers all eighty members of the Spear Host at the center of the camp and announces that you'll be moving out soon.</p>
       
       <p>This is it. This is what you’ve been preparing for over the past few months. The anticipation in the camp is palpable. You can only hope your training has prepared you for what’s to come.</p>
       
@@ -538,14 +538,14 @@ window.questTemplates.frontier_campaign = {
       objective: 'You\'re in the vanguard! The din of battle crashes around you. Stay alive, do your duty. For the Paanic Empire!',
       action: 'combat',
       battleType: 'individual',
-      enemyType: ['ARRASI_VAELGORR'], 
+      enemyType: ['ARRASI_GRYNDAL'], 
       allies: ['PAANIC_REGULAR'],
       combatOptions:{
         requireDefeat: false,
         maxTurns: 75,
         enemySequence: [
-          { type: ["ARRASI_DRUSKARI", "ARRASI_VAELGORR"], waves: 2 },
-          { type: ["ARRASI_VAELGORR", "ARRASI_VAELGORR"], waves: 2},
+          { type: ["ARRASI_GRYNDAL", "ARRASI_THARRKYN"], waves: 2 },
+          { type: ["ARRASI_THARRKYN", "ARRASI_HARNSKIR"], waves: 2},
         ],
       },
       narrative: `<p>On the walls, you come face to face with brutal Arrasi warriors...</p>`,
@@ -559,14 +559,14 @@ window.questTemplates.frontier_campaign = {
       objective: 'The din of battle crashes around you. Stay alive, do your duty. For the Paanic Empire!',
       action: 'combat',
       battleType: 'individual',
-      enemyType: ['ARRASI_VAELGORR', 'ARRASI_VAELGORR'], 
+      enemyType: ['ARRASI_HARNSKIR', 'ARRASI_GRYNDAL'], 
       allies: ['PAANIC_REGULAR'],
       combatOptions:{
         requireDefeat: false,
         maxTurns: 75,
         enemySequence: [
-          { type: ["ARRASI_DRUSKARI", "ARRASI_VAELGORR"], waves: 2 },
-          { type: ["ARRASI_VAELGORR", "ARRASI_VAELGORR"], waves: 2},
+          { type: ["ARRASI_HARNSKIR", "ARRASI_GRYNDAL"], waves: 2 },
+          { type: ["ARRASI_THARRKYN", "ARRASI_GRYNDAL"], waves: 2},
         ],
       },
       narrative: `<p>Finally, the order is given, and you are thrown into the fray. The way has been paved for you, paid with by the blood of your fellow regulars.</p>

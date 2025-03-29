@@ -210,39 +210,49 @@ window.CAMPAIGN_STATUS = {
   };
   
   // Change the player's location
-  window.changeCampaignLocation = function(locationId) {
-    const location = Object.values(window.CAMPAIGN_LOCATIONS).find(loc => loc.id === locationId);
-    
-    if (!location) {
-      console.error(`Location "${locationId}" not found`);
-      return false;
+window.changeCampaignLocation = function(locationId) {
+  const location = Object.values(window.CAMPAIGN_LOCATIONS).find(loc => loc.id === locationId);
+  
+  if (!location) {
+    console.error(`Location "${locationId}" not found`);
+    return false;
+  }
+  
+  console.log(`Changing location to: ${location.name}`);
+  
+  // Update campaign state
+  window.gameState.campaignState.currentLocation = locationId;
+  
+  // Update UI elements
+  document.getElementById('location').textContent = `Location: ${location.name}`;
+  document.querySelector('.game-header h1').textContent = location.name;
+  
+  // Reset daily activities
+  window.gameState.dailyTrainingCount = 0;
+  window.gameState.dailyPatrolDone = false;
+  window.gameState.dailyScoutDone = false;
+  
+  // Update available actions
+  window.updateActionButtons();
+  
+  // Add narrative about the new location
+  window.setNarrative(`You have arrived at ${location.name}. ${location.description}`);
+  
+  // Show notification
+  window.showNotification(`Arrived at: ${location.name}`, 'info');
+  
+  // Change music based on location
+  if (window.setMusicContext) {
+    if (locationId === window.CAMPAIGN_LOCATIONS.KASVAARI_CAMP.id) {
+      window.setMusicContext('camp', 'campMarch');
+    } else {
+      // For other locations, use campaign music
+      window.setMusicContext('campaign');
     }
-    
-    console.log(`Changing location to: ${location.name}`);
-    
-    // Update campaign state
-    window.gameState.campaignState.currentLocation = locationId;
-    
-    // Update UI elements
-    document.getElementById('location').textContent = `Location: ${location.name}`;
-    document.querySelector('.game-header h1').textContent = location.name;
-    
-    // Reset daily activities
-    window.gameState.dailyTrainingCount = 0;
-    window.gameState.dailyPatrolDone = false;
-    window.gameState.dailyScoutDone = false;
-    
-    // Update available actions
-    window.updateActionButtons();
-    
-    // Add narrative about the new location
-    window.setNarrative(`You have arrived at ${location.name}. ${location.description}`);
-    
-    // Show notification
-    window.showNotification(`Arrived at: ${location.name}`, 'info');
-    
-    return true;
-  };
+  }
+  
+  return true;
+};
   
   // Get the current campaign part data
   window.getCurrentCampaignPart = function() {

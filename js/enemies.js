@@ -10,7 +10,7 @@
 window.ENEMY_TEMPLATES = {
   ARRASI_VAELGORR: {
     name: "Arrasi Vaelgorr",
-    description: "Chainmail wearing warriors who skirmish the enemy before a charge and fill in the shield wall. Known to use spears and shields, and carry several javelins or throwing spears.",
+    description: "Seasoned warriors who make up a large portion of the Arrasi shieldwall. Known to use spears and shields, and carry several javelins or throwing spears.",
     health: 90,
     maxHealth: 90,
     experienceValue: 20,
@@ -34,7 +34,7 @@ window.ENEMY_TEMPLATES = {
     
     // Equipment reference (for narrative purposes)
     weapon: "Thrusting Spear, Javelins",
-    armor: "Chainmail",
+    armor: "Chain vest over woolen underlayer.",
     ammunition: {
       javelin: {
         current: 3,
@@ -107,6 +107,95 @@ window.ENEMY_TEMPLATES = {
     
     // Equipment reference
     weapon: "Massive Hewing Sword",
-    armor: "Druskari Plate"
+    armor: "Chainmail Hauberk"
+  },
+
+
+  ARRASI_HARNSKIR: {
+    name: "Arrasi Harnskir",
+    description: "Barely armored spearmen from rural clans, forming basic defensive lines.",
+    health: 50,
+    maxHealth: 50,
+    experienceValue: 5,
+    lootTable: ["legionShield", "rations", "repair_kit"],
+    lootChance: 0.3,
+    
+    // Combat attributes
+    power: 5,
+    accuracy: 4,
+    speed: 5,
+    defense: 4,
+    counterSkill: 1,
+    hasShield: true,
+    blockChance: 12,
+    armorPenetration: 5,
+    
+    // Preferred tactics
+    preferredDistance: 2, 
+    preferredStance: "defensive",
+    weaponRange: 2, 
+    
+    // Equipment reference (for narrative purposes)
+    weapon: "Thrusting Spear",
+    armor: "Basic Tunic",
+  },
+
+  ARRASI_GRYNDAL: {
+    name: "Arrasi Gryndal",
+    description: "Young, reckless warriors with makeshift weapons, often the first to charge in battle.",
+    health: 60,
+    maxHealth: 60,
+    experienceValue: 5,
+    lootTable: ["rations", "repair_kit"],
+    lootChance: 0.2,
+    
+    // Combat attributes
+    power: 9,
+    accuracy: 4,
+    speed: 8,
+    defense: 3,
+    counterSkill: 0,
+    hasShield: false,
+    blockChance: 0,
+    armorPenetration: 5,
+    
+    // Preferred tactics
+    preferredDistance: 1, 
+    preferredStance: "aggressive",
+    weaponRange: 1, 
+    
+    // Equipment reference (for narrative purposes)
+    weapon: "Cragspike",
+    armor: "Basic Tunic",
+  },
+
+
+  ARRASI_THARRKYN: {
+    name: "Arrasi Tharrkyn",
+    description: "Club-armed brutes who fight in loose bands, relying on brute force over finesse.",
+    health: 65,
+    maxHealth: 65,
+    experienceValue: 5,
+    lootTable: ["rations", "repair_kit"],
+    lootChance: 0.2,
+    
+    // Combat attributes
+    power: 11,
+    accuracy: 3,
+    speed: 6,
+    defense: 5,
+    counterSkill: 1,
+    hasShield: true,
+    blockChance: 8,
+    armorPenetration: 10,
+    
+    // Preferred tactics
+    preferredDistance: 1, 
+    preferredStance: "aggressive",
+    weaponRange: 1, 
+    
+    // Equipment reference (for narrative purposes)
+    weapon: "Clubhammer",
+    armor: "Layered Linen",
   }
 };

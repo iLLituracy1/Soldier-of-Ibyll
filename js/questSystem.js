@@ -392,7 +392,7 @@ window.performStatCheck = function(statCheck) {
   if (statCheck.type === 'attribute') {
     // Single attribute check
     const attrValue = window.player[statCheck.stat] || 0;
-    const randomFactor = (Math.random() * 10) - 8; // -5 to +5
+    const randomFactor = (Math.random() * 2) - 1; // -5 to +5
     const checkTotal = attrValue + randomFactor;
     const success = checkTotal >= statCheck.difficulty;
     
@@ -412,7 +412,7 @@ window.performStatCheck = function(statCheck) {
     if (statCheck.attribute) {
       // Check attribute
       const attrValue = window.player[statCheck.attribute] || 0;
-      const attrRandomFactor = (Math.random() * 10) - 8; // -5 to +5
+      const attrRandomFactor = (Math.random() * 2) - 1; // -5 to +5
       const attrTotal = attrValue + attrRandomFactor;
       const attrSuccess = attrTotal >= statCheck.difficulty;
       
@@ -429,7 +429,7 @@ window.performStatCheck = function(statCheck) {
       
       // Check skill
       const skillValue = window.player.skills[statCheck.stat] || 0;
-      const skillRandomFactor = (Math.random() * 10) - 8; // -5 to +5
+      const skillRandomFactor = (Math.random() * 2) - 1; // -5 to +5
       const skillTotal = skillValue + skillRandomFactor;
       const skillSuccess = skillTotal >= statCheck.difficulty;
       
@@ -461,7 +461,7 @@ window.performStatCheck = function(statCheck) {
     else {
       // Just a single skill check
       const skillValue = window.player.skills[statCheck.stat] || 0;
-      const randomFactor = (Math.random() * 10) - 8; // -5 to +5
+      const randomFactor = (Math.random() * 2) - 1; // -5 to +5
       const checkTotal = skillValue + randomFactor;
       const success = checkTotal >= statCheck.difficulty;
       
@@ -482,7 +482,7 @@ window.performStatCheck = function(statCheck) {
     if (statCheck.attributes) {
       statCheck.attributes.forEach(attr => {
         const attrValue = window.player[attr] || 0;
-        const randomFactor = (Math.random() * 10) - 8;
+        const randomFactor = (Math.random() * 2) - 1;
         const checkTotal = attrValue + randomFactor;
         const success = checkTotal >= statCheck.difficulty;
         
@@ -502,7 +502,7 @@ window.performStatCheck = function(statCheck) {
     if (statCheck.skills) {
       statCheck.skills.forEach(skill => {
         const skillValue = window.player.skills[skill] || 0;
-        const randomFactor = (Math.random() * 10) - 8;
+        const randomFactor = (Math.random() * 2) - 1;
         const checkTotal = skillValue + randomFactor;
         const success = checkTotal >= statCheck.difficulty;
         
@@ -1261,6 +1261,11 @@ window.showQuestNotification = function(quest, type) {
 
 // Function to transition to the quest scene
 window.enterQuestScene = function(quest) {
+  // Change to quest music
+  if (window.setMusicContext) {
+    window.setMusicContext('quest');
+  }
+  
   // Hide main game container and show quest scene
   document.getElementById('gameContainer').classList.add('hidden');
   document.getElementById('questSceneContainer').classList.remove('hidden');
@@ -1300,6 +1305,11 @@ window.enterQuestScene = function(quest) {
 window.exitQuestScene = function() {
   document.getElementById('questSceneContainer').classList.add('hidden');
   document.getElementById('gameContainer').classList.remove('hidden');
+  
+  // Return to camp music
+  if (window.setMusicContext) {
+    window.setMusicContext('camp', 'campMarch');
+  }
   
   console.log('Exited quest scene');
 };
@@ -1565,7 +1575,6 @@ window.updateTimeAndDay = function(minutesToAdd) {
 };
 
 // Override the narrative functions to work in both scenes
-const originalSetNarrative = window.setNarrative;
 window.setNarrative = function(text) {
   // Cancel any ongoing typewriter animation
   if (window.currentTypewriterCancelFn) {
@@ -1586,12 +1595,22 @@ window.setNarrative = function(text) {
     window.disableQuestButtons();
   } else {
     // Use original function for main game (which now has typewriter built in)
-    originalSetNarrative(text);
+    const narrativeDiv = document.getElementById('narrative');
+    window.currentTypewriterCancelFn = window.typewriterEffect(text, narrativeDiv, function() {
+      if (typeof window.enableQuestButtons === 'function') {
+        window.enableQuestButtons();
+      }
+      window.currentTypewriterCancelFn = null;
+    });
+    
+    // Disable buttons if function exists
+    if (typeof window.disableQuestButtons === 'function') {
+      window.disableQuestButtons();
+    }
   }
 };
 
-// Replace the overridden addToNarrative function (around line 1800)
-const originalAddToNarrative = window.addToNarrative;
+// Replace the overridden addToNarrative function
 window.addToNarrative = function(text) {
   // Cancel any ongoing typewriter animation
   if (window.currentTypewriterCancelFn) {
@@ -1610,10 +1629,12 @@ window.addToNarrative = function(text) {
       return;
     }
     
-    // Update quest narrative with typewriter effect
-    const questNarrative = document.getElementById('questNarrative');
+    // Create a temporary element for typewriter effect
+    const tempElement = document.createElement('div');
     
-    window.currentTypewriterCancelFn = window.typewriterEffect(text, document.createElement('div'), function() {
+    // Use typewriter effect and store the cancel function
+    window.currentTypewriterCancelFn = window.typewriterEffect(text, tempElement, function() {
+      const questNarrative = document.getElementById('questNarrative');
       questNarrative.innerHTML += `<p>${text}</p>`;
       questNarrative.scrollTop = questNarrative.scrollHeight;
       window.enableQuestButtons();
@@ -1623,8 +1644,35 @@ window.addToNarrative = function(text) {
     // Disable buttons during typewriter
     window.disableQuestButtons();
   } else {
-    // Use original function for main game
-    originalAddToNarrative(text);
+    // Use the updated main game function
+    const narrativeDiv = document.getElementById('narrative');
+    
+    // If typewriter is already active, just append normally
+    if (window.typewriterConfig.isActive) {
+      narrativeDiv.innerHTML += `<p>${text}</p>`;
+      narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+      window.typewriterConfig.isActive = false;
+      return;
+    }
+    
+    // Create a temporary element for typewriter effect
+    const tempElement = document.createElement('div');
+    
+    // Use typewriter effect and store the cancel function
+    window.currentTypewriterCancelFn = window.typewriterEffect(text, tempElement, function() {
+      narrativeDiv.innerHTML += `<p>${text}</p>`;
+      narrativeDiv.scrollTop = narrativeDiv.scrollHeight;
+      
+      if (typeof window.enableQuestButtons === 'function') {
+        window.enableQuestButtons();
+      }
+      window.currentTypewriterCancelFn = null;
+    });
+    
+    // Disable buttons if function exists
+    if (typeof window.disableQuestButtons === 'function') {
+      window.disableQuestButtons();
+    }
   }
 };
 
