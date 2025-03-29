@@ -121,7 +121,7 @@ window.ENEMY_TEMPLATES = {
     lootChance: 0.3,
     
     // Combat attributes
-    power: 5,
+    power: 7,
     accuracy: 4,
     speed: 5,
     defense: 4,

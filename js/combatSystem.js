@@ -62,129 +62,134 @@ window.combatSystem = {
     }
   },
   
-  // Start combat with enemy(ies) and optional ally(ies)
-  initiateCombat: function(enemyTypes, allyTypes = [], options = {}) {
-    // Default options
-    const combatOptions = {
-      requireDefeat: false,  // Combat continues until one side is defeated by default
-      maxTurns: 30,        // Maximum number of turns before combat ends
-      ...options            // Allow overriding default options
-    };
+ // Start combat with enemy(ies) and optional ally(ies)
+initiateCombat: function(enemyTypes, allyTypes = [], options = {}) {
+  // Default options
+  const combatOptions = {
+    requireDefeat: false,  // Combat continues until one side is defeated by default
+    maxTurns: 30,        // Maximum number of turns before combat ends
+    ...options            // Allow overriding default options
+  };
+  
+  // Reset combat state
+  this.state = {
+    active: true,
+    turn: 0,
+    maxTurns: combatOptions.maxTurns,
+    requireDefeat: combatOptions.requireDefeat,
+    phase: "initial",
+    globalDistance: 2,  // Keep this for backward compatibility
+    playerStance: "neutral",
+    enemyStance: "neutral", // For backward compatibility with combatUI.js
+    targetArea: "body",
+    combatLog: [],
     
-    // Reset combat state
-    this.state = {
-      active: true,
-      turn: 0,
-      maxTurns: combatOptions.maxTurns,
-      requireDefeat: combatOptions.requireDefeat,
-      phase: "initial",
-      globalDistance: 2,  // Keep this for backward compatibility
-      playerStance: "neutral",
-      enemyStance: "neutral", // For backward compatibility with combatUI.js
-      targetArea: "body",
-      combatLog: [],
-      
-      // Multi-combat properties
-      enemies: [],
-      allies: [],
-      activeEnemyIndex: 0,
-      activeAllyIndex: 0,
-     
-      
-      // Counter system properties
-      counterWindowOpen: false,
-      counterChain: 0,
-      maxCounterChain: 4,
-      lastCounterActor: null,
+    // Multi-combat properties
+    enemies: [],
+    allies: [],
+    activeEnemyIndex: 0,
+    activeAllyIndex: 0,
+   
+    
+    // Counter system properties
+    counterWindowOpen: false,
+    counterChain: 0,
+    maxCounterChain: 4,
+    lastCounterActor: null,
 
-      // Wave-based combat properties
-      currentWaveIndex: 0,
-      enemySequence: options.enemySequence || null,
-      remainingWaves: options.enemySequence ? options.enemySequence[0].waves : 0,
+    // Wave-based combat properties
+    currentWaveIndex: 0,
+    enemySequence: options.enemySequence || null,
+    remainingWaves: options.enemySequence ? options.enemySequence[0].waves : 0,
 
-      
-      // Backward compatibility
-      enemy: null,
-      distance: 2 // For backwards compatibility
-      
-    };
+    
+    // Backward compatibility
+    enemy: null,
+    distance: 2 // For backwards compatibility
+    
+  };
 
-    // When starting combat, create allyDistances property to track relative distances
-    this.state.allyDistances = {};
-    this.state.playerDistances = {};
+  // When starting combat, create allyDistances property to track relative distances
+  this.state.allyDistances = {};
+  this.state.playerDistances = {};
 
-    // Initialize distance tracking for each enemy
-    for (let enemyIndex = 0; enemyIndex < this.state.enemies.length; enemyIndex++) {
-      const enemy = this.state.enemies[enemyIndex];
-      // Initialize player's distance to each enemy (use enemy's preferred distance as starting point)
-      this.state.playerDistances[enemy.id] = enemy.preferredDistance;
-    }
+  // Initialize distance tracking for each enemy
+  for (let enemyIndex = 0; enemyIndex < this.state.enemies.length; enemyIndex++) {
+    const enemy = this.state.enemies[enemyIndex];
+    // Initialize player's distance to each enemy (use enemy's preferred distance as starting point)
+    this.state.playerDistances[enemy.id] = enemy.preferredDistance;
+  }
 
-    // Initialize distance tracking for each ally to each enemy
-    for (let allyIndex = 0; allyIndex < this.state.allies.length; allyIndex++) {
-      const ally = this.state.allies[allyIndex];
-      this.state.allyDistances[ally.id] = {};
+  // Initialize distance tracking for each ally to each enemy
+  for (let allyIndex = 0; allyIndex < this.state.allies.length; allyIndex++) {
+    const ally = this.state.allies[allyIndex];
+    this.state.allyDistances[ally.id] = {};
   
     for (let enemyIndex = 0; enemyIndex < this.state.enemies.length; enemyIndex++) {
       const enemy = this.state.enemies[enemyIndex];
       // Initialize ally's distance to each enemy (use enemy's preferred distance as starting point)
       this.state.allyDistances[ally.id][enemy.id] = enemy.preferredDistance;
-     }
     }
+  }
     
-    // Create enemy instances
-    if (typeof enemyTypes === 'string') {
-      // Single enemy (backward compatibility)
-      const enemy = this.createEnemy(enemyTypes);
+  // Create enemy instances
+  if (typeof enemyTypes === 'string') {
+    // Single enemy (backward compatibility)
+    const enemy = this.createEnemy(enemyTypes);
+    this.state.enemies.push(enemy);
+    this.state.enemy = enemy; // For backward compatibility
+  } else {
+    // Multiple enemies
+    for (const enemyType of enemyTypes) {
+      const enemy = this.createEnemy(enemyType);
       this.state.enemies.push(enemy);
-      this.state.enemy = enemy; // For backward compatibility
-    } else {
-      // Multiple enemies
-      for (const enemyType of enemyTypes) {
-        const enemy = this.createEnemy(enemyType);
-        this.state.enemies.push(enemy);
-        if (this.state.enemies.length === 1) {
-          this.state.enemy = enemy; // For backward compatibility
-        }
+      if (this.state.enemies.length === 1) {
+        this.state.enemy = enemy; // For backward compatibility
       }
     }
+  }
     
-    // Create ally instances
-    for (const allyType of allyTypes) {
-      this.state.allies.push(this.createAlly(allyType));
-    }
+  // Create ally instances
+  for (const allyType of allyTypes) {
+    this.state.allies.push(this.createAlly(allyType));
+  }
     
-    // Tell the UI to set up the combat interface
-    if (window.combatUI) {
-      window.combatUI.renderCombatInterface();
-    }
-    
-    // Generate descriptive intro based on number of combatants
-    let intro;
-    if (this.state.enemies.length === 1) {
-      intro = `You're locked in combat with a ${this.state.enemies[0].name}.`;
-    } else {
-      intro = `You're locked in combat with ${this.getEnemyGroupDescription()}.`;
-    }
-    
-    // Add ally description if present
-    if (this.state.allies.length > 0) {
-      const allyNames = this.state.allies.map(a => a.name);
-      if (allyNames.length === 1) {
-        intro += ` A ${allyNames[0]} fights alongside you.`;
-      } else {
-        const lastAlly = allyNames.pop();
-        intro += ` ${allyNames.join(', ')} and a ${lastAlly} fight alongside you.`;
-      }
-    }
-    
-    this.addCombatMessage(intro);
-    this.addCombatMessage(`You circle each other, feeling out the ground, prodding for weaknesses.`);
-    
-    // Enter player phase
-    this.enterPhase("player");
-  },
+  // Tell the UI to set up the combat interface
+  if (window.combatUI) {
+    window.combatUI.renderCombatInterface();
+  }
   
+  // Change to battle music
+  if (window.setMusicContext) {
+    window.setMusicContext('battle');
+  }
+    
+  // Generate descriptive intro based on number of combatants
+  let intro;
+  if (this.state.enemies.length === 1) {
+    intro = `You're locked in combat with a ${this.state.enemies[0].name}.`;
+  } else {
+    intro = `You're locked in combat with ${this.getEnemyGroupDescription()}.`;
+  }
+    
+  // Add ally description if present
+  if (this.state.allies.length > 0) {
+    const allyNames = this.state.allies.map(a => a.name);
+    if (allyNames.length === 1) {
+      intro += ` A ${allyNames[0]} fights alongside you.`;
+    } else {
+      const lastAlly = allyNames.pop();
+      intro += ` ${allyNames.join(', ')} and a ${lastAlly} fight alongside you.`;
+    }
+  }
+    
+  this.addCombatMessage(intro);
+  this.addCombatMessage(`You circle each other, feeling out the ground, prodding for weaknesses.`);
+    
+  // Enter player phase
+  this.enterPhase("player");
+},
+
   // Helper function to get a description of the enemy group
   getEnemyGroupDescription: function() {
     const enemies = this.state.enemies;
@@ -2736,7 +2741,7 @@ spawnNextWave: function() {
 
 
   
-  // End combat and handle outcome
+ // End combat and handle outcome
 endCombat: function(outcome) {
   // Set combat as inactive
   this.state.active = false;
@@ -2795,11 +2800,11 @@ endCombat: function(outcome) {
     ];
 
      
-    } else if (outcome === "draw") {
-      // Battle shift / draw outcome
-      narrativeText = [
-        "The battle shifts, forcing your engagement to end as the larger conflict swallows your skirmish.",
-      ];
+  } else if (outcome === "draw") {
+    // Battle shift / draw outcome
+    narrativeText = [
+      "The battle shifts, forcing your engagement to end as the larger conflict swallows your skirmish.",
+    ];
     
     // Minor armor durability damage on retreat
     this.applyArmorDurabilityDamage(0.5);
@@ -2865,6 +2870,10 @@ endCombat: function(outcome) {
   
   // For death, don't update UI or check level
   if (window.gameState.playerDied) {
+    // If player died and music is set, play the death music
+    if (window.setMusicContext) {
+      window.setMusicContext('death', 'end');
+    }
     return;
   }
   
@@ -2875,6 +2884,17 @@ endCombat: function(outcome) {
   
   // Check for level up
   window.checkLevelUp();
+  
+  // Return to previous music context based on whether we're in a quest
+  if (window.setMusicContext) {
+    if (window.gameState.inQuestSequence) {
+      // Return to quest music if in a quest
+      window.setMusicContext('quest');
+    } else {
+      // Otherwise return to camp music
+      window.setMusicContext('camp', 'campMarch');
+    }
+  }
 },
   
   // Generate loot from all defeated enemies

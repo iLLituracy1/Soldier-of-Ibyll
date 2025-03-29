@@ -16,7 +16,7 @@ window.musicTracks = {
       id: 'curious',
       src: 'audio/Curious.mp3',
       title: 'Curious',
-      contexts: ['quest', 'campaign'],
+      contexts: ['camp'],
       volume: 0.6
     },
     campMarch: {
@@ -33,12 +33,12 @@ window.musicTracks = {
       contexts: ['battle'],
       volume: 0.7
     },
-    gather: {
-      id: 'gather',
-      src: 'audio/Gather.mp3',
-      title: 'Gather',
+    soldier: {
+      id: 'soldier',
+      src: 'audio/Soldier.mp3',
+      title: 'Soldier',
       contexts: ['quest', 'campaign'],
-      volume: 0.6
+      volume: 0.5
     },
     inTheHeatOfIt: {
       id: 'inTheHeatOfIt',
@@ -58,7 +58,7 @@ window.musicTracks = {
       id: 'grass',
       src: 'audio/Grass.mp3',
       title: 'Grass',
-      contexts: ['quest', 'campaign'],
+      contexts: ['camp'],
       volume: 0.6
     },
     end: {
@@ -67,6 +67,13 @@ window.musicTracks = {
       title: 'Death',
       contexts: ['death'],
       volume: 0.6
+    },
+    impend: {
+        id: 'impend',
+        src: 'audio/Impend.mp3',
+        title: 'Impend',
+        contexts: ['quest', 'campaign'],
+        volume: 0.5
     }
   };
   
@@ -227,149 +234,197 @@ window.musicTracks = {
     },
     
     // Transition to a new track
-    transitionTo: function(newTrack) {
-      if (!newTrack) return;
-      
-      console.log(`Transitioning to track: ${newTrack.title}`);
-      
-      // If the same track is already playing, don't transition
-      if (this.currentTrack && this.currentTrack.id === newTrack.id) {
-        return;
-      }
-      
-      // Get the audio element from our cache
-      this.nextTrack = newTrack;
-      this.nextAudio = this.audioElements[newTrack.id];
-      
-      if (!this.nextAudio) {
-        console.error(`Audio element not found for track: ${newTrack.id}`);
-        return;
-      }
-      
-      // Make sure loop is set
-      this.nextAudio.loop = true;
-      
-      // Set initial volume to 0
-      this.nextAudio.volume = 0;
-      
-      // Stop any current fade for this audio
-      if (this.fadeIntervals[newTrack.id]) {
-        clearInterval(this.fadeIntervals[newTrack.id]);
-        delete this.fadeIntervals[newTrack.id];
-      }
-      
-      // Start playing the next track, restart from beginning
-      this.nextAudio.currentTime = 0;
-      
-      const playPromise = this.nextAudio.play();
-      
-      // Handle play promise (might reject due to autoplay restrictions)
-      if (playPromise !== undefined) {
-        playPromise.catch(e => {
-          console.log("Autoplay prevented by browser, waiting for user interaction", e);
-          
-          if (!document.getElementById('music-play-overlay')) {
-            this.createPlayButton();
+transitionTo: function(newTrack) {
+    if (!newTrack) return;
+    
+    console.log(`Transitioning to track: ${newTrack.title}`);
+    
+    // If the same track is already playing, don't transition
+    if (this.currentTrack && this.currentTrack.id === newTrack.id) {
+      return;
+    }
+    
+    // Get the audio element from our cache
+    this.nextTrack = newTrack;
+    this.nextAudio = this.audioElements[newTrack.id];
+    
+    if (!this.nextAudio) {
+      console.error(`Audio element not found for track: ${newTrack.id}`);
+      return;
+    }
+    
+    // Make sure loop is set
+    this.nextAudio.loop = true;
+    
+    // Set initial volume to 0
+    this.nextAudio.volume = 0;
+    
+    // Stop any current fade for this audio
+    const nextTrackFadeInId = `${newTrack.id}_fadein`;
+    if (this.fadeIntervals[nextTrackFadeInId]) {
+      clearInterval(this.fadeIntervals[nextTrackFadeInId]);
+      delete this.fadeIntervals[nextTrackFadeInId];
+    }
+    
+    // Save references to current and next track/audio for use in callbacks
+    const currentTrack = this.currentTrack;
+    const currentAudio = this.currentAudio;
+    const nextAudio = this.nextAudio;
+    
+    // Start playing the next track, restart from beginning
+    this.nextAudio.currentTime = 0;
+    
+    const playPromise = this.nextAudio.play();
+    
+    // Handle play promise (might reject due to autoplay restrictions)
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        console.log(`Successfully started playing ${newTrack.title}`);
+        
+        // If we have a current track, fade it out
+        if (currentAudio) {
+          // Stop any current fade for the current track
+          const currentTrackFadeOutId = `${currentTrack.id}_fadeout`;
+          if (this.fadeIntervals[currentTrackFadeOutId]) {
+            clearInterval(this.fadeIntervals[currentTrackFadeOutId]);
+            delete this.fadeIntervals[currentTrackFadeOutId];
           }
           
-          // We'll mark that user interaction is needed
-          this.userInteractionNeeded = true;
-        });
-      }
+          // Fade out current track
+          this.simpleFade(
+            currentAudio, 
+            currentAudio.volume, 
+            0, 
+            this.fadeTime, 
+            () => {
+              if (currentAudio) {
+                currentAudio.pause();
+                console.log(`${currentTrack.title} paused after fade out`);
+              }
+            },
+            currentTrackFadeOutId
+          );
+        }
+        
+        // Fade in the next track
+        const targetVolume = newTrack.volume * this.volume;
+        this.simpleFade(nextAudio, 0, targetVolume, this.fadeTime, null, nextTrackFadeInId);
+        
+        // Update current track reference
+        this.currentTrack = newTrack;
+        this.currentAudio = nextAudio;
+      }).catch(e => {
+        console.log("Autoplay prevented by browser, waiting for user interaction", e);
+        
+        if (!document.getElementById('music-play-overlay')) {
+          this.createPlayButton();
+        }
+        
+        // We'll mark that user interaction is needed
+        this.userInteractionNeeded = true;
+      });
+    } else {
+      // For browsers that don't return a promise from play()
+      console.log(`Started playing ${newTrack.title} (no promise returned)`);
       
       // If we have a current track, fade it out
-      if (this.currentAudio) {
-        // Stop any current fade for this audio
-        if (this.fadeIntervals[this.currentTrack.id]) {
-          clearInterval(this.fadeIntervals[this.currentTrack.id]);
-          delete this.fadeIntervals[this.currentTrack.id];
+      if (currentAudio) {
+        // Stop any current fade for the current track
+        const currentTrackFadeOutId = `${currentTrack.id}_fadeout`;
+        if (this.fadeIntervals[currentTrackFadeOutId]) {
+          clearInterval(this.fadeIntervals[currentTrackFadeOutId]);
+          delete this.fadeIntervals[currentTrackFadeOutId];
         }
         
         // Fade out current track
         this.simpleFade(
-          this.currentAudio, 
-          this.currentAudio.volume, 
+          currentAudio, 
+          currentAudio.volume, 
           0, 
           this.fadeTime, 
           () => {
-            if (this.currentAudio) {
-              this.currentAudio.pause();
-              console.log(`${this.currentTrack.title} paused after fade out`);
+            if (currentAudio) {
+              currentAudio.pause();
+              console.log(`${currentTrack.title} paused after fade out`);
             }
           },
-          this.currentTrack.id
+          currentTrackFadeOutId
         );
       }
       
       // Fade in the next track
       const targetVolume = newTrack.volume * this.volume;
-      this.simpleFade(this.nextAudio, 0, targetVolume, this.fadeTime, null, newTrack.id);
+      this.simpleFade(nextAudio, 0, targetVolume, this.fadeTime, null, nextTrackFadeInId);
       
       // Update current track reference
-      this.currentTrack = this.nextTrack;
-      this.currentAudio = this.nextAudio;
-      this.nextTrack = null;
-      this.nextAudio = null;
-    },
+      this.currentTrack = newTrack;
+      this.currentAudio = nextAudio;
+    }
     
-    // Simpler fade function using setInterval
-    simpleFade: function(audio, fromVolume, toVolume, duration, onComplete, trackId) {
-      if (!audio) return;
+    // Clear next track references once they're no longer needed
+    this.nextTrack = null;
+    this.nextAudio = null;
+  },
+
+  // Simpler fade function using setInterval
+simpleFade: function(audio, fromVolume, toVolume, duration, onComplete, fadeId) {
+    if (!audio) return;
+    
+    const steps = 20; // Number of steps for the fade
+    const stepDuration = duration / steps; // Time per step
+    const volumeStep = (toVolume - fromVolume) / steps; // Volume change per step
+    let currentStep = 0;
+    
+    // Clear any existing fade interval for this fade ID
+    if (this.fadeIntervals[fadeId]) {
+      clearInterval(this.fadeIntervals[fadeId]);
+      delete this.fadeIntervals[fadeId];
+    }
+    
+    // Set initial volume
+    audio.volume = fromVolume;
+    
+    // Create the interval
+    this.fadeIntervals[fadeId] = setInterval(() => {
+      currentStep++;
       
-      const steps = 20; // Number of steps for the fade
-      const stepDuration = duration / steps; // Time per step
-      const volumeStep = (toVolume - fromVolume) / steps; // Volume change per step
-      let currentStep = 0;
-      
-      // Clear any existing fade interval for this track
-      if (this.fadeIntervals[trackId]) {
-        clearInterval(this.fadeIntervals[trackId]);
-        delete this.fadeIntervals[trackId];
-      }
-      
-      // Set initial volume
-      audio.volume = fromVolume;
-      
-      // Create the interval
-      this.fadeIntervals[trackId] = setInterval(() => {
-        currentStep++;
+      if (currentStep <= steps) {
+        // Set new volume
+        const newVolume = fromVolume + (volumeStep * currentStep);
+        audio.volume = Math.max(0, Math.min(1, newVolume)); // Clamp to valid range
+      } else {
+        // Ensure final volume is set exactly
+        audio.volume = toVolume;
         
-        if (currentStep <= steps) {
-          // Set new volume
-          const newVolume = fromVolume + (volumeStep * currentStep);
-          audio.volume = Math.max(0, Math.min(1, newVolume)); // Clamp to valid range
-        } else {
-          // Ensure final volume is set exactly
-          audio.volume = toVolume;
-          
-          // Clear the interval
-          clearInterval(this.fadeIntervals[trackId]);
-          delete this.fadeIntervals[trackId];
-          
-          // Call completion handler if provided
-          if (onComplete) onComplete();
-        }
-      }, stepDuration);
-    },
+        // Clear the interval
+        clearInterval(this.fadeIntervals[fadeId]);
+        delete this.fadeIntervals[fadeId];
+        
+        // Call completion handler if provided
+        if (onComplete) onComplete();
+      }
+    }, stepDuration);
+  },
     
     // Stop all music
-    stopMusic: function() {
-      // Cancel all fade intervals
-      Object.keys(this.fadeIntervals).forEach(trackId => {
-        clearInterval(this.fadeIntervals[trackId]);
-        delete this.fadeIntervals[trackId];
-      });
-      
-      if (this.currentAudio) {
-        this.simpleFade(this.currentAudio, this.currentAudio.volume, 0, this.fadeTime, () => {
-          if (this.currentAudio) {
-            this.currentAudio.pause();
-            this.currentTrack = null;
-            this.currentAudio = null;
-          }
-        }, this.currentTrack ? this.currentTrack.id : 'current');
-      }
-    },
+stopMusic: function() {
+    // Cancel all fade intervals
+    Object.keys(this.fadeIntervals).forEach(fadeId => {
+      clearInterval(this.fadeIntervals[fadeId]);
+      delete this.fadeIntervals[fadeId];
+    });
+    
+    if (this.currentAudio) {
+      const fadeOutId = this.currentTrack ? `${this.currentTrack.id}_fadeout` : 'current_fadeout';
+      this.simpleFade(this.currentAudio, this.currentAudio.volume, 0, this.fadeTime, () => {
+        if (this.currentAudio) {
+          this.currentAudio.pause();
+          this.currentTrack = null;
+          this.currentAudio = null;
+        }
+      }, fadeOutId);
+    }
+  },
     
     // Handle context changes (event listener)
     handleContextChange: function(event) {

@@ -1261,9 +1261,17 @@ window.showQuestNotification = function(quest, type) {
 
 // Function to transition to the quest scene
 window.enterQuestScene = function(quest) {
-  // Change to quest music
+  // Only change music if this isn't a campaign quest or if no music is playing
   if (window.setMusicContext) {
-    window.setMusicContext('quest');
+    // Get the quest template to check if it's a campaign quest
+    const template = window.questTemplates[quest.templateId];
+    const isCampaignQuest = template && template.isCampaignQuest === true;
+    
+    // If it's not a campaign quest or if no music is currently playing, set music
+    if (!isCampaignQuest || !window.musicSystem.currentTrack) {
+      window.setMusicContext('quest');
+    }
+    // Otherwise keep the current music (likely campaign music)
   }
   
   // Hide main game container and show quest scene

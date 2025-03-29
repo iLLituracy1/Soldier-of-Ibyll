@@ -140,10 +140,10 @@ window.applyQuestRewards = function(quest) {
   
   console.log(`Applying rewards for quest: ${quest.id}`);
   
-  // Get enhanced rewards if available
-  const questId = quest.templateId;
-  let rewardsToApply = quest.rewards || {};
-  let enhancedRewards = window.enhancedQuestRewards[questId];
+// Get enhanced rewards if available
+const questId = quest.templateId;
+let rewardsToApply = quest.rewards || {};
+let enhancedRewards = window.enhancedQuestRewards ? window.enhancedQuestRewards[questId] : undefined;
   
   // Collect all rewards that will be displayed
   const rewardSummary = {
@@ -200,20 +200,22 @@ if (rewardsToApply.deeds || rewardsToApply.experience) {
     });
   }
   
-      // Apply enhanced experience/deeds
-    if (enhancedRewards.deeds || enhancedRewards.experience) {
+   // Apply enhanced experience/deeds
+if (enhancedRewards) {  // Add this check
+  if (enhancedRewards.deeds || enhancedRewards.experience) {
       const enhancedDeeds = enhancedRewards.deeds || enhancedRewards.experience || 0;
       
       // Use new feats system if available
       if (typeof window.awardDeeds === 'function') {
-        window.awardDeeds(enhancedDeeds, window.DEEDS_SOURCES.QUEST, `Enhanced reward: ${quest.title}`);
+          window.awardDeeds(enhancedDeeds, window.DEEDS_SOURCES.QUEST, `Enhanced reward: ${quest.title}`);
       } else {
-        // Fallback to old system
-        window.gameState.deeds += enhancedDeeds;
+          // Fallback to old system
+          window.gameState.deeds += enhancedDeeds;
       }
       
       rewardSummary.deeds = (rewardSummary.deeds || 0) + enhancedDeeds;
       console.log(`Added ${enhancedDeeds} enhanced deeds`);
+  }
 
     
     // Apply enhanced currency
