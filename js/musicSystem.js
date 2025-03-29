@@ -17,21 +17,21 @@ window.musicTracks = {
       src: 'audio/Curious.mp3',
       title: 'Curious',
       contexts: ['camp'],
-      volume: 0.6
+      volume: 0.4
     },
     campMarch: {
       id: 'campMarch',
       src: 'audio/Camp_March.mp3',
       title: 'Camp March',
       contexts: ['camp'],
-      volume: 0.5
+      volume: 0.4
     },
     wadeThrough: {
       id: 'wadeThrough',
       src: 'audio/Wade_Through.mp3',
       title: 'Wade Through',
       contexts: ['battle'],
-      volume: 0.7
+      volume: 0.6
     },
     soldier: {
       id: 'soldier',
@@ -45,14 +45,14 @@ window.musicTracks = {
       src: 'audio/In_the_Heat_of_It.mp3',
       title: 'In the Heat of It',
       contexts: ['battle'],
-      volume: 0.7
+      volume: 0.6
     },
-    crossedSwords: {
-      id: 'crossedSwords',
-      src: 'audio/Crossed_Swords.mp3',
-      title: 'Crossed Swords',
+    Nemesis: {
+      id: 'Nemesis',
+      src: 'audio/Nemesis.mp3',
+      title: 'Nemesis',
       contexts: ['battle'],
-      volume: 0.8
+      volume: 0.6
     },
     grass: {
       id: 'grass',

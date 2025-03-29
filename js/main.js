@@ -124,28 +124,7 @@ function setupEventHandlers() {
   console.log("Event handlers set up");
 }
 
-// Return to main menu function
-window.returnToMainMenu = function() {
-  // Hide game containers
-  document.getElementById('gameContainer').classList.add('hidden');
-  document.getElementById('questSceneContainer').classList.add('hidden');
-  document.getElementById('creator').classList.add('hidden');
-  
-  // Show main menu
-  document.getElementById('mainMenuScreen').classList.remove('hidden');
-  
-  // Reset player died state if applicable
-  if (window.gameState) {
-    window.gameState.playerDied = false;
-  }
-  
-  // Change to intro music
-  if (window.setMusicContext) {
-    window.setMusicContext('menu', 'intro');
-  }
-  
-  console.log("Returned to main menu");
-};
+// REMOVED: Return to main menu function is now solely defined in saveLoadSystem.js
 
 // ================= GAME START & ADVENTURE SEQUENCE =================
 

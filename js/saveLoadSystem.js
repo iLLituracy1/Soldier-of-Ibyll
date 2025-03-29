@@ -4,6 +4,7 @@
 // Define constants for localStorage
 const SINGLE_SAVE_KEY = 'soldierOfIbyll_currentGame';
 const HAS_SAVE_KEY = 'soldierOfIbyll_hasSave';
+const SAVE_LIST_KEY = 'soldierOfIbyll_saveList';
 let currentGameSaved = false;
 
 // Initialize the save/load system
@@ -855,7 +856,7 @@ function overwriteSave(saveId) {
   window.showNotification('Game saved successfully!', 'success');
 }
 
-// Return to main menu function
+// Return to main menu function - updated with music change
 window.returnToMainMenu = function() {
   console.log("Returning to main menu");
   
@@ -897,6 +898,16 @@ window.returnToMainMenu = function() {
     mainMenu.classList.remove('hidden');
   }
   
+  // Reset player died state if applicable
+  if (window.gameState) {
+    window.gameState.playerDied = false;
+  }
+  
+  // Change to intro music
+  if (window.setMusicContext) {
+    window.setMusicContext('menu', 'intro');
+  }
+  
   // Update continue button to reflect save state
   updateContinueButton();
   
@@ -909,7 +920,7 @@ window.hasSavedGame = function() {
 };
 
 
-// Save the current game - automatically called when returning to main menu
+// Save the current game - Fixed to include campaignState
 window.saveCurrentGame = function() {
   // Don't save if player has died
   if (window.gameState && window.gameState.playerDied) {
@@ -929,6 +940,7 @@ window.saveCurrentGame = function() {
       gameState: JSON.parse(JSON.stringify(window.gameState)),
       gameTime: window.gameTime,
       gameDay: window.gameDay,
+      campaignState: window.gameState.campaignState, // Explicitly include campaign state
       timestamp: Date.now()
     };
     
@@ -936,6 +948,9 @@ window.saveCurrentGame = function() {
     localStorage.setItem(SINGLE_SAVE_KEY, JSON.stringify(saveData));
     localStorage.setItem(HAS_SAVE_KEY, 'true');
     currentGameSaved = true;
+    
+    // Update continue button after saving
+    updateContinueButton();
     
     console.log("Game saved successfully");
     return true;
@@ -1076,17 +1091,4 @@ function updateContinueButton() {
   
   const hasSave = window.hasSavedGame();
   continueButton.disabled = !hasSave;
-};
-  
-  // Hide all screens
-  document.getElementById('creator').classList.add('hidden');
-  document.getElementById('gameContainer').classList.add('hidden');
-  document.getElementById('questSceneContainer').classList.add('hidden');
-  document.getElementById('loadGameMenu').classList.add('hidden');
-  document.getElementById('saveGameMenu').classList.add('hidden');
-  document.getElementById('creditsScreen').classList.add('hidden');
-  
-  // Show main menu
-  document.getElementById('mainMenuScreen').classList.remove('hidden');
-  
-  console.log("Returned to main menu");
+}

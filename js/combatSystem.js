@@ -2757,14 +2757,15 @@ endCombat: function(outcome) {
     ];
     
     // Calculate victory rewards and track combat feats
-    let totalDeeds = 0;
+        let totalDeeds = 0;
     this.state.enemies.forEach(enemy => {
-      if (enemy.health <= 0) {
+      if (enemy.health <= 0 && !enemy.featRecorded) {
         if (typeof window.recordCombatFeat === 'function') {
           window.recordCombatFeat(enemy.name);
         }
+        enemy.featRecorded = true; // Mark as recorded to prevent double-counting
         totalDeeds += enemy.experienceValue || 10;
-      } else {
+      } else if (enemy.health > 0) {
         const damagePercent = (enemy.maxHealth - enemy.health) / enemy.maxHealth;
         totalDeeds += Math.floor((enemy.experienceValue || 10) * damagePercent * 0.5);
       }

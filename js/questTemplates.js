@@ -588,9 +588,11 @@ window.questTemplates.frontier_campaign = {
       battleType: 'narrative',
       narrative: `<p>The fort is yours, though it came at a steep cost. The wounded are dragged to makeshift triage stations, while soldiers patrol the battlements to ensure no counterattack catches you unaware.</p>
 
-      <p>Among the surviving defenders, a small group of hardened elites have retreated to the Keep. The entrance has been barred, and the defenders are refusing to yield.</p>
+      <p>Among the surviving defenders, a small group of hardened elites have retreated to the Keep. Most of them are the elite Druskari, warriors renowned for fighting to the bitter end.</p>
+      
+      <p>The entrance has been barred, and the defenders are refusing to yield.</p>
 
-      <p>Darius, the Sen'Vaorin who led the vanguard, stands before the assembled host and calls for volunteers. Anyone willing to storm the Keep will receive two extra shares of spoils. Predictably, most of the volunteers are seasoned warriors. No one expects a green recruit to step forward.</p>
+      <p>Darius, the Sen'Vaorin who led the vanguard, stands before the assembled host and calls for volunteers. Anyone willing to storm the Keep will receive two extra shares of spoils. Predictably, most of the volunteers are seasoned warriors.</p>
 
       <p>You feel a mix of exhaustion and relief, but part of you wonders if the Keep’s defenders have anything worth the risk...</p>`,
 
@@ -598,7 +600,7 @@ window.questTemplates.frontier_campaign = {
         {
           text: "Don't volunteer.",
           action: "remain_silent",
-          nextStage: "stage_camp"
+          nextStage: "stage_aftermath2"
         },
         {
           text: "Volunteer.",
@@ -637,15 +639,30 @@ window.questTemplates.frontier_campaign = {
       objective: 'Victory!',
       action: 'proceed',
       battleType: 'narrative',
-      narrative: `<p>As the keep falls, the last defenders are either put to the swords or captured. You move through the structure, having first plunder rights!</p>
+      narrative: `<p>As the keep falls, the last defenders fight to the end. You move through the structure, clearing each room with a group of regulars.</p>
       
-      <p>Sen'Vaorin Darius ensures your task force gets to plunder the keep spoils without the rest of the army, and afterward you receive your double share.</p>`,
+      <p>Sen'Vaorin Darius ensures your task force gets first plunder rights in the keep, and afterward you receive your double share.</p>`,
       timeAdvance: 60,
       nextStage: 'stage_camp',
       rewards: {
         taelors: 350,
-        deeds: 25,
+        deeds: 100,
       }
+    },
+
+    {
+      id: 'stage_aftermath2',
+      description: 'The Keep falls without you.',
+      objective: 'Wait...',
+      action: 'proceed',
+      battleType: 'narrative',
+      narrative: `<p>You watch as the task force forms up and begins their assault on the keep. The assault is brutal, with both sides taking casualties.</p>
+      
+      <p>The defenders hold strong for about two hours. As expected, no Druskari prisoners are taken.</p>
+      
+      <p>Your unit has been ordered to return to camp to rest while others move to secure the hill pass.</p>`,
+      timeAdvance: 120,
+      nextStage: "stage_camp"
     },
 
     {
